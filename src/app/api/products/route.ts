@@ -2,15 +2,12 @@ import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
+import BUNDLED_PRODUCTS from "../../../../data/secure-vault/products-data.json";
 
 function getWritableProductsPath(): string {
   if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
     return path.join(os.tmpdir(), "terra-products-data.json");
   }
-  return path.join(process.cwd(), "data", "secure-vault", "products-data.json");
-}
-
-function getBundledProductsPath(): string {
   return path.join(process.cwd(), "data", "secure-vault", "products-data.json");
 }
 
@@ -34,17 +31,10 @@ async function loadPersistedProducts(): Promise<any[]> {
     }
   }
 
-  // 2. Try reading from bundled static repo file
-  const bundledPath = getBundledProductsPath();
-  try {
-    const raw = await fs.readFile(bundledPath, "utf-8");
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      memoryProducts = parsed;
-      return memoryProducts;
-    }
-  } catch {
-    // Return empty if not yet existing
+  // 2. Direct static bundle fallback (guaranteed available in Lambda)
+  if (Array.isArray(BUNDLED_PRODUCTS) && BUNDLED_PRODUCTS.length > 0) {
+    memoryProducts = [...BUNDLED_PRODUCTS];
+    return memoryProducts;
   }
 
   return memoryProducts || [];
@@ -83,7 +73,13 @@ export async function GET() {
 // POST /api/products -> Updates, adds, deletes products or product images
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    let body: any;
+    try {
+      body = await request.json();
+    } catch {
+      const text = await request.text();
+      body = text ? JSON.parse(text) : {};
+    }
     const current = await loadPersistedProducts();
 
     // 1. Full sync
@@ -147,8 +143,8 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ ok: false, error: "Invalid action or payload" }, { status: 400 });
-  } catch (err) {
+  } catch (err: any) {
     console.error("[Products POST Error]", err);
-    return NextResponse.json({ ok: false, error: "Failed to update products" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: err?.message || "Failed to update products" }, { status: 500 });
   }
 }
