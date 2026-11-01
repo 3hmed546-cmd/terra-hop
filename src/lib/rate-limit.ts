@@ -20,12 +20,12 @@ const blockedIps = new Map<string, IpBlockRecord>();
 const requestTrackers = new Map<string, RequestTracker>();
 const routeLimitStore = new Map<string, { count: number; resetTime: number }>();
 
-// Block duration: 30 minutes in milliseconds
-export const HARD_BLOCK_DURATION_MS = 30 * 60 * 1000; // 30 minutes
+// Block duration: 1 minute in milliseconds
+export const HARD_BLOCK_DURATION_MS = 60 * 1000; // 1 minute
 // Tracking window for DoS detection: 1 minute
 export const DOS_MONITOR_WINDOW_MS = 60 * 1000;
-// Maximum rapid requests before triggering 30-minute block:
-export const DOS_MAX_REQUESTS_THRESHOLD = 15;
+// Maximum rapid requests before triggering block (set to high safe threshold to prevent false positives):
+export const DOS_MAX_REQUESTS_THRESHOLD = 150;
 
 // Periodically purge expired blocks and request trackers every 2 minutes
 if (typeof setInterval !== "undefined") {

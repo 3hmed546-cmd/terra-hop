@@ -12,33 +12,44 @@ export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const ip = getClientIp(request);
 
-  // 1. DoS & Flooding Protection Check:
-  // If an IP floods more than 15 requests in the tracking window -> 30-minute hard block!
-  const dosStatus = checkDoSProtection(ip);
-  if (!dosStatus.allowed) {
-    const retryAfter = dosStatus.retryAfterSeconds;
+  // Check admin authentication session
+  const sessionCookie = request.cookies.get("terra_admin_session")?.value;
+  const isAuthedSession = verifySessionToken(sessionCookie).valid;
 
-    if (pathname.startsWith("/api/")) {
-      return NextResponse.json(
-        {
-          error: "IP_BLOCKED_TEMPORARILY",
-          message:
-            "تم حظر هذا العنوان مؤقتاً لمدة 30 دقيقة لحماية السيرفر من تكرار الطلبات المشبوهة (تجاوز 15 طلباً).",
-          retryAfter,
-        },
-        {
-          status: 429,
-          headers: {
-            "Retry-After": String(retryAfter),
-            "Content-Type": "application/json",
-            "X-RateLimit-Limit": "15",
-            "X-RateLimit-Remaining": "0",
+  // Exempt authenticated admins, media API, and Next.js internal RSC prefetches from DoS blocking
+  const isExemptFromDos =
+    isAuthedSession ||
+    pathname.startsWith("/api/media") ||
+    pathname.startsWith("/api/refresh") ||
+    request.nextUrl.searchParams.has("_rsc");
+
+  // 1. DoS & Flooding Protection Check (for public unauthenticated traffic only):
+  if (!isExemptFromDos) {
+    const dosStatus = checkDoSProtection(ip);
+    if (!dosStatus.allowed) {
+      const retryAfter = dosStatus.retryAfterSeconds;
+
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json(
+          {
+            error: "IP_BLOCKED_TEMPORARILY",
+            message:
+              "تم حظر هذا العنوان مؤقتاً لحماية السيرفر من تكرار الطلبات المشبوهة.",
+            retryAfter,
           },
-        }
-      );
-    }
+          {
+            status: 429,
+            headers: {
+              "Retry-After": String(retryAfter),
+              "Content-Type": "application/json",
+              "X-RateLimit-Limit": "150",
+              "X-RateLimit-Remaining": "0",
+            },
+          }
+        );
+      }
 
-    const htmlResponse = `<!DOCTYPE html>
+      const htmlResponse = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
@@ -63,7 +74,7 @@ export function proxy(request: NextRequest) {
       border-radius: 9999px; font-size: 12px; letter-spacing: 1px;
       margin-bottom: 16px;
     }
-    h1 { font-size: 24px; margin-bottom: 12px; font-weight: 800; }
+    <h1> { font-size: 24px; margin-bottom: 12px; font-weight: 800; }
     p { font-size: 14px; color: #a3a3a3; line-height: 1.6; margin-bottom: 20px; }
     .timer {
       font-family: monospace; font-size: 18px;
@@ -76,27 +87,25 @@ export function proxy(request: NextRequest) {
   <div class="box">
     <div class="badge">حماية السيرفر (DOS PROTECTION)</div>
     <h1>تم حظر هذا العنوان مؤقتاً</h1>
-    <p>تم رصد عدد طلبات متكرر بشكل غير طبيعي تجاوز 15 طلباً متتالياً. حفاظاً على استقرار الخادم وسرعة المتجر، تم فرض حظر مؤقت لمدة 30 دقيقة.</p>
-    <div class="timer">مدة الانتظار المتبقية: حوالي ${Math.ceil(retryAfter / 60)} دقيقة</div>
+    <p>تم رصد عدد طلبات متكرر بشكل غير طبيعي. حفاظاً على استقرار الخادم وسرعة المتجر، تم فرض حظر مؤقت.</p>
+    <div class="timer">مدة الانتظار المتبقية: حوالي دقيقة واحدة</div>
     <p style="font-size: 12px; color: #737373;">TERRA HOP Security Engine &bull; Cloudflare Shield</p>
   </div>
 </body>
 </html>`;
 
-    return new NextResponse(htmlResponse, {
-      status: 429,
-      headers: {
-        "Retry-After": String(retryAfter),
-        "Content-Type": "text/html; charset=utf-8",
-      },
-    });
+      return new NextResponse(htmlResponse, {
+        status: 429,
+        headers: {
+          "Retry-After": String(retryAfter),
+          "Content-Type": "text/html; charset=utf-8",
+        },
+      });
+    }
   }
 
   // 2. Secret Admin Routing & IDOR / Access Control Protection
   const secret = (process.env.ADMIN_PATH ?? process.env.ADMIN_LOGIN_PATH ?? "").replace(/^\/+|\/+$/g, "");
-  const sessionCookie = request.cookies.get("terra_admin_session")?.value;
-  // Cryptographically verify HMAC-SHA256 signature (Blocks fake cookie injection)
-  const isAuthedSession = verifySessionToken(sessionCookie).valid;
 
   // Clean redirection for admin entry: /admin, /admin/, or /admin/login -> redirect to secret login URL
   if (pathname === "/admin" || pathname === "/admin/" || pathname === "/admin/login") {

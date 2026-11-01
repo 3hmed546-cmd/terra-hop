@@ -75,27 +75,25 @@ export function Hero({ hero }: HeroProps) {
     window.addEventListener("terra_gallery_changed", onSync);
     window.addEventListener("storage", onSync);
 
-    // 3. Live server polling (every 3 seconds) for all external clients with 0 reload
-    const pollTimer = setInterval(async () => {
-      try {
-        const res = await fetch("/api/media", { cache: "no-store" });
-        if (res.ok) {
-          const data = await res.json();
+    // 3. Revalidate on window focus (without hammering the server in a loop)
+    const onFocus = () => {
+      fetch("/api/media", { cache: "no-store" })
+        .then((r) => r.json())
+        .then((data) => {
           if (data.images && Array.isArray(data.images)) {
             saveGalleryImages(data.images, false);
             syncGallery();
           }
-        }
-      } catch {
-        // network fallback
-      }
-    }, 3000);
+        })
+        .catch(() => {});
+    };
+    window.addEventListener("focus", onFocus);
 
     return () => {
       channel?.close();
       window.removeEventListener("terra_gallery_changed", onSync);
       window.removeEventListener("storage", onSync);
-      clearInterval(pollTimer);
+      window.removeEventListener("focus", onFocus);
     };
   }, [syncGallery]);
 

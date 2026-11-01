@@ -21,6 +21,7 @@ import {
   saveGalleryImages,
   GALLERY_CHANNEL_NAME,
 } from "@/lib/admin/gallery";
+import { resizeImageToDataUrl } from "@/lib/admin/image-resize";
 import { useToast } from "@/components/admin/ui/Toast";
 
 export function MediaGallery() {
@@ -31,7 +32,9 @@ export function MediaGallery() {
   // Modals state
   const [confirmTarget, setConfirmTarget] = useState<GalleryImage | null>(null);
   const [successDeletedName, setSuccessDeletedName] = useState<string | null>(null);
+  const [successAddedName, setSuccessAddedName] = useState<string | null>(null);
   const [addCategory, setAddCategory] = useState<"header" | "clothing" | null>(null);
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
 
   // Add Form state
   const [newTitle, setNewTitle] = useState("");
@@ -127,16 +130,18 @@ export function MediaGallery() {
     const nextImages = await addGalleryImage(newImage);
     setImages(nextImages);
 
-    toast.push(`تمت إضافة "${newImage.title}" وتحديث المتجر فوراً`);
+    const addedTitle = newImage.title;
     setAddCategory(null);
     setNewTitle("");
     setNewTag("");
     setNewSrc("");
     setAddError(null);
+    setSuccessAddedName(addedTitle);
+    toast.push(`تمت إضافة "${addedTitle}" وتحديث المتجر فوراً`);
   }
 
-  // Handle File Input conversion to base64 DataURL
-  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  // Handle File Input conversion to optimized lightweight base64 DataURL
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -145,17 +150,33 @@ export function MediaGallery() {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        setNewSrc(reader.result);
-        if (!newTitle) {
-          const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
-          setNewTitle(nameWithoutExt);
-        }
+    setIsProcessingFile(true);
+    setAddError(null);
+
+    try {
+      // Compress and resize image to fit comfortably in localStorage without quota errors
+      const optimizedDataUrl = await resizeImageToDataUrl(file, 900, 0.82);
+      setNewSrc(optimizedDataUrl);
+      if (!newTitle) {
+        const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
+        setNewTitle(nameWithoutExt);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      // Fallback to FileReader
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === "string") {
+          setNewSrc(reader.result);
+          if (!newTitle) {
+            const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
+            setNewTitle(nameWithoutExt);
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsProcessingFile(false);
+    }
   }
 
   // Restore Default Images
@@ -567,14 +588,15 @@ export function MediaGallery() {
               <div className="space-y-2">
                 <label className="block text-xs font-bold text-obsidian">رفع صورة من جهازك:</label>
                 <label className="border-2 border-dashed border-concrete hover:border-obsidian rounded-lg p-4 flex flex-col items-center justify-center gap-2 cursor-pointer bg-white transition-colors">
-                  <Upload className="w-6 h-6 text-graphite" />
+                  <Upload className={`w-6 h-6 ${isProcessingFile ? "animate-bounce text-obsidian" : "text-graphite"}`} />
                   <span className="text-xs font-semibold text-graphite">
-                    اضغط هنا لاختيار صورة من جهازك
+                    {isProcessingFile ? "جاري معالجة وضغط الصورة..." : "اضغط هنا لاختيار صورة من جهازك"}
                   </span>
-                  <span className="text-[10px] text-concrete">يدعم PNG, JPG, WEBP</span>
+                  <span className="text-[10px] text-concrete">يدعم PNG, JPG, WEBP (يتم تحسينها وضغطها تلقائياً)</span>
                   <input
                     type="file"
                     accept="image/*"
+                    disabled={isProcessingFile}
                     onChange={handleFileUpload}
                     className="hidden"
                   />
@@ -617,12 +639,46 @@ export function MediaGallery() {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-obsidian hover:bg-charcoal text-off-white rounded text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer"
+                  disabled={isProcessingFile || !newSrc}
+                  className="px-6 py-2 bg-obsidian hover:bg-charcoal text-off-white rounded text-xs font-bold transition-all shadow-md active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
                   + إضافة الصورة للمعرض
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* نافذة نجاح الإضافة (Success Add Popup / Modal)            */}
+      {/* ======================================================== */}
+      {successAddedName && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div
+            className="bg-off-white border-2 border-emerald-600 rounded-xl max-w-sm w-full p-6 shadow-2xl text-center space-y-4"
+            dir="rtl"
+          >
+            <div className="w-14 h-14 bg-emerald-100 border border-emerald-300 rounded-full flex items-center justify-center mx-auto text-emerald-600">
+              <CheckCircle2 className="w-8 h-8" />
+            </div>
+
+            <div>
+              <h3 className="text-base font-extrabold text-obsidian">تمت الإضافة بنجاح!</h3>
+              <p className="text-xs text-graphite mt-1 leading-relaxed">
+                تمت إضافة الصورة <strong>"{successAddedName}"</strong> بنجاح إلى المعرض وتحديث الصفحة الرئيسية مباشرة بدون ريلود.
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setSuccessAddedName(null)}
+                className="w-full py-2.5 bg-obsidian hover:bg-charcoal text-off-white text-xs font-bold rounded shadow transition-all cursor-pointer"
+              >
+                حسناً
+              </button>
+            </div>
           </div>
         </div>
       )}
