@@ -12,6 +12,7 @@ import type { Order, Product } from "@/lib/admin/types";
 import { OrderDecisionDialogs, type DecisionMode } from "../orders/OrderDecisionDialogs";
 import { PageHeader } from "../PageHeader";
 import { RestockDialog } from "../products/RestockDialog";
+import { MediaGallery } from "../media/MediaGallery";
 import { Button, EmptyState, StatCard, StatusBadge, Table, type Column } from "../ui";
 
 const D = ADMIN_STRINGS.dashboard;
@@ -199,6 +200,10 @@ export function Dashboard() {
             );
           }}
         />
+      </section>
+
+      <section className="adm-section mt-12" aria-labelledby="dash-media">
+        <MediaGallery />
       </section>
 
       <OrderDecisionDialogs

@@ -15,6 +15,7 @@ import { Button, Dialog, ToastProvider } from "./ui";
 const N = ADMIN_STRINGS.nav;
 const ITEMS = [
   { path: "/dashboard", label: N.dashboard },
+  { path: "/media", label: N.media },
   { path: "/products", label: N.products },
   { path: "/orders", label: N.orders },
   { path: "/settings", label: N.settings },
