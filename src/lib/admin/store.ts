@@ -27,12 +27,62 @@ import { isAuthenticated } from "../admin-auth";
 import type { AdminData, ErrorCode, Product, Result, Settings } from "./types";
 
 const STORAGE_KEY = "terra-hop-admin-preview";
-const VERSION = 3;
+const VERSION = 4;
+export const PRODUCTS_CHANNEL_NAME = "terra_products_channel";
 
 let state: AdminData | null = null;
 /** True when the last attempt to save to localStorage failed (full or blocked). */
 let storageFailed = false;
 const listeners = new Set<() => void>();
+let broadcastChannel: BroadcastChannel | null = null;
+
+if (typeof window !== "undefined" && typeof BroadcastChannel !== "undefined") {
+  try {
+    broadcastChannel = new BroadcastChannel(PRODUCTS_CHANNEL_NAME);
+    broadcastChannel.onmessage = (event) => {
+      if (event.data?.type === "SYNC_PRODUCTS" && Array.isArray(event.data.products)) {
+        if (state) {
+          state = { ...state, products: event.data.products };
+          persist(state);
+          emit();
+        }
+      }
+    };
+  } catch {
+    // ignore
+  }
+}
+
+let syncTimer: ReturnType<typeof setTimeout> | null = null;
+function debouncedApiSync(products: Product[]) {
+  if (typeof window === "undefined") return;
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => {
+    fetch("/api/products", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "sync", products }),
+    }).catch(() => {});
+  }, 400);
+}
+
+let serverSyncInitiated = false;
+function syncFromServerOnce() {
+  if (typeof window === "undefined" || serverSyncInitiated) return;
+  serverSyncInitiated = true;
+  fetch("/api/products", { cache: "no-store" })
+    .then((r) => r.json())
+    .then((data) => {
+      if (data?.ok && Array.isArray(data.products) && data.products.length > 0) {
+        if (state) {
+          state = { ...state, products: data.products };
+          persist(state);
+          emit();
+        }
+      }
+    })
+    .catch(() => {});
+}
 
 function isValid(value: unknown): value is AdminData {
   const v = value as AdminData | null;
@@ -40,6 +90,7 @@ function isValid(value: unknown): value is AdminData {
 }
 
 function load(): AdminData {
+  syncFromServerOnce();
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (raw) {
@@ -108,10 +159,19 @@ function subscribe(listener: () => void): () => void {
       emit();
     }
   };
+  const onCustomSync = (e: Event) => {
+    const custom = e as CustomEvent<{ products: Product[] }>;
+    if (custom.detail?.products && state) {
+      state = { ...state, products: custom.detail.products };
+      emit();
+    }
+  };
   window.addEventListener("storage", onStorage);
+  window.addEventListener("terra_products_changed", onCustomSync);
   return () => {
     listeners.delete(listener);
     window.removeEventListener("storage", onStorage);
+    window.removeEventListener("terra_products_changed", onCustomSync);
   };
 }
 
@@ -119,6 +179,23 @@ function commit(next: AdminData): void {
   state = next;
   persist(next);
   emit();
+
+  // 1. Broadcast to other open browser tabs
+  try {
+    broadcastChannel?.postMessage({ type: "SYNC_PRODUCTS", products: next.products });
+  } catch {
+    // ignore
+  }
+
+  // 2. Dispatch custom DOM event for active components in same tab
+  try {
+    window.dispatchEvent(new CustomEvent("terra_products_changed", { detail: { products: next.products } }));
+  } catch {
+    // ignore
+  }
+
+  // 3. Persist to API in background
+  debouncedApiSync(next.products);
 }
 
 export type ActionResult = { ok: true } | { ok: false; error: ErrorCode };

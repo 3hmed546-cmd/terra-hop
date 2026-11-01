@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -23,7 +23,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { PageShell } from "@/components/layout/page-shell";
-import { images } from "@/content/images";
+import { images, resolveImage } from "@/content/images";
 import { formatPrice } from "@/lib/format";
 import { useCart } from "@/lib/cart";
 import { useLocale } from "@/lib/locale-context";
@@ -41,9 +41,36 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
   const { add } = useCart();
   const { locale, t } = useLocale();
 
-  // Images mapping
-  const shots = product.images.map((slot) => images[slot]);
+  const { data: adminData } = useAdminStore();
+  const matchedAdmin = adminData?.products.find(
+    (p) => p.slug === product.slug || p.id === product.slug
+  );
+
+  // Live dynamic images mapping (synced with admin store & API)
+  const shots = useMemo(() => {
+    if (matchedAdmin?.images && matchedAdmin.images.length > 0) {
+      return matchedAdmin.images.map((img: any) => {
+        const url = typeof img === "string" ? img : img.url;
+        const alt = typeof img === "object" ? img.alt : "";
+        const resolved = resolveImage(url);
+        return {
+          ...resolved,
+          src: url,
+          alt: alt || resolved.alt || product.name,
+        };
+      });
+    }
+    return product.images.map((slot) => images[slot] || resolveImage(slot));
+  }, [matchedAdmin?.images, product.images, product.name]);
+
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+
+  // Keep index within bounds if shots change
+  useEffect(() => {
+    if (activeImageIndex >= shots.length) {
+      setActiveImageIndex(0);
+    }
+  }, [shots.length, activeImageIndex]);
 
   // Size selection and actions
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
@@ -88,19 +115,16 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
   const localizedName =
     locale === "ar" && t.products[product.slug]?.name
       ? t.products[product.slug].name
-      : product.name;
+      : (matchedAdmin?.name || product.name);
 
   const localizedDesc =
     locale === "ar" && t.products[product.slug]?.description
       ? t.products[product.slug].description
-      : product.description;
+      : (matchedAdmin?.description || product.description);
 
   const localizedStatus =
     locale === "ar" ? t.drop.preorderBadge : (product.status ?? "PREORDER");
 
-  // Sync live price from admin store
-  const { data: adminData } = useAdminStore();
-  const matchedAdmin = adminData?.products.find((p) => p.slug === product.slug || p.id === product.slug);
   const currentPrice = matchedAdmin ? (matchedAdmin.priceCents / 100) : product.price;
   const currentOriginalPrice = matchedAdmin?.compareAtCents ? (matchedAdmin.compareAtCents / 100) : product.originalPrice;
 
@@ -532,6 +556,7 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
                     fill
                     sizes="(min-width: 1024px) 55vw, 100vw"
                     priority
+                    unoptimized={(shots[activeImageIndex]?.src || "").startsWith("data:")}
                     className="object-cover"
                   />
                 </motion.div>
@@ -618,6 +643,7 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
                           alt=""
                           fill
                           sizes="80px"
+                          unoptimized={shot.src.startsWith("data:")}
                           className="object-cover"
                         />
                       </button>
@@ -736,6 +762,7 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
                     alt=""
                     fill
                     sizes="48px"
+                    unoptimized={(shots[0]?.src || "").startsWith("data:")}
                     className="object-cover"
                   />
                 </div>

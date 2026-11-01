@@ -81,109 +81,11 @@ export const INITIAL_GALLERY_IMAGES: GalleryImage[] = [
     tag: "بانر واجهة",
     addedAt: "2026-10-25",
   },
-
-  // --- صور الملابس والمنتجات (Clothing & Products Images) ---
-  {
-    id: "clt-1",
-    title: "تيشيرت أوفرسايز أسود (وجه أمامي)",
-    src: "/preview-images/tee-black-1.jpg",
-    category: "clothing",
-    tag: "تيشيرت",
-    addedAt: "2026-10-26",
-  },
-  {
-    id: "clt-2",
-    title: "تيشيرت أوفرسايز أسود (ظهر)",
-    src: "/preview-images/tee-black-2.jpg",
-    category: "clothing",
-    tag: "تيشيرت",
-    addedAt: "2026-10-26",
-  },
-  {
-    id: "clt-3",
-    title: "تيشيرت أوفرسايز رمادي (وجه أمامي)",
-    src: "/preview-images/tee-grey-1.jpg",
-    category: "clothing",
-    tag: "تيشيرت",
-    addedAt: "2026-10-26",
-  },
-  {
-    id: "clt-4",
-    title: "تيشيرت أوفرسايز رمادي (ظهر)",
-    src: "/preview-images/tee-grey-2.jpg",
-    category: "clothing",
-    tag: "تيشيرت",
-    addedAt: "2026-10-26",
-  },
-  {
-    id: "clt-5",
-    title: "تيشيرت أوفرسايز أوف وايت (وجه أمامي)",
-    src: "/preview-images/tee-offwhite-1.jpg",
-    category: "clothing",
-    tag: "تيشيرت",
-    addedAt: "2026-10-26",
-  },
-  {
-    id: "clt-6",
-    title: "تيشيرت أوفرسايز أوف وايت (ظهر)",
-    src: "/preview-images/tee-offwhite-2.jpg",
-    category: "clothing",
-    tag: "تيشيرت",
-    addedAt: "2026-10-26",
-  },
-  {
-    id: "clt-7",
-    title: "هودي ستريت وير بريميوم 01",
-    src: "/preview-images/hoodie-1.jpg",
-    category: "clothing",
-    tag: "هودي",
-    addedAt: "2026-10-27",
-  },
-  {
-    id: "clt-8",
-    title: "هودي ستريت وير بريميوم 02",
-    src: "/preview-images/hoodie-2.jpg",
-    category: "clothing",
-    tag: "هودي",
-    addedAt: "2026-10-27",
-  },
-  {
-    id: "clt-9",
-    title: "لوك بوك أزياء الشارع 01",
-    src: "/preview-images/look-1.jpg",
-    category: "clothing",
-    tag: "لوك بوك",
-    addedAt: "2026-10-27",
-  },
-  {
-    id: "clt-10",
-    title: "لوك بوك أزياء الشارع 02",
-    src: "/preview-images/look-2.jpg",
-    category: "clothing",
-    tag: "لوك بوك",
-    addedAt: "2026-10-27",
-  },
-  {
-    id: "clt-11",
-    title: "لوك بوك أزياء الشارع 03",
-    src: "/preview-images/look-3.jpg",
-    category: "clothing",
-    tag: "لوك بوك",
-    addedAt: "2026-10-27",
-  },
-  {
-    id: "clt-12",
-    title: "لوك بوك أزياء الشارع 04",
-    src: "/preview-images/look-4.jpg",
-    category: "clothing",
-    tag: "لوك بوك",
-    addedAt: "2026-10-27",
-  },
 ];
 
-export const GALLERY_STORAGE_KEY = "terra_hop_gallery_images_v3";
-export const DELETED_IDS_STORAGE_KEY = "terra_hop_deleted_image_ids_v3";
-export const CUSTOM_IMAGES_STORAGE_KEY = "terra_hop_custom_images_v3";
+export const GALLERY_STORAGE_KEY = "terra_hop_gallery_images_v4";
+export const DELETED_IDS_STORAGE_KEY = "terra_hop_deleted_image_ids_v4";
+export const CUSTOM_IMAGES_STORAGE_KEY = "terra_hop_custom_images_v4";
 export const GALLERY_CHANNEL_NAME = "terra_gallery_channel";
 
 export function getDeletedImageIds(): string[] {
@@ -259,6 +161,19 @@ export function loadGalleryImages(): GalleryImage[] {
   return [...missingCustom, ...cleanInitial];
 }
 
+let mediaSyncTimer: ReturnType<typeof setTimeout> | null = null;
+function debouncedMediaSync(cleanImages: GalleryImage[], deletedIds: Set<string>) {
+  if (typeof window === "undefined") return;
+  if (mediaSyncTimer) clearTimeout(mediaSyncTimer);
+  mediaSyncTimer = setTimeout(() => {
+    fetch("/api/media", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "sync", images: cleanImages, deletedIds: Array.from(deletedIds) }),
+    }).catch(() => {});
+  }, 500);
+}
+
 export function saveGalleryImages(images: GalleryImage[], notifyServerAndTabs: boolean = true): void {
   if (typeof window === "undefined") return;
   const deletedIds = new Set(getDeletedImageIds());
@@ -289,16 +204,8 @@ export function saveGalleryImages(images: GalleryImage[], notifyServerAndTabs: b
       // ignore
     }
 
-    // 3. Persist to server API in background
-    try {
-      fetch("/api/media", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "sync", images: cleanImages, deletedIds: Array.from(deletedIds) }),
-      }).catch(() => {});
-    } catch {
-      // ignore
-    }
+    // 3. Persist to server API with debounce to avoid rate limiting
+    debouncedMediaSync(cleanImages, deletedIds);
   }
 }
 
@@ -306,7 +213,8 @@ export async function deleteGalleryImage(id: string): Promise<GalleryImage[]> {
   markImageDeleted(id);
   const current = loadGalleryImages();
   const next = current.filter((img) => img.id !== id);
-  saveGalleryImages(next, true);
+  // Update local storage and DOM without redundant second API call
+  saveGalleryImages(next, false);
 
   try {
     fetch("/api/media", {
@@ -325,7 +233,8 @@ export async function addGalleryImage(image: GalleryImage): Promise<GalleryImage
   saveCustomImage(image);
   const current = loadGalleryImages();
   const next = [image, ...current.filter((img) => img.id !== image.id)];
-  saveGalleryImages(next, true);
+  // Update local storage and DOM without redundant second API call
+  saveGalleryImages(next, false);
 
   try {
     fetch("/api/media", {

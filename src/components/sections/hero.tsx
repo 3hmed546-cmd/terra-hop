@@ -78,10 +78,7 @@ export function Hero({ hero }: HeroProps) {
     // 1. Fetch immediately on mount so customer sees any newly added images without delay
     fetchServerGallery();
 
-    // 2. Poll gently every 10s for real-time live static updates for all customers
-    const pollInterval = window.setInterval(fetchServerGallery, 10000);
-
-    // 3. Instant cross-tab real-time sync with BroadcastChannel
+    // 2. Instant cross-tab real-time sync with BroadcastChannel
     let channel: BroadcastChannel | null = null;
     if (typeof BroadcastChannel !== "undefined") {
       try {
@@ -103,7 +100,6 @@ export function Hero({ hero }: HeroProps) {
     window.addEventListener("focus", fetchServerGallery);
 
     return () => {
-      window.clearInterval(pollInterval);
       channel?.close();
       window.removeEventListener("terra_gallery_changed", onSync);
       window.removeEventListener("storage", onSync);

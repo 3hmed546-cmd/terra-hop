@@ -299,25 +299,45 @@ export const translations: Record<Locale, Translations> = {
       empty: "الكولكشن القادم سيتوفر قريباً.",
     },
     products: {
-      "black-oversized-tee": {
-        name: "تيشيرت أوفرسايز أسود",
-        description: "قطن مصري ثقيل 100%، أكتاف ساقطة وقصة أوفرسايز بوكسي مريحة مع لوجو الصدر المطرز.",
-        category: "تيشيرتات",
-      },
-      "off-white-graphic-tee": {
-        name: "تيشيرت جرافيك أوف وايت",
-        description: "قطن أوف وايت ناعم ومريح بقصة أوفرسايز واسعة تناسب الإطلالات اليومية المتميزة.",
-        category: "تيشيرتات",
-      },
-      "black-oversized-hoodie": {
-        name: "هودي أوفرسايز أسود",
-        description: "ميلتون قطن سميك مبطن بالوبر، غطاء رأس عميق وجيب كانغرو واسع بقصة متناسقة.",
+      "phantom-obsidian-hoodie": {
+        name: "هودي فانتوم أسود بريميوم",
+        description: "هودي ستريت وير أسود فاحم مصنوع من قطن مصري 100% ثقيل (450 GSM). غطاء رأس مزدوج، جيب كانغرو مبطن، وتطريز كوكبي فاخر عالي الكثافة على الصدر.",
         category: "هوديز",
       },
-      "washed-grey-tee": {
-        name: "تيشيرت رمادي مغسول",
-        description: "تيشيرت معالج بمظهر مغسول عتيق وملمس فائق النعومة، قصة أوفرسايز عصرية.",
-        category: "تيشيرتات",
+      "dusty-cobalt-hoodie": {
+        name: "هودي أزرق ترابي ستريت",
+        description: "لون أزرق ترابي استثنائي مستوحى من ألوان الشارع العصرية. قصة أوفرسايز دروب شولدر وأكمام مضلعة سميكة لراحة فائقة في كل حركة.",
+        category: "هوديز",
+      },
+      "vintage-mocha-hoodie": {
+        name: "هودي بني موكا فينتاج",
+        description: "إطلالة شتوية غنية بلون الشوكولاتة العتيقة وتأثير فينتاج دافئ. قطن مغسول ناعم الملمس متين ومقاوم للوبر.",
+        category: "هوديز",
+      },
+      "alpine-forest-hoodie": {
+        name: "هودي أخضر غابات ألبين",
+        description: "درجة خضراء غنية وفاخرة مع لوجو أبيض متباين. بطانة داخلية فائقة النعومة وتطريز متقن على المعصم والصدر.",
+        category: "هوديز",
+      },
+      "charcoal-acid-hoodie": {
+        name: "هودي رمادي فحمي مغسول",
+        description: "معالجة غسيل أسيد فريدة تعطي كل قطعة شخصية حصرية مستقلة. قصة دروب عريضة وجيوب معززة بدرزات ثلاثية.",
+        category: "هوديز",
+      },
+      "deep-ocean-teal-hoodie": {
+        name: "هودي أزرق بترولي تيل",
+        description: "لون بترولي داكن عميق يجمع بين الغموض والأناقة المعاصرة. تصميم مينيمالي نقي مع تفاصيل متقنة وتشطيب فاخر.",
+        category: "هوديز",
+      },
+      "midnight-slate-navy-hoodie": {
+        name: "هودي كحلي أردوازي فاخر",
+        description: "تون كحلي أردوازي ملكي ثقيل بتشطيب قطن فاخر. أربطة هودي عريضة بحليات معدنية غير لامعة وغطاء رأس مبطن.",
+        category: "هوديز",
+      },
+      "desert-sand-dunes-hoodie": {
+        name: "هودي بيج صحراوي رملي",
+        description: "تون بيج رملي دافئ ومريح مناسب للإطلالات اليومية الهادئة. نسيج قطني ناعم جداً على البشرة ومقاوم للتجعد.",
+        category: "هوديز",
       },
     },
     brandStory: {
@@ -617,25 +637,45 @@ export const translations: Record<Locale, Translations> = {
       empty: "The next drop is coming soon.",
     },
     products: {
-      "black-oversized-tee": {
-        name: "Black Oversized Tee",
-        description: "Heavy cotton jersey, dropped shoulders and a boxy oversized cut. A small chest logo and nothing else.",
-        category: "T-shirts",
-      },
-      "off-white-graphic-tee": {
-        name: "Off-White Graphic Tee",
-        description: "Soft off-white cotton with a relaxed oversized fit. Made to be worn loose over everything.",
-        category: "T-shirts",
-      },
-      "black-oversized-hoodie": {
-        name: "Black Oversized Hoodie",
-        description: "Thick brushed fleece, deep hood and a roomy kangaroo pocket. Oversized through the body and sleeves.",
+      "phantom-obsidian-hoodie": {
+        name: "Phantom Obsidian Hoodie",
+        description: "Heavyweight 100% combed cotton fleece (450 GSM), dropped shoulders, double-layer hood, and high-density planet chest embroidery.",
         category: "Hoodies",
       },
-      "washed-grey-tee": {
-        name: "Washed Grey Tee",
-        description: "A washed grey tee with a lived-in feel from the first day. Oversized cut, soft hand.",
-        category: "T-shirts",
+      "dusty-cobalt-hoodie": {
+        name: "Dusty Cobalt Streetwear Hoodie",
+        description: "Rare dusty blue hue tailored in an oversized streetwear fit with heavy ribbed trims for all-day effortless comfort.",
+        category: "Hoodies",
+      },
+      "vintage-mocha-hoodie": {
+        name: "Vintage Mocha Brown Hoodie",
+        description: "Warm seasonal chocolate tones with a soft vintage pre-shrunk cotton touch, built to resist pilling and retain form.",
+        category: "Hoodies",
+      },
+      "alpine-forest-hoodie": {
+        name: "Alpine Forest Green Hoodie",
+        description: "Deep luxury forest green hoodie with contrast branding, ultra-soft brushed fleece lining, and reinforced stitching.",
+        category: "Hoodies",
+      },
+      "charcoal-acid-hoodie": {
+        name: "Charcoal Acid-Wash Hoodie",
+        description: "Distinct acid-washed vintage mineral finish granting every piece its own unique streetwear edge and character.",
+        category: "Hoodies",
+      },
+      "deep-ocean-teal-hoodie": {
+        name: "Deep Ocean Teal Hoodie",
+        description: "Rich dark oceanic teal shade crafted for an understated contemporary aesthetic with obsessive tailoring details.",
+        category: "Hoodies",
+      },
+      "midnight-slate-navy-hoodie": {
+        name: "Midnight Slate Navy Hoodie",
+        description: "Regal slate navy heavyweight cotton fleece with custom matte hardware and cozy double-layered hood.",
+        category: "Hoodies",
+      },
+      "desert-sand-dunes-hoodie": {
+        name: "Desert Sand Dunes Hoodie",
+        description: "Warm desert sand beige tone in a relaxed silhouette, offering lightweight breathability and gentle fleece comfort.",
+        category: "Hoodies",
       },
     },
     brandStory: {

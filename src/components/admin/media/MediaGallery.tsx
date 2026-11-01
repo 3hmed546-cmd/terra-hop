@@ -10,6 +10,9 @@ import {
   Image as ImageIcon,
   RotateCcw,
   ExternalLink,
+  Star,
+  Layers,
+  Sparkles,
 } from "lucide-react";
 import {
   GalleryImage,
@@ -24,16 +27,31 @@ import {
   GALLERY_CHANNEL_NAME,
 } from "@/lib/admin/gallery";
 import { resizeImageToDataUrl } from "@/lib/admin/image-resize";
+import { useAdminStore } from "@/lib/admin/store";
+import { formatPrice } from "@/lib/format";
+import type { Product, ProductImage } from "@/lib/admin/types";
+
+type ConfirmDeleteTarget =
+  | { type: "header"; image: GalleryImage }
+  | { type: "product"; product: Product; image: ProductImage };
 
 export function MediaGallery() {
   const [images, setImages] = useState<GalleryImage[]>(INITIAL_GALLERY_IMAGES);
   const [mounted, setMounted] = useState(false);
 
+  // Admin store for live synchronized products
+  const { data: adminData, actions: adminActions } = useAdminStore();
+  const products = adminData?.products || [];
+
   // Modals state
-  const [confirmTarget, setConfirmTarget] = useState<GalleryImage | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<ConfirmDeleteTarget | null>(null);
   const [successDeletedName, setSuccessDeletedName] = useState<string | null>(null);
   const [successAddedName, setSuccessAddedName] = useState<string | null>(null);
-  const [addCategory, setAddCategory] = useState<"header" | "clothing" | null>(null);
+
+  // Add Target: header image or specific product
+  const [addMode, setAddMode] = useState<"header" | "product" | null>(null);
+  const [addProductTarget, setAddProductTarget] = useState<Product | null>(null);
+
   const [isProcessingFile, setIsProcessingFile] = useState(false);
 
   // Add Form state
@@ -41,6 +59,9 @@ export function MediaGallery() {
   const [newTag, setNewTag] = useState("");
   const [newSrc, setNewSrc] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
+
+  // Selected product filter for albums
+  const [selectedProductFilter, setSelectedProductFilter] = useState<string>("all");
 
   const refreshGallery = useCallback(() => {
     setImages(loadGalleryImages());
@@ -50,7 +71,7 @@ export function MediaGallery() {
     refreshGallery();
     setMounted(true);
 
-    // Initial fetch from server to sync if any other device made changes
+    // Initial gentle fetch from server to sync if any other device made changes
     fetch("/api/media", { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
@@ -63,16 +84,6 @@ export function MediaGallery() {
 
           saveGalleryImages(merged, false);
           setImages(merged);
-
-          // If the server still had deleted items, sync our authoritative clean state back to server
-          const serverHadDeleted = data.images.some((img: GalleryImage) => localDeleted.has(img.id));
-          if (serverHadDeleted || missingCustom.length > 0) {
-            fetch("/api/media", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ action: "sync", images: merged, deletedIds: Array.from(localDeleted) }),
-            }).catch(() => {});
-          }
         }
       })
       .catch(() => {});
@@ -104,27 +115,75 @@ export function MediaGallery() {
   }, [refreshGallery]);
 
   const headerImages = images.filter((img) => img.category === "header");
-  const clothingImages = images.filter((img) => img.category === "clothing");
 
   // Handle Deletion Execution
   async function handleConfirmDelete() {
     if (!confirmTarget) return;
 
-    const target = confirmTarget;
-    // 1. Delete image from state, localStorage, broadcast to tabs & server
-    const nextImages = await deleteGalleryImage(target.id);
-    setImages(nextImages);
+    if (confirmTarget.type === "header") {
+      const target = confirmTarget.image;
+      const nextImages = await deleteGalleryImage(target.id);
+      setImages(nextImages);
+      setConfirmTarget(null);
+      setSuccessDeletedName(`صورة الهيدر "${target.title}"`);
+      return;
+    }
 
-    // 2. Close confirm popup & open success popup
-    setConfirmTarget(null);
-    setSuccessDeletedName(target.title);
+    if (confirmTarget.type === "product") {
+      const { product, image } = confirmTarget;
+      const filteredImages = (product.images || []).filter((img) => img.id !== image.id && img.url !== image.url);
+      const updatedProduct: Product = {
+        ...product,
+        images: filteredImages,
+        updatedAt: new Date().toISOString(),
+      };
+
+      // 1. Update in local memory & broadcast to all tabs
+      adminActions.saveProduct(updatedProduct);
+
+      // 2. Persist to API
+      try {
+        fetch("/api/products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "delete_image",
+            productId: product.id,
+            imageId: image.id,
+          }),
+        }).catch(() => {});
+      } catch {
+        // ignore
+      }
+
+      setConfirmTarget(null);
+      setSuccessDeletedName(`صورة ${image.alt || product.name} من ألبوم (${product.name})`);
+    }
+  }
+
+  // Handle Setting Primary Image for a Product
+  function handleSetPrimaryImage(product: Product, imageId: string) {
+    const targetImg = product.images.find((img) => img.id === imageId);
+    if (!targetImg) return;
+    const reordered = [targetImg, ...product.images.filter((img) => img.id !== imageId)];
+    const updated: Product = { ...product, images: reordered, updatedAt: new Date().toISOString() };
+    adminActions.saveProduct(updated);
+    try {
+      fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "save", product: updated }),
+      }).catch(() => {});
+    } catch {
+      // ignore
+    }
   }
 
   // Handle Add Image Execution
   async function handleAddImage(e: React.FormEvent) {
     e.preventDefault();
     if (!newTitle.trim()) {
-      setAddError("يرجى إدخال اسم أو عنوان للصورة");
+      setAddError("يرجى إدخال اسم أو وصف للصورة");
       return;
     }
     if (!newSrc.trim()) {
@@ -132,26 +191,69 @@ export function MediaGallery() {
       return;
     }
 
-    const category = addCategory || "header";
-    const newImage: GalleryImage = {
-      id: `img-${Date.now()}`,
-      title: newTitle.trim(),
-      src: newSrc.trim(),
-      category,
-      tag: newTag.trim() || (category === "header" ? "صورة هيدر" : "صورة ملابس"),
-      addedAt: new Date().toISOString().split("T")[0],
-    };
+    if (addMode === "header") {
+      const newImage: GalleryImage = {
+        id: `img-${Date.now()}`,
+        title: newTitle.trim(),
+        src: newSrc.trim(),
+        category: "header",
+        tag: newTag.trim() || "هيدر كاروسيل",
+        addedAt: new Date().toISOString().split("T")[0],
+      };
 
-    const nextImages = await addGalleryImage(newImage);
-    setImages(nextImages);
+      const nextImages = await addGalleryImage(newImage);
+      setImages(nextImages);
 
-    const addedTitle = newImage.title;
-    setAddCategory(null);
+      const addedTitle = newImage.title;
+      resetAddForm();
+      setSuccessAddedName(`صورة الهيدر "${addedTitle}"`);
+      return;
+    }
+
+    if (addMode === "product" && addProductTarget) {
+      const product = addProductTarget;
+      const newProductImage: ProductImage = {
+        id: `pimg-${Date.now()}`,
+        url: newSrc.trim(),
+        alt: newTitle.trim(),
+      };
+
+      const updatedImages = [...(product.images || []), newProductImage];
+      const updatedProduct: Product = {
+        ...product,
+        images: updatedImages,
+        updatedAt: new Date().toISOString(),
+      };
+
+      adminActions.saveProduct(updatedProduct);
+
+      try {
+        fetch("/api/products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "add_image",
+            productId: product.id,
+            image: newProductImage,
+          }),
+        }).catch(() => {});
+      } catch {
+        // ignore
+      }
+
+      const pName = product.name;
+      resetAddForm();
+      setSuccessAddedName(`صورة جديدة لألبوم (${pName})`);
+    }
+  }
+
+  function resetAddForm() {
+    setAddMode(null);
+    setAddProductTarget(null);
     setNewTitle("");
     setNewTag("");
     setNewSrc("");
     setAddError(null);
-    setSuccessAddedName(addedTitle);
   }
 
   // Handle File Input conversion to optimized lightweight base64 DataURL
@@ -168,7 +270,6 @@ export function MediaGallery() {
     setAddError(null);
 
     try {
-      // Compress and resize image to fit comfortably in localStorage without quota errors
       const optimizedDataUrl = await resizeImageToDataUrl(file, 900, 0.82);
       setNewSrc(optimizedDataUrl);
       if (!newTitle) {
@@ -176,7 +277,6 @@ export function MediaGallery() {
         setNewTitle(nameWithoutExt);
       }
     } catch {
-      // Fallback to FileReader
       const reader = new FileReader();
       reader.onload = () => {
         if (typeof reader.result === "string") {
@@ -204,11 +304,18 @@ export function MediaGallery() {
 
   if (!mounted) {
     return (
-      <div className="adm-card p-8 text-center text-graphite">
-        جاري تحميل معرض الصور...
+      <div className="adm-card p-8 text-center text-graphite font-bold">
+        جاري تحميل معرض الصور وإدارة الوسائط...
       </div>
     );
   }
+
+  const filteredProducts =
+    selectedProductFilter === "all"
+      ? products
+      : products.filter((p) => p.id === selectedProductFilter || p.slug === selectedProductFilter);
+
+  const totalProductImages = products.reduce((sum, p) => sum + (p.images?.length || 0), 0);
 
   return (
     <div className="space-y-12" dir="rtl">
@@ -217,10 +324,10 @@ export function MediaGallery() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <ImageIcon className="w-5 h-5 text-off-white" />
-            <h2 className="text-xl font-bold tracking-wide">معرض وإدارة صور الموقع (Live Static)</h2>
+            <h2 className="text-xl font-bold tracking-wide">إدارة صور الموقع والمنتجات (Live Static)</h2>
           </div>
           <p className="text-xs text-concrete max-w-xl leading-relaxed">
-            التحكم الكامل في جميع الصور المعروضة على المتجر. الصور مقسمة في أقسام مخصصة، مع ميزة التحديث اللحظي (Live Sync): عند حذف أو إضافة أي صورة يتم التحديث فوراً في الصفحة الرئيسية دون الحاجة لعمل Reload.
+            التحكم الكامل واللحظي في جميع صور المتجر. الصور مقسمة في ألبومات مستقلة لكل هودي ومنتج على حدة، بالإضافة لقسم صور الهيدرز. أي تعديل أو حذف أو إضافة يتحدث فوراً في المتجر بدون ريلود (Live Static).
           </p>
         </div>
 
@@ -230,7 +337,7 @@ export function MediaGallery() {
               الهيدرز: <strong>{headerImages.length}</strong>
             </span>
             <span className="px-3 py-1.5 bg-charcoal rounded border border-concrete/30">
-              الملابس: <strong>{clothingImages.length}</strong>
+              صور المنتجات: <strong>{totalProductImages}</strong>
             </span>
           </div>
 
@@ -241,7 +348,7 @@ export function MediaGallery() {
             title="استعادة الصور الأصلية في حال حذفت شيئاً بالخطأ"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span>استعادة الكل</span>
+            <span>استعادة الهيدرز</span>
           </button>
         </div>
       </div>
@@ -269,7 +376,8 @@ export function MediaGallery() {
           <button
             type="button"
             onClick={() => {
-              setAddCategory("header");
+              setAddMode("header");
+              setAddProductTarget(null);
               setNewTag("هيدر كاروسيل");
               setAddError(null);
             }}
@@ -331,7 +439,7 @@ export function MediaGallery() {
 
                     <button
                       type="button"
-                      onClick={() => setConfirmTarget(img)}
+                      onClick={() => setConfirmTarget({ type: "header", image: img })}
                       className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-red-600 hover:text-white hover:bg-red-600 border border-red-200 hover:border-red-600 rounded transition-colors cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -346,100 +454,205 @@ export function MediaGallery() {
       </section>
 
       {/* ======================================================== */}
-      {/* 2. قسم صور الملابس والمنتجات (Clothing & Products Images) */}
+      {/* 2. قسم ألبومات صور المنتجات (Product Photo Albums)         */}
       {/* ======================================================== */}
-      <section className="bg-off-white border-2 border-obsidian rounded-lg p-6 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-line mb-6">
+      <section className="bg-off-white border-2 border-obsidian rounded-lg p-6 shadow-sm space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-line">
           <div>
             <div className="flex items-center gap-2">
-              <span className="inline-block w-3 h-3 bg-obsidian rounded-full"></span>
+              <span className="inline-block w-3 h-3 bg-red-600 rounded-full"></span>
               <h3 className="text-lg font-bold text-obsidian tracking-wide">
-                👕 صور الملابس والمنتجات (Clothing & Products Images)
+                👕 ألبومات صور المنتجات والهوديز (Product Photo Albums)
               </h3>
-              <span className="text-xs font-mono px-2 py-0.5 bg-obsidian text-off-white rounded">
-                {clothingImages.length} صورة
+              <span className="text-xs font-mono px-2 py-0.5 bg-red-600 text-white rounded font-bold">
+                {products.length} منتجات
               </span>
             </div>
             <p className="text-xs text-graphite mt-1">
-              هذه الصور خاصة بالتيشيرتات، الهوديز، واللوك بوك المعروضة في المتجر وتفاصيل المنتجات.
+              لكل هودي ومنتج ألبوم صور خاص به. يمكنك إضافة صور حصرية للمنتج، حذف أي صورة، أو تعيين الصورة الرئيسية كغلاف. التعديل هنا يظهر فوراً في المتجر دون الحاجة لـ Reload.
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              setAddCategory("clothing");
-              setNewTag("تيشيرت / هودي");
-              setAddError(null);
-            }}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-obsidian text-off-white text-xs font-bold rounded hover:bg-charcoal transition-all shadow-sm active:scale-95 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            + إضافة صورة ملابس جديدة
-          </button>
+          {/* Filter by Product */}
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-bold text-obsidian">عرض منتج:</label>
+            <select
+              value={selectedProductFilter}
+              onChange={(e) => setSelectedProductFilter(e.target.value)}
+              className="px-3 py-1.5 bg-white border border-concrete rounded text-xs text-obsidian font-bold focus:outline-obsidian cursor-pointer"
+            >
+              <option value="all">جميع المنتجات ({products.length})</option>
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        {/* Clothing Images Grid */}
-        {clothingImages.length === 0 ? (
+        {/* Albums List */}
+        {filteredProducts.length === 0 ? (
           <div className="text-center py-12 border border-dashed border-concrete rounded-md bg-white/50">
-            <p className="text-sm font-semibold text-graphite">لا توجد صور ملابس معروضة حالياً.</p>
-            <p className="text-xs text-concrete mt-1">يمكنك إضافة صور جديدة بالضغط على الزر أعلاه.</p>
+            <p className="text-sm font-semibold text-graphite">لا توجد منتجات مسجلة حالياً.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-            {clothingImages.map((img) => (
-              <div
-                key={img.id}
-                className="group relative bg-white border border-line rounded-lg overflow-hidden shadow-xs hover:shadow-md hover:border-obsidian transition-all flex flex-col justify-between"
-              >
-                {/* Image Container */}
-                <div className="relative aspect-4/5 w-full bg-stone-100 overflow-hidden flex items-center justify-center">
-                  <img
-                    src={img.src}
-                    alt={img.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    loading="lazy"
-                  />
-                  <span className="absolute top-2 right-2 text-[10px] font-bold bg-obsidian/85 text-off-white px-2 py-0.5 rounded shadow">
-                    {img.tag}
-                  </span>
-                </div>
+          <div className="space-y-8">
+            {filteredProducts.map((product) => {
+              const productImages = product.images || [];
+              const mainColor = product.colors?.[0]?.hex || "#080808";
 
-                {/* Info & Actions */}
-                <div className="p-3.5 bg-white flex flex-col gap-2">
-                  <div className="min-w-0">
-                    <h4 className="text-xs font-bold text-obsidian truncate" title={img.title}>
-                      {img.title}
-                    </h4>
-                    <p className="text-[10px] text-graphite font-mono truncate dir-ltr text-right mt-0.5">
-                      {img.src}
-                    </p>
-                  </div>
+              return (
+                <div
+                  key={product.id}
+                  className="bg-white border-2 border-line hover:border-obsidian rounded-xl p-5 shadow-xs transition-all space-y-4"
+                >
+                  {/* Album Header */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-line/60">
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="w-4 h-4 rounded-full border border-stone-300 shadow-xs shrink-0"
+                        style={{ backgroundColor: mainColor }}
+                        title={product.colors?.[0]?.name}
+                      />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm sm:text-base font-extrabold text-obsidian">
+                            {product.name}
+                          </h4>
+                          <span className="text-[11px] font-mono px-2 py-0.5 bg-stone-100 text-stone-700 rounded border">
+                            {formatPrice(product.priceCents / 100)}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-graphite font-mono dir-ltr text-right mt-0.5">
+                          ID: {product.id} • {productImages.length} صور في الألبوم
+                        </p>
+                      </div>
+                    </div>
 
-                  <div className="pt-2 border-t border-line/60 flex items-center justify-between gap-2">
-                    <a
-                      href={img.src}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[11px] text-graphite hover:text-obsidian inline-flex items-center gap-1 font-medium"
-                      title="معاينة بالحجم الكامل"
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                      معاينة
-                    </a>
-
+                    {/* Add Photo Button for this product */}
                     <button
                       type="button"
-                      onClick={() => setConfirmTarget(img)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-red-600 hover:text-white hover:bg-red-600 border border-red-200 hover:border-red-600 rounded transition-colors cursor-pointer"
+                      onClick={() => {
+                        setAddMode("product");
+                        setAddProductTarget(product);
+                        setNewTitle(`${product.name} - صورة إضافية`);
+                        setNewTag("صورة منتج");
+                        setAddError(null);
+                      }}
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-obsidian text-off-white text-xs font-bold rounded hover:bg-charcoal transition-all shadow-xs cursor-pointer active:scale-95"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      حذف
+                      <Plus className="w-3.5 h-3.5" />
+                      + إضافة صورة لهذا الهودي
                     </button>
                   </div>
+
+                  {/* Album Photos Grid */}
+                  {productImages.length === 0 ? (
+                    <div className="text-center py-8 border border-dashed border-stone-200 rounded-lg bg-stone-50">
+                      <p className="text-xs text-graphite font-semibold">لا توجد صور لهذا المنتج حتى الآن.</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAddMode("product");
+                          setAddProductTarget(product);
+                          setNewTitle(product.name);
+                          setAddError(null);
+                        }}
+                        className="mt-2 text-xs font-bold text-red-600 hover:underline cursor-pointer"
+                      >
+                        + اضغط هنا لإضافة الصورة الأولى
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                      {productImages.map((pImg, idx) => {
+                        const isPrimary = idx === 0;
+
+                        return (
+                          <div
+                            key={pImg.id || pImg.url}
+                            className={`group relative bg-stone-50 border rounded-lg overflow-hidden flex flex-col justify-between transition-all ${
+                              isPrimary
+                                ? "border-red-600 ring-2 ring-red-600/20 shadow-sm"
+                                : "border-line hover:border-obsidian"
+                            }`}
+                          >
+                            {/* Image Box */}
+                            <div className="relative aspect-4/5 w-full bg-stone-100 overflow-hidden flex items-center justify-center">
+                              <img
+                                src={pImg.url}
+                                alt={pImg.alt || product.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                loading="lazy"
+                              />
+
+                              {/* Badges */}
+                              {isPrimary ? (
+                                <span className="absolute top-2 right-2 text-[10px] font-black bg-red-600 text-white px-2 py-0.5 rounded shadow flex items-center gap-1">
+                                  <Star className="w-2.5 h-2.5 fill-white" />
+                                  الغلاف الرئيسي
+                                </span>
+                              ) : (
+                                <span className="absolute top-2 right-2 text-[10px] font-bold bg-black/70 text-white px-1.5 py-0.5 rounded">
+                                  صورة {idx + 1}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Actions */}
+                            <div className="p-2.5 bg-white flex flex-col gap-1.5 border-t border-line/60">
+                              <p className="text-[10px] text-obsidian font-bold truncate" title={pImg.alt || product.name}>
+                                {pImg.alt || `صورة ${idx + 1}`}
+                              </p>
+
+                              <div className="flex items-center justify-between gap-1 pt-1 border-t border-line/40">
+                                {!isPrimary && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetPrimaryImage(product, pImg.id)}
+                                    className="text-[10px] font-bold text-obsidian hover:text-red-600 hover:underline cursor-pointer"
+                                    title="تعيين كصورة رئيسية للمنتج تظهر على الكارت أولاً"
+                                  >
+                                    تعيين كغلاف
+                                  </button>
+                                )}
+
+                                <a
+                                  href={pImg.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[10px] text-graphite hover:text-obsidian inline-flex items-center gap-0.5 font-medium ml-auto"
+                                >
+                                  <ExternalLink className="w-2.5 h-2.5" />
+                                  معاينة
+                                </a>
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setConfirmTarget({
+                                      type: "product",
+                                      product,
+                                      image: pImg,
+                                    })
+                                  }
+                                  className="inline-flex items-center gap-0.5 px-2 py-0.5 text-[11px] font-bold text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                                  title="حذف هذه الصورة من المنتج"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                  حذف
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
@@ -459,7 +672,7 @@ export function MediaGallery() {
               </div>
               <div>
                 <h3 className="text-base font-bold text-obsidian">تأكيد حذف الصورة</h3>
-                <p className="text-xs text-graphite">يرجى التأكيد قبل إزالة الصورة من العرض</p>
+                <p className="text-xs text-graphite">يرجى التأكيد قبل إزالة الصورة نهائياً</p>
               </div>
             </div>
 
@@ -467,24 +680,31 @@ export function MediaGallery() {
             <div className="flex items-center gap-4 p-3 bg-white border border-line rounded-lg">
               <div className="w-16 h-20 bg-stone-100 rounded overflow-hidden flex-none">
                 <img
-                  src={confirmTarget.src}
-                  alt={confirmTarget.title}
+                  src={confirmTarget.type === "header" ? confirmTarget.image.src : confirmTarget.image.url}
+                  alt={confirmTarget.type === "header" ? confirmTarget.image.title : confirmTarget.image.alt}
                   className="w-full h-full object-cover"
                 />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold text-obsidian truncate">{confirmTarget.title}</p>
+                <p className="text-xs font-bold text-obsidian truncate">
+                  {confirmTarget.type === "header" ? confirmTarget.image.title : confirmTarget.image.alt || confirmTarget.product.name}
+                </p>
                 <p className="text-[11px] text-graphite mt-0.5">
-                  القسم: <strong>{confirmTarget.category === "header" ? "صور الهيدر" : "صور الملابس"}</strong>
+                  القسم:{" "}
+                  <strong>
+                    {confirmTarget.type === "header"
+                      ? "صور الهيدر"
+                      : `ألبوم هودي: ${confirmTarget.product.name}`}
+                  </strong>
                 </p>
                 <p className="text-[10px] text-concrete font-mono truncate dir-ltr text-right mt-1">
-                  {confirmTarget.src}
+                  {confirmTarget.type === "header" ? confirmTarget.image.src : confirmTarget.image.url}
                 </p>
               </div>
             </div>
 
             <p className="text-xs text-graphite leading-relaxed">
-              هل أنت متأكد أنك تريد حذف هذه الصورة نهائياً؟ بمجرد الضغط على <strong>موافق</strong> ستتم إزالتها فوراً وتحديث الصفحة الرئيسية دون الحاجة لـ Reload.
+              هل أنت متأكد أنك تريد حذف هذه الصورة نهائياً؟ بمجرد الضغط على <strong>موافق، احذف الصورة</strong> ستتم إزالتها فوراً وتحديث الصفحة والمعرض دون الحاجة لـ Reload.
             </p>
 
             {/* Buttons: موافق / إلغاء */}
@@ -524,7 +744,7 @@ export function MediaGallery() {
             <div>
               <h3 className="text-base font-extrabold text-obsidian">تم الحذف بنجاح!</h3>
               <p className="text-xs text-graphite mt-1 leading-relaxed">
-                تم حذف الصورة <strong>"{successDeletedName}"</strong> بنجاح من الصفحة والمعرض، وتحديث المحتوى المعروض في المتجر لحظياً.
+                تم حذف <strong>"{successDeletedName}"</strong> بنجاح وتحديث المحتوى المعروض في المتجر لحظياً.
               </p>
             </div>
 
@@ -544,7 +764,7 @@ export function MediaGallery() {
       {/* ======================================================== */}
       {/* نافذة إضافة صورة جديدة (Add New Image Modal)             */}
       {/* ======================================================== */}
-      {addCategory && (
+      {addMode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
           <div
             className="bg-off-white border-2 border-obsidian rounded-xl max-w-lg w-full p-6 shadow-2xl space-y-5 text-right"
@@ -554,12 +774,14 @@ export function MediaGallery() {
               <div className="flex items-center gap-2">
                 <Plus className="w-5 h-5 text-obsidian" />
                 <h3 className="text-base font-bold text-obsidian">
-                  إضافة صورة جديدة إلى {addCategory === "header" ? "صور الهيدر" : "صور الملابس"}
+                  {addMode === "header"
+                    ? "إضافة صورة جديدة إلى صور الهيدر"
+                    : `إضافة صورة جديدة لألبوم (${addProductTarget?.name})`}
                 </h3>
               </div>
               <button
                 type="button"
-                onClick={() => setAddCategory(null)}
+                onClick={resetAddForm}
                 className="text-graphite hover:text-obsidian text-sm font-bold"
               >
                 ✕
@@ -575,28 +797,34 @@ export function MediaGallery() {
 
               {/* Title Input */}
               <div className="space-y-1">
-                <label className="block text-xs font-bold text-obsidian">اسم / عنوان الصورة:</label>
+                <label className="block text-xs font-bold text-obsidian">اسم / وصف الصورة:</label>
                 <input
                   type="text"
-                  placeholder="مثال: هودي رمادي أوفرسايز - كولكشن جديد"
+                  placeholder={
+                    addMode === "header"
+                      ? "مثال: هيرو بانر كولكشن الشتاء"
+                      : "مثال: الموديل يرتدي الهودي من زاوية جانبية"
+                  }
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-concrete rounded text-xs text-obsidian focus:outline-obsidian"
+                  className="w-full px-3 py-2 bg-white border border-concrete rounded text-xs text-obsidian focus:outline-obsidian font-bold"
                   required
                 />
               </div>
 
-              {/* Tag Input */}
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-obsidian">التصنيف أو الشارة (Tag):</label>
-                <input
-                  type="text"
-                  placeholder="مثال: هيدر رئيسي أو تيشيرت"
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-concrete rounded text-xs text-obsidian focus:outline-obsidian"
-                />
-              </div>
+              {/* Tag Input for Header */}
+              {addMode === "header" && (
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-obsidian">التصنيف أو الشارة (Tag):</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: هيدر رئيسي أو بانر"
+                    value={newTag}
+                    onChange={(e) => setNewTag(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-concrete rounded text-xs text-obsidian focus:outline-obsidian"
+                  />
+                </div>
+              )}
 
               {/* File Upload Box */}
               <div className="space-y-2">
@@ -622,7 +850,7 @@ export function MediaGallery() {
                 <label className="block text-xs font-bold text-obsidian">أو أدخل مسار / رابط الصورة:</label>
                 <input
                   type="text"
-                  placeholder="/preview-images/your-image.jpg أو https://..."
+                  placeholder="/login-hoodies/hoodie-black.webp أو https://..."
                   value={newSrc}
                   onChange={(e) => setNewSrc(e.target.value)}
                   className="w-full px-3 py-2 bg-white border border-concrete rounded text-xs text-obsidian font-mono text-left focus:outline-obsidian"
@@ -646,7 +874,7 @@ export function MediaGallery() {
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-line">
                 <button
                   type="button"
-                  onClick={() => setAddCategory(null)}
+                  onClick={resetAddForm}
                   className="px-4 py-2 border border-concrete rounded text-xs font-bold text-obsidian hover:bg-stone-200 cursor-pointer"
                 >
                   إلغاء
@@ -656,7 +884,7 @@ export function MediaGallery() {
                   disabled={isProcessingFile || !newSrc}
                   className="px-6 py-2 bg-obsidian hover:bg-charcoal text-off-white rounded text-xs font-bold transition-all shadow-md active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
-                  + إضافة الصورة للمعرض
+                  + إضافة الصورة وتحديث المتجر فوراً
                 </button>
               </div>
             </form>
@@ -680,7 +908,7 @@ export function MediaGallery() {
             <div>
               <h3 className="text-base font-extrabold text-obsidian">تمت الإضافة بنجاح!</h3>
               <p className="text-xs text-graphite mt-1 leading-relaxed">
-                تمت إضافة الصورة <strong>"{successAddedName}"</strong> بنجاح إلى المعرض وتحديث الصفحة الرئيسية مباشرة بدون ريلود.
+                تمت إضافة <strong>"{successAddedName}"</strong> بنجاح وتحديث المتجر مباشرة بدون ريلود (Live Static).
               </p>
             </div>
 

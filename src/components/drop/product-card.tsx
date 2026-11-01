@@ -12,21 +12,41 @@ import type { Product } from "@/content/home";
 // The whole card is one link. The second image fades in on hover only.
 export function ProductCard({ product }: { product: Product }) {
   const { locale, t } = useLocale();
-  const [first, second] = product.images.map((slot) => images[slot]);
+  const { data: adminData } = useAdminStore();
+  const matchedAdmin = adminData?.products.find(
+    (p) => p.slug === product.slug || p.id === product.slug
+  );
+
   const sizes = "(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw";
+
+  // Dynamic image resolution: prioritizes live admin store, falls back to static content
+  const fallbackFirst = images[product.images[0]] || {
+    src: "/login-hoodies/hoodie-black.webp",
+    alt: product.name,
+    width: 900,
+    height: 1100,
+  };
+  const fallbackSecond = images[product.images[1]] || fallbackFirst;
+
+  const adminFirst = matchedAdmin?.images?.[0];
+  const adminSecond = matchedAdmin?.images?.[1];
+
+  const firstSrc = adminFirst?.url || fallbackFirst.src;
+  const firstAlt = adminFirst?.alt || fallbackFirst.alt || product.name;
+  const secondSrc = adminSecond?.url || (adminFirst ? adminFirst.url : fallbackSecond.src);
 
   const localizedName =
     locale === "ar" && t.products[product.slug]?.name
       ? t.products[product.slug].name
-      : product.name;
+      : (matchedAdmin?.name || product.name);
 
   const localizedStatus =
     locale === "ar" ? t.drop.preorderBadge : (product.status ?? "PREORDER");
 
-  const { data: adminData } = useAdminStore();
-  const matchedAdmin = adminData?.products.find((p) => p.slug === product.slug || p.id === product.slug);
-  const currentPrice = matchedAdmin ? (matchedAdmin.priceCents / 100) : product.price;
-  const currentOriginalPrice = matchedAdmin?.compareAtCents ? (matchedAdmin.compareAtCents / 100) : product.originalPrice;
+  const currentPrice = matchedAdmin ? matchedAdmin.priceCents / 100 : product.price;
+  const currentOriginalPrice = matchedAdmin?.compareAtCents
+    ? matchedAdmin.compareAtCents / 100
+    : product.originalPrice;
 
   const hasDiscount = !!currentOriginalPrice && currentOriginalPrice > currentPrice;
   const discountPercent = hasDiscount
@@ -37,18 +57,20 @@ export function ProductCard({ product }: { product: Product }) {
     <Link href={product.href} className="group block">
       <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-charcoal">
         <Image
-          src={first.src}
-          alt={first.alt}
-          width={first.width}
-          height={first.height}
+          src={firstSrc}
+          alt={firstAlt}
+          width={900}
+          height={1100}
+          unoptimized={firstSrc.startsWith("data:")}
           sizes={sizes}
           className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
         <Image
-          src={second?.src || first.src}
+          src={secondSrc}
           alt=""
-          width={second?.width || first.width}
-          height={second?.height || first.height}
+          width={900}
+          height={1100}
+          unoptimized={secondSrc.startsWith("data:")}
           sizes={sizes}
           className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-200 group-hover:opacity-100"
         />
