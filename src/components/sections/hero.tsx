@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
+import { Play, Pause } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { ButtonLink } from "@/components/ui/button";
 import { AnimatedLogo } from "@/components/motion/animated-logo";
 import { Reveal } from "@/components/motion/reveal";
-import { StatusLabel } from "@/components/ui/status-label";
 import { loginHoodies, loginHoodieIntervalMs } from "@/content/login-hoodies";
 import { useLocale } from "@/lib/locale-context";
 import type { home } from "@/content/home";
@@ -45,8 +44,6 @@ export function Hero({ hero }: HeroProps) {
 
   const current = loginHoodies[index];
   const currentCaption = locale === "ar" ? current.caption.ar : current.caption.en;
-  const localizedColor =
-    locale === "ar" ? t.hero.hoodies[current.name] ?? current.name : current.name;
 
   return (
     <section
@@ -206,60 +203,42 @@ export function Hero({ hero }: HeroProps) {
       </div>
 
       {/* Bottom Bar: CTA on left, Carousel Indicator on right (Responsive for both Mobile & Desktop) */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 px-4 pb-6 md:px-6 lg:px-10 lg:pb-12 z-10 text-left">
-        <Reveal delay={0.6} className="flex flex-col items-start gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-wider text-graphite font-mono">{t.hero.label}</p>
-            <StatusLabel className="text-off-white! font-bold text-sm sm:text-base">
-              {locale === "ar" ? "هودي ستريت وير" : t.hero.status}
-            </StatusLabel>
-          </div>
+      <div className="flex items-end justify-between gap-4 px-4 pb-6 md:px-6 lg:px-10 lg:pb-12 z-10 text-left">
+        <Reveal delay={0.6}>
           <ButtonLink href="/shop" variant="secondary" className="border-off-white! text-xs sm:text-sm py-2.5 px-5">
             {locale === "ar" ? "تسوق الآن ←" : `${t.hero.cta} →`}
           </ButtonLink>
         </Reveal>
 
-        {/* Hoodie Carousel Controls (Color name, dashes indicator, Play/Pause / Explore) */}
-        <div className="flex items-center justify-between sm:justify-end gap-3 text-xs font-mono uppercase tracking-widest text-graphite pt-1 sm:pt-0">
-          <div className="flex items-center gap-2">
-            <span className="text-off-white font-bold">{localizedColor}</span>
-            <span className="text-stone-400 text-[11px]">
-              0{index + 1} / 0{loginHoodies.length}
-            </span>
-          </div>
+        {/* Hoodie Carousel Controls (Dashes indicator & Play/Pause button) */}
+        <div className="flex items-center gap-3 text-xs font-mono uppercase tracking-widest text-graphite pb-1">
+          <ul className="flex gap-1" aria-hidden="true">
+            {loginHoodies.map((h, i) => (
+              <li
+                key={h.name}
+                className={`h-1 w-2.5 sm:w-4 rounded-full transition-colors duration-300 ${
+                  i === index ? "bg-off-white" : "bg-concrete/40"
+                }`}
+              />
+            ))}
+          </ul>
 
-          <div className="flex items-center gap-2.5">
-            <ul className="flex gap-1" aria-hidden="true">
-              {loginHoodies.map((h, i) => (
-                <li
-                  key={h.name}
-                  className={`h-1 w-3 sm:w-4 rounded-full transition-colors duration-300 ${
-                    i === index ? "bg-off-white" : "bg-concrete/40"
-                  }`}
-                />
-              ))}
-            </ul>
-
-            <Link
-              href="/shop"
-              className="text-label text-off-white hover:underline flex items-center gap-1 cursor-pointer ml-1"
+          {!reduced && (
+            <button
+              type="button"
+              onClick={() => setPlaying((p) => !p)}
+              aria-pressed={!playing}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/40 text-off-white backdrop-blur-xs hover:border-white/60 hover:bg-black/60 transition cursor-pointer"
+              title={playing ? t.hero.pause : t.hero.play}
+              aria-label={playing ? t.hero.pause : t.hero.play}
             >
-              <span>{t.hero.explore}</span>
-              <span aria-hidden="true">←</span>
-            </Link>
-
-            {!reduced && (
-              <button
-                type="button"
-                onClick={() => setPlaying((p) => !p)}
-                aria-pressed={!playing}
-                className="text-label min-h-8 px-1 text-off-white/70 hover:text-off-white hover:underline cursor-pointer"
-                title={playing ? t.hero.pause : t.hero.play}
-              >
-                {playing ? t.hero.pause : t.hero.play}
-              </button>
-            )}
-          </div>
+              {playing ? (
+                <Pause className="h-3.5 w-3.5 fill-current" />
+              ) : (
+                <Play className="h-3.5 w-3.5 fill-current ml-0.5" />
+              )}
+            </button>
+          )}
         </div>
       </div>
     </section>
