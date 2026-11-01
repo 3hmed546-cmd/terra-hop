@@ -6,7 +6,6 @@ import { Play, Pause } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { ButtonLink } from "@/components/ui/button";
 import { AnimatedLogo } from "@/components/motion/animated-logo";
-import { Reveal } from "@/components/motion/reveal";
 import { loginHoodies, loginHoodieIntervalMs } from "@/content/login-hoodies";
 import { useLocale } from "@/lib/locale-context";
 import type { home } from "@/content/home";
@@ -204,14 +203,36 @@ export function Hero({ hero }: HeroProps) {
 
       {/* Bottom Bar: CTA on left, Carousel Indicator on right (Responsive for both Mobile & Desktop) */}
       <div className="flex items-end justify-between gap-4 px-4 pb-6 md:px-6 lg:px-10 lg:pb-12 z-10 text-left">
-        <Reveal delay={0.6}>
-          <ButtonLink href="/shop" variant="secondary" className="border-off-white! text-xs sm:text-sm py-2.5 px-5">
+        {/* Shopping CTA Button - Smooth entrance animation from bottom settling into place */}
+        <motion.div
+          initial={{ opacity: 0, y: 36 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: 0.75,
+            delay: 0.3,
+            ease: [0.22, 1, 0.36, 1],
+          }}
+        >
+          <ButtonLink
+            href="/shop"
+            variant="secondary"
+            className="border-off-white! text-xs sm:text-sm py-2.5 px-5 shadow-lg backdrop-blur-xs hover:scale-105 active:scale-95 transition-all"
+          >
             {locale === "ar" ? "تسوق الآن ←" : `${t.hero.cta} →`}
           </ButtonLink>
-        </Reveal>
+        </motion.div>
 
         {/* Hoodie Carousel Controls (Dashes indicator & Play/Pause button) */}
-        <div className="flex items-center gap-3 text-xs font-mono uppercase tracking-widest text-graphite pb-1">
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: 0.75,
+            delay: 0.45,
+            ease: [0.22, 1, 0.36, 1],
+          }}
+          className="flex items-center gap-3 text-xs font-mono uppercase tracking-widest text-graphite pb-1"
+        >
           <ul className="flex gap-1" aria-hidden="true">
             {loginHoodies.map((h, i) => (
               <li
@@ -239,7 +260,7 @@ export function Hero({ hero }: HeroProps) {
               )}
             </button>
           )}
-        </div>
+        </motion.div>
       </div>
     </section>
   );
