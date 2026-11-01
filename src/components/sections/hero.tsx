@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Play, Pause } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { ButtonLink } from "@/components/ui/button";
 import { AnimatedLogo } from "@/components/motion/animated-logo";
-import { loginHoodies, loginHoodieIntervalMs } from "@/content/login-hoodies";
+import { loginHoodies, loginHoodieIntervalMs, type LoginHoodie } from "@/content/login-hoodies";
+import { loadGalleryImages, saveGalleryImages, GALLERY_CHANNEL_NAME } from "@/lib/admin/gallery";
 import { useLocale } from "@/lib/locale-context";
 import type { home } from "@/content/home";
 
@@ -17,11 +18,86 @@ export function Hero({ hero }: HeroProps) {
   const [playing, setPlaying] = useState(true);
   const [reduced, setReduced] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [hoodiesList, setHoodiesList] = useState<LoginHoodie[]>(loginHoodies);
   const { t, locale } = useLocale();
+
+  // Sync active header hoodies from live gallery
+  const syncGallery = useCallback(() => {
+    const gallery = loadGalleryImages();
+    const activeHeaders = gallery.filter((g) => g.category === "header");
+    const activeSrcs = new Set(activeHeaders.map((g) => g.src));
+
+    // Standard hoodies still in gallery
+    const filteredStandard = loginHoodies.filter((h) => activeSrcs.has(h.src));
+
+    // Custom headers added in gallery
+    const customHeaders = activeHeaders.filter(
+      (g) => !loginHoodies.some((lh) => lh.src === g.src)
+    );
+    const extraHoodies: LoginHoodie[] = customHeaders.map((g) => ({
+      src: g.src,
+      name: g.title,
+      glow: "#232323",
+      caption: {
+        ar: { prefix: "تميز", accent: "بأسلوبك", sub: g.title },
+        en: { prefix: "STAND OUT", accent: "YOUR WAY", sub: g.title },
+      },
+    }));
+
+    const nextList = [...filteredStandard, ...extraHoodies];
+    if (nextList.length > 0) {
+      setHoodiesList(nextList);
+      setIndex((curr) => (curr >= nextList.length ? 0 : curr));
+    }
+  }, []);
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+    syncGallery();
+
+    // 1. Instant cross-tab real-time sync with BroadcastChannel
+    let channel: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== "undefined") {
+      try {
+        channel = new BroadcastChannel(GALLERY_CHANNEL_NAME);
+        channel.onmessage = (e) => {
+          if (e.data?.type === "UPDATE") {
+            syncGallery();
+          }
+        };
+      } catch {
+        // ignore
+      }
+    }
+
+    // 2. Same-tab and storage events
+    const onSync = () => syncGallery();
+    window.addEventListener("terra_gallery_changed", onSync);
+    window.addEventListener("storage", onSync);
+
+    // 3. Live server polling (every 3 seconds) for all external clients with 0 reload
+    const pollTimer = setInterval(async () => {
+      try {
+        const res = await fetch("/api/media", { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.images && Array.isArray(data.images)) {
+            saveGalleryImages(data.images, false);
+            syncGallery();
+          }
+        }
+      } catch {
+        // network fallback
+      }
+    }, 3000);
+
+    return () => {
+      channel?.close();
+      window.removeEventListener("terra_gallery_changed", onSync);
+      window.removeEventListener("storage", onSync);
+      clearInterval(pollTimer);
+    };
+  }, [syncGallery]);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -34,15 +110,19 @@ export function Hero({ hero }: HeroProps) {
   const running = playing && !reduced;
 
   useEffect(() => {
-    if (!running) return;
+    if (!running || hoodiesList.length === 0) return;
     const id = window.setInterval(() => {
-      if (!document.hidden) setIndex((i) => (i + 1) % loginHoodies.length);
+      if (!document.hidden) setIndex((i) => (i + 1) % hoodiesList.length);
     }, loginHoodieIntervalMs);
     return () => window.clearInterval(id);
-  }, [running, index]);
+  }, [running, index, hoodiesList.length]);
 
-  const current = loginHoodies[index];
-  const currentCaption = locale === "ar" ? current.caption.ar : current.caption.en;
+  const current = hoodiesList[index] ?? hoodiesList[0] ?? loginHoodies[0];
+  const currentCaption = current
+    ? locale === "ar"
+      ? current.caption.ar
+      : current.caption.en
+    : loginHoodies[0].caption.ar;
 
   return (
     <section
@@ -51,7 +131,7 @@ export function Hero({ hero }: HeroProps) {
     >
       {/* Background Spotlight Glows */}
       <div className="absolute inset-0 pointer-events-none -z-20 overflow-hidden" aria-hidden="true">
-        {loginHoodies.map((h, i) => (
+        {hoodiesList.map((h, i) => (
           <div
             key={`glow-${h.src}`}
             className={`absolute inset-0 transition-opacity duration-1000 ease-out ${
@@ -67,7 +147,7 @@ export function Hero({ hero }: HeroProps) {
       {/* Rotating Hoodie Images Showcase - Desktop (aligned to right bottom) */}
       <div className="hidden md:flex absolute inset-0 -z-10 pointer-events-none items-end justify-end md:pr-[5%] lg:pr-[10%]">
         <div className="relative h-full w-full max-w-[850px]">
-          {loginHoodies.map((h, i) => (
+          {hoodiesList.map((h, i) => (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               key={h.src}
@@ -93,7 +173,7 @@ export function Hero({ hero }: HeroProps) {
       {/* Rotating Hoodie Images Showcase - Mobile (Large & Fills space with NO bottom gap, matching Image 2) */}
       <div className="flex md:hidden absolute inset-x-0 bottom-0 top-56 sm:top-60 -z-10 pointer-events-none items-end justify-center overflow-hidden">
         <div className="relative h-[78vh] w-full max-w-[480px]">
-          {loginHoodies.map((h, i) => (
+          {hoodiesList.map((h, i) => (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               key={`m-${h.src}`}
@@ -139,59 +219,55 @@ export function Hero({ hero }: HeroProps) {
               <span className="text-3xl lg:text-4xl xl:text-5xl font-extrabold text-white tracking-tight">
                 {currentCaption.prefix}
               </span>
-              <span
-                className="inline-block px-4 py-1 rounded-xl text-3xl lg:text-4xl xl:text-5xl font-black text-white shadow-xl tracking-tight"
-                style={{ backgroundColor: "#c8102e" }}
-              >
+              <span className="bg-[#b31428] text-white text-2xl lg:text-3xl xl:text-4xl font-extrabold px-3 py-1 rounded-md shadow-md">
                 {currentCaption.accent}
               </span>
             </div>
-            <p
-              dir={locale === "ar" ? "rtl" : "ltr"}
-              className="mt-2 text-sm lg:text-base xl:text-lg font-semibold text-stone-200 tracking-wide"
-            >
+            <p className="mt-2 text-sm lg:text-base font-semibold text-stone-200/90 tracking-wide drop-shadow-sm max-w-sm">
               {currentCaption.sub}
             </p>
           </motion.div>
         </AnimatePresence>
       </div>
 
-      {/* MOBILE LAYOUT (md:hidden) Top & Center Section (Matching Reference Image 2 Perfectly) */}
-      <div className="flex md:hidden flex-col items-center text-center pt-[74px] sm:pt-[78px] px-4 z-10">
-        {/* 1. Animated Logo centered with breathing room from top (+15px down for clear social icon clearance) */}
-        <div className="w-[72%] max-w-[280px] mx-auto">
+      {/* MOBILE LAYOUT (< md) */}
+      <div className="flex md:hidden flex-col items-center justify-start flex-1 px-4 pt-16 z-10">
+        {/* Big White TERRA HOP Logo in Mobile */}
+        <h1 className="w-full max-w-[280px] sm:max-w-[320px] text-center mb-6">
           <AnimatedLogo>
             <Logo className="w-full drop-shadow-md" />
           </AnimatedLogo>
-        </div>
+        </h1>
 
-        {/* 2. Caption Centered Horizontally Exactly 40px Below Logo (Shifted 10px up as requested) */}
+        {/* Mobile Upper Caption (Centered, above model's head: mt-[40px] lifted up by 10px) */}
         <div
           dir={locale === "ar" ? "rtl" : "ltr"}
-          className="mt-[40px] flex flex-col items-center text-center w-full max-w-sm mx-auto select-none"
+          className="flex flex-col items-center text-center mt-[40px] z-10 select-none"
         >
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={`m-caption-${index}`}
-              initial={mounted ? { opacity: 0, y: 8 } : false}
+              initial={mounted ? { opacity: 0, y: 10 } : false}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.35, ease: "easeOut" }}
-              className="flex flex-col items-center text-center"
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.38, ease: "easeOut" }}
+              className="flex flex-col items-center"
             >
-              <div className="flex items-center justify-center gap-2 flex-wrap">
-                <span className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight drop-shadow-md">
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-xl sm:text-2xl font-extrabold text-white tracking-tight drop-shadow-sm">
                   {currentCaption.prefix}
                 </span>
-                <span
-                  className="inline-block px-3.5 py-1 rounded-xl text-2xl sm:text-3xl font-black text-white shadow-xl tracking-tight"
-                  style={{ backgroundColor: "#c8102e" }}
-                >
+                <span className="bg-[#b31428] text-white text-lg sm:text-xl font-extrabold px-3 py-0.5 rounded-md shadow-md">
                   {currentCaption.accent}
                 </span>
               </div>
               <p
-                dir={locale === "ar" ? "rtl" : "ltr"}
+                style={{
+                  fontFamily:
+                    locale === "ar"
+                      ? "'Cairo', var(--font-inter), system-ui, sans-serif"
+                      : "inherit",
+                }}
                 className="mt-2 text-xs sm:text-sm font-semibold text-stone-200/95 tracking-wide drop-shadow-md text-center max-w-[260px] sm:max-w-xs"
               >
                 {currentCaption.sub}
@@ -235,7 +311,7 @@ export function Hero({ hero }: HeroProps) {
           className="flex items-center gap-3 text-xs font-mono uppercase tracking-widest text-graphite pb-1"
         >
           <ul className="flex gap-1" aria-hidden="true">
-            {loginHoodies.map((h, i) => (
+            {hoodiesList.map((h, i) => (
               <li
                 key={h.name}
                 className={`h-1 w-2.5 sm:w-4 rounded-full transition-colors duration-300 ${

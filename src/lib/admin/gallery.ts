@@ -189,26 +189,110 @@ export const INITIAL_GALLERY_IMAGES: GalleryImage[] = [
   },
 ];
 
-const STORAGE_KEY = "terra_hop_gallery_images_v1";
+export const GALLERY_STORAGE_KEY = "terra_hop_gallery_images_v2";
+export const GALLERY_CHANNEL_NAME = "terra_gallery_channel";
 
 export function loadGalleryImages(): GalleryImage[] {
   if (typeof window === "undefined") return INITIAL_GALLERY_IMAGES;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(GALLERY_STORAGE_KEY);
     if (!raw) return INITIAL_GALLERY_IMAGES;
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    if (Array.isArray(parsed)) return parsed;
   } catch {
     // fallback
   }
   return INITIAL_GALLERY_IMAGES;
 }
 
-export function saveGalleryImages(images: GalleryImage[]): void {
+export function saveGalleryImages(images: GalleryImage[], notifyServerAndTabs: boolean = true): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(images));
+    localStorage.setItem(GALLERY_STORAGE_KEY, JSON.stringify(images));
+  } catch {
+    // ignore quota errors
+  }
+
+  if (notifyServerAndTabs) {
+    // 1. Broadcast to other tabs & windows instantly with 0ms delay
+    if (typeof BroadcastChannel !== "undefined") {
+      try {
+        const bc = new BroadcastChannel(GALLERY_CHANNEL_NAME);
+        bc.postMessage({ type: "UPDATE", images });
+        bc.close();
+      } catch {
+        // ignore
+      }
+    }
+
+    // 2. Dispatch custom DOM event for same-tab real-time subscribers
+    try {
+      window.dispatchEvent(new CustomEvent("terra_gallery_changed", { detail: images }));
+    } catch {
+      // ignore
+    }
+
+    // 3. Persist to server API in background
+    try {
+      fetch("/api/media", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ images }),
+      }).catch(() => {});
+    } catch {
+      // ignore
+    }
+  }
+}
+
+export async function deleteGalleryImage(id: string): Promise<GalleryImage[]> {
+  const current = loadGalleryImages();
+  const next = current.filter((img) => img.id !== id);
+  saveGalleryImages(next, true);
+
+  try {
+    fetch("/api/media", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete", id }),
+    }).catch(() => {});
   } catch {
     // ignore
   }
+
+  return next;
+}
+
+export async function addGalleryImage(image: GalleryImage): Promise<GalleryImage[]> {
+  const current = loadGalleryImages();
+  const next = [image, ...current];
+  saveGalleryImages(next, true);
+
+  try {
+    fetch("/api/media", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "add", image }),
+    }).catch(() => {});
+  } catch {
+    // ignore
+  }
+
+  return next;
+}
+
+export async function resetGalleryImages(): Promise<GalleryImage[]> {
+  saveGalleryImages(INITIAL_GALLERY_IMAGES, true);
+
+  try {
+    fetch("/api/media", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "reset" }),
+    }).catch(() => {});
+  } catch {
+    // ignore
+  }
+
+  return INITIAL_GALLERY_IMAGES;
 }

@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState, useId } from "react";
-import Image from "next/image";
+import { useEffect, useState, useCallback } from "react";
 import {
   Trash2,
   Plus,
@@ -10,16 +9,18 @@ import {
   Upload,
   Image as ImageIcon,
   RotateCcw,
-  Sparkles,
   ExternalLink,
 } from "lucide-react";
 import {
   GalleryImage,
   INITIAL_GALLERY_IMAGES,
   loadGalleryImages,
+  deleteGalleryImage,
+  addGalleryImage,
+  resetGalleryImages,
   saveGalleryImages,
+  GALLERY_CHANNEL_NAME,
 } from "@/lib/admin/gallery";
-import { Button } from "@/components/admin/ui/Button";
 import { useToast } from "@/components/admin/ui/Toast";
 
 export function MediaGallery() {
@@ -38,31 +39,71 @@ export function MediaGallery() {
   const [newSrc, setNewSrc] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const refreshGallery = useCallback(() => {
     setImages(loadGalleryImages());
-    setMounted(true);
   }, []);
+
+  useEffect(() => {
+    refreshGallery();
+    setMounted(true);
+
+    // Initial fetch from server to sync if any other device made changes
+    fetch("/api/media", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.images && Array.isArray(data.images)) {
+          saveGalleryImages(data.images, false);
+          setImages(data.images);
+        }
+      })
+      .catch(() => {});
+
+    // Listen to real-time events across tabs
+    let channel: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== "undefined") {
+      try {
+        channel = new BroadcastChannel(GALLERY_CHANNEL_NAME);
+        channel.onmessage = (e) => {
+          if (e.data?.type === "UPDATE") {
+            refreshGallery();
+          }
+        };
+      } catch {
+        // ignore
+      }
+    }
+
+    const onSync = () => refreshGallery();
+    window.addEventListener("terra_gallery_changed", onSync);
+    window.addEventListener("storage", onSync);
+
+    return () => {
+      channel?.close();
+      window.removeEventListener("terra_gallery_changed", onSync);
+      window.removeEventListener("storage", onSync);
+    };
+  }, [refreshGallery]);
 
   const headerImages = images.filter((img) => img.category === "header");
   const clothingImages = images.filter((img) => img.category === "clothing");
 
   // Handle Deletion Execution
-  function handleConfirmDelete() {
+  async function handleConfirmDelete() {
     if (!confirmTarget) return;
 
     const target = confirmTarget;
-    const nextImages = images.filter((img) => img.id !== target.id);
+    // 1. Delete image from state, localStorage, broadcast to tabs & server
+    const nextImages = await deleteGalleryImage(target.id);
     setImages(nextImages);
-    saveGalleryImages(nextImages);
 
-    // Close confirm dialog & open success dialog
+    // 2. Close confirm popup & open success popup
     setConfirmTarget(null);
     setSuccessDeletedName(target.title);
-    toast.push(`تم حذف "${target.title}" بنجاح`);
+    toast.push(`تم حذف "${target.title}" بنجاح وتحديث المتجر فوراً`);
   }
 
   // Handle Add Image Execution
-  function handleAddImage(e: React.FormEvent) {
+  async function handleAddImage(e: React.FormEvent) {
     e.preventDefault();
     if (!newTitle.trim()) {
       setAddError("يرجى إدخال اسم أو عنوان للصورة");
@@ -83,11 +124,10 @@ export function MediaGallery() {
       addedAt: new Date().toISOString().split("T")[0],
     };
 
-    const nextImages = [newImage, ...images];
+    const nextImages = await addGalleryImage(newImage);
     setImages(nextImages);
-    saveGalleryImages(nextImages);
 
-    toast.push(`تمت إضافة "${newImage.title}" بنجاح`);
+    toast.push(`تمت إضافة "${newImage.title}" وتحديث المتجر فوراً`);
     setAddCategory(null);
     setNewTitle("");
     setNewTag("");
@@ -110,7 +150,6 @@ export function MediaGallery() {
       if (typeof reader.result === "string") {
         setNewSrc(reader.result);
         if (!newTitle) {
-          // Pre-fill clean title from file name
           const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
           setNewTitle(nameWithoutExt);
         }
@@ -120,10 +159,10 @@ export function MediaGallery() {
   }
 
   // Restore Default Images
-  function handleResetDefaults() {
+  async function handleResetDefaults() {
     if (confirm("هل تريد استعادة جميع الصور الأولية؟")) {
-      setImages(INITIAL_GALLERY_IMAGES);
-      saveGalleryImages(INITIAL_GALLERY_IMAGES);
+      const reset = await resetGalleryImages();
+      setImages(reset);
       toast.push("تمت استعادة صور المعرض الأصلية بنجاح");
     }
   }
@@ -143,10 +182,10 @@ export function MediaGallery() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <ImageIcon className="w-5 h-5 text-off-white" />
-            <h2 className="text-xl font-bold tracking-wide">معرض وإدارة صور الموقع</h2>
+            <h2 className="text-xl font-bold tracking-wide">معرض وإدارة صور الموقع (Live Static)</h2>
           </div>
           <p className="text-xs text-concrete max-w-xl leading-relaxed">
-            التحكم الكامل في جميع الصور المعروضة على المتجر. الصور مقسمة في أقسام مخصصة لسهولة الإدارة، مع إمكانية الحذف الفوري أو رفع وإضافة صور جديدة.
+            التحكم الكامل في جميع الصور المعروضة على المتجر. الصور مقسمة في أقسام مخصصة، مع ميزة التحديث اللحظي (Live Sync): عند حذف أو إضافة أي صورة يتم التحديث فوراً في الصفحة الرئيسية دون الحاجة لعمل Reload.
           </p>
         </div>
 
@@ -163,7 +202,7 @@ export function MediaGallery() {
           <button
             type="button"
             onClick={handleResetDefaults}
-            className="flex items-center gap-1.5 text-xs text-concrete hover:text-off-white transition-colors px-2 py-1"
+            className="flex items-center gap-1.5 text-xs text-concrete hover:text-off-white transition-colors px-2 py-1 cursor-pointer"
             title="استعادة الصور الأصلية في حال حذفت شيئاً بالخطأ"
           >
             <RotateCcw className="w-3.5 h-3.5" />
@@ -188,7 +227,7 @@ export function MediaGallery() {
               </span>
             </div>
             <p className="text-xs text-graphite mt-1">
-              هذه الصور تظهر في الهيرو والبانر المتحرك في أعلى الصفحة الرئيسية وفي صفحة تسجيل الدخول.
+              هذه الصور تظهر في الهيرو والبانر المتحرك في أعلى الصفحة الرئيسية وفي صفحة تسجيل الدخول. الحذف هنا يزيلها فوراً من الهيرو لايف!
             </p>
           </div>
 
@@ -410,7 +449,7 @@ export function MediaGallery() {
             </div>
 
             <p className="text-xs text-graphite leading-relaxed">
-              هل أنت متأكد أنك تريد حذف هذه الصورة نهائياً؟ بمجرد الضغط على <strong>موافق</strong> ستتم إزالتها فوراً ولن تظهر في الصفحة.
+              هل أنت متأكد أنك تريد حذف هذه الصورة نهائياً؟ بمجرد الضغط على <strong>موافق</strong> ستتم إزالتها فوراً وتحديث الصفحة الرئيسية دون الحاجة لـ Reload.
             </p>
 
             {/* Buttons: موافق / إلغاء */}
@@ -450,7 +489,7 @@ export function MediaGallery() {
             <div>
               <h3 className="text-base font-extrabold text-obsidian">تم الحذف بنجاح!</h3>
               <p className="text-xs text-graphite mt-1 leading-relaxed">
-                تم حذف الصورة <strong>"{successDeletedName}"</strong> بنجاح من الصفحة والمعرض، وتم تحديث المحتوى المعروض.
+                تم حذف الصورة <strong>"{successDeletedName}"</strong> بنجاح من الصفحة والمعرض، وتحديث المحتوى المعروض في المتجر لحظياً.
               </p>
             </div>
 

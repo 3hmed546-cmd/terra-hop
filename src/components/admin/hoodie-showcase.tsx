@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { loginHoodies, loginHoodieIntervalMs } from "@/content/login-hoodies";
+import { useEffect, useState, useCallback } from "react";
+import { loginHoodies, loginHoodieIntervalMs, type LoginHoodie } from "@/content/login-hoodies";
+import { loadGalleryImages, GALLERY_CHANNEL_NAME } from "@/lib/admin/gallery";
 import { uiStrings } from "@/lib/ui-strings";
 
 const t = uiStrings.adminLogin;
@@ -22,6 +23,45 @@ export function HoodieShowcase() {
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [reduced, setReduced] = useState(false);
+  const [hoodiesList, setHoodiesList] = useState<LoginHoodie[]>(loginHoodies);
+
+  const syncGallery = useCallback(() => {
+    const gallery = loadGalleryImages();
+    const activeHeaders = gallery.filter((g) => g.category === "header");
+    const activeSrcs = new Set(activeHeaders.map((g) => g.src));
+
+    const filtered = loginHoodies.filter((h) => activeSrcs.has(h.src));
+    if (filtered.length > 0) {
+      setHoodiesList(filtered);
+      setIndex((curr) => (curr >= filtered.length ? 0 : curr));
+    }
+  }, []);
+
+  useEffect(() => {
+    syncGallery();
+
+    let channel: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== "undefined") {
+      try {
+        channel = new BroadcastChannel(GALLERY_CHANNEL_NAME);
+        channel.onmessage = (e) => {
+          if (e.data?.type === "UPDATE") syncGallery();
+        };
+      } catch {
+        // ignore
+      }
+    }
+
+    const onSync = () => syncGallery();
+    window.addEventListener("terra_gallery_changed", onSync);
+    window.addEventListener("storage", onSync);
+
+    return () => {
+      channel?.close();
+      window.removeEventListener("terra_gallery_changed", onSync);
+      window.removeEventListener("storage", onSync);
+    };
+  }, [syncGallery]);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -34,21 +74,21 @@ export function HoodieShowcase() {
   const running = playing && !reduced;
 
   useEffect(() => {
-    if (!running) return;
+    if (!running || hoodiesList.length === 0) return;
     const id = window.setInterval(() => {
-      if (!document.hidden) setIndex((i) => (i + 1) % loginHoodies.length);
+      if (!document.hidden) setIndex((i) => (i + 1) % hoodiesList.length);
     }, loginHoodieIntervalMs);
     return () => window.clearInterval(id);
-  }, [running, index]);
+  }, [running, index, hoodiesList.length]);
 
-  const current = loginHoodies[index];
+  const current = hoodiesList[index] ?? hoodiesList[0] ?? loginHoodies[0];
 
   return (
     <section aria-label={t.showcaseLabel} className="flex min-h-0 flex-1 flex-col">
       <div className="relative min-h-[260px] flex-1">
         {/* Spotlight behind the photo. One layer per hoodie, cross-fading together with the photo,
             so light and dark garments both stand out against the black panel. */}
-        {loginHoodies.map((h, i) => (
+        {hoodiesList.map((h, i) => (
           <div
             key={`glow-${h.src}`}
             aria-hidden="true"
@@ -61,53 +101,53 @@ export function HoodieShowcase() {
           />
         ))}
 
-        {loginHoodies.map((h, i) => (
-          // eslint-disable-next-line @next/next/no-img-element -- local static WebP, no optimization needed
+        {/* Hoodie photo. An absolute stack with opacity cross-fade matches the spotlight timing. */}
+        {hoodiesList.map((h, i) => (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             key={h.src}
             src={h.src}
             alt=""
             aria-hidden="true"
-            width={900}
-            height={965}
+            width={720}
+            height={860}
             decoding="async"
             fetchPriority={i === 0 ? "high" : "auto"}
-            // The photos are cropped at the waist: fade the bottom edge into the panel so the cut is invisible.
             style={{
-              WebkitMaskImage: "linear-gradient(to bottom, #000 80%, transparent 100%)",
-              maskImage: "linear-gradient(to bottom, #000 80%, transparent 100%)",
+              WebkitMaskImage: "linear-gradient(to bottom, #000 80%, transparent 98%)",
+              maskImage: "linear-gradient(to bottom, #000 80%, transparent 98%)",
             }}
-            className={`absolute inset-0 h-full w-full object-contain object-bottom transition-[opacity,transform] duration-1000 ease-out ${
+            className={`pointer-events-none absolute inset-0 h-full w-full object-contain object-bottom transition-[opacity,transform] duration-1000 ease-out ${
               i === index ? "translate-y-0 scale-100 opacity-100" : "translate-y-3 scale-95 opacity-0"
             }`}
           />
         ))}
       </div>
 
-      <div className="flex items-center justify-between gap-4 pt-4">
-        <p aria-live="off" className="text-label">
-          <span className="sr-only">
-            {t.hoodieOf.replace("{n}", String(index + 1)).replace("{total}", String(loginHoodies.length))}.{" "}
-          </span>
+      {/* Footer bar with hoodie name, slide dots and pause button */}
+      <div className="relative z-10 flex items-center justify-between border-t border-white/10 px-6 py-4 text-xs font-mono uppercase tracking-widest text-concrete">
+        <span aria-live="polite" aria-atomic="true">
           {ARABIC_HOODIE_NAMES[current.name] ?? current.name}
-        </p>
-        <div className="flex items-center gap-3">
+        </span>
+
+        <div className="flex items-center gap-4">
           <ul className="flex gap-1.5" aria-hidden="true">
-            {loginHoodies.map((h, i) => (
+            {hoodiesList.map((h, i) => (
               <li
                 key={h.name}
-                className={`h-0.5 w-5 transition-colors duration-300 ${
-                  i === index ? "bg-off-white" : "bg-concrete/50"
+                className={`h-1.5 w-1.5 rounded-full transition-colors duration-300 ${
+                  i === index ? "bg-white" : "bg-white/20"
                 }`}
               />
             ))}
           </ul>
+
           {!reduced && (
             <button
               type="button"
               onClick={() => setPlaying((p) => !p)}
               aria-pressed={!playing}
-              className="text-label min-h-8 px-1 hover:underline cursor-pointer"
+              className="text-concrete hover:text-white transition-colors cursor-pointer"
             >
               {playing ? t.pause : t.play}
             </button>
