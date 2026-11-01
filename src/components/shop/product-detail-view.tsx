@@ -28,7 +28,7 @@ import { formatPrice } from "@/lib/format";
 import { useCart } from "@/lib/cart";
 import { useLocale } from "@/lib/locale-context";
 import { StatusLabel } from "@/components/ui/status-label";
-import { useAdminStore } from "@/lib/admin/store";
+import { useLive } from "@/lib/use-live";
 import type { Product } from "@/content/home";
 
 type Props = {
@@ -41,10 +41,10 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
   const { add } = useCart();
   const { locale, t } = useLocale();
 
-  const { data: adminData } = useAdminStore();
-  const matchedAdmin = adminData?.products.find(
-    (p) => p.slug === product.slug || p.id === product.slug
-  );
+  const { data: liveProducts } = useLive("products");
+  const matchedAdmin = Array.isArray(liveProducts)
+    ? liveProducts.find((p: any) => p.slug === product.slug || p.id === product.slug)
+    : null;
 
   // Live dynamic images mapping (synced with admin store & API)
   const shots = useMemo(() => {
@@ -625,7 +625,7 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
                   ref={thumbnailsRef}
                   className="flex flex-1 gap-3 overflow-x-auto pb-1.5 scrollbar-none snap-x"
                 >
-                  {shots.map((shot, idx) => {
+                  {shots.map((shot: any, idx: number) => {
                     const isSelected = idx === activeImageIndex;
                     return (
                       <button

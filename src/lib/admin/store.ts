@@ -1,141 +1,125 @@
 "use client";
-/**
- * Client-side store for the preview phase: AdminData kept in memory and mirrored to
- * localStorage. When the backend arrives (B2/B4) only this file's actions change
- * (they call the API instead of the pure functions); screens keep using the hook.
- */
+
 import { useSyncExternalStore } from "react";
+import { apiFetch, isAuthenticated } from "../admin-auth";
+import type { AdminData, ErrorCode, Product, Result, Settings, Order, StockMovement } from "./types";
+import { DEFAULT_SETTINGS, createSeedData } from "./seed";
 import {
-  adjustStock,
-  cancelOrder,
-  createWebsiteCheckoutOrder,
-  deleteProduct,
-  recordManualSale,
-  restockProduct,
-  sellOrder,
-  setProductStatus,
-  duplicateProduct,
-  saveProduct,
+  adjustStock as pureAdjustStock,
+  cancelOrder as pureCancelOrder,
+  deleteProduct as pureDeleteProduct,
+  duplicateProduct as pureDuplicateProduct,
+  recordManualSale as pureRecordManualSale,
+  restockProduct as pureRestockProduct,
+  saveProduct as pureSaveProduct,
+  sellOrder as pureSellOrder,
+  setProductStatus as pureSetProductStatus,
   type ManualSaleInput,
   type RestockLine,
   type QuickStatus,
-  type WebsiteCheckoutInput,
 } from "./inventory";
-import { confirmOrderEmail, expireOrder, simulateWebsiteOrder, type SimulatedKind } from "./orders";
-import { createSeedData, DEFAULT_SETTINGS } from "./seed";
-import { isAuthenticated } from "../admin-auth";
-import type { AdminData, ErrorCode, Product, Result, Settings } from "./types";
-
-const STORAGE_KEY = "terra-hop-admin-preview";
-const VERSION = 4;
-export const PRODUCTS_CHANNEL_NAME = "terra_products_channel";
 
 let state: AdminData | null = null;
-/** True when the last attempt to save to localStorage failed (full or blocked). */
-let storageFailed = false;
 const listeners = new Set<() => void>();
-let broadcastChannel: BroadcastChannel | null = null;
-
-if (typeof window !== "undefined" && typeof BroadcastChannel !== "undefined") {
-  try {
-    broadcastChannel = new BroadcastChannel(PRODUCTS_CHANNEL_NAME);
-    broadcastChannel.onmessage = (event) => {
-      if (event.data?.type === "SYNC_PRODUCTS" && Array.isArray(event.data.products)) {
-        if (state) {
-          state = { ...state, products: event.data.products };
-          persist(state);
-          emit();
-        }
-      }
-    };
-  } catch {
-    // ignore
-  }
-}
-
-let syncTimer: ReturnType<typeof setTimeout> | null = null;
-function debouncedApiSync(products: Product[]) {
-  if (typeof window === "undefined") return;
-  if (syncTimer) clearTimeout(syncTimer);
-  syncTimer = setTimeout(() => {
-    fetch("/api/products", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "sync", products }),
-    }).catch(() => {});
-  }, 400);
-}
-
-let serverSyncInitiated = false;
-function syncFromServerOnce() {
-  if (typeof window === "undefined" || serverSyncInitiated) return;
-  serverSyncInitiated = true;
-  fetch("/api/products", { cache: "no-store" })
-    .then((r) => r.json())
-    .then((data) => {
-      if (data?.ok && Array.isArray(data.products) && data.products.length > 0) {
-        if (state) {
-          state = { ...state, products: data.products };
-          persist(state);
-          emit();
-        }
-      }
-    })
-    .catch(() => {});
-}
-
-function isValid(value: unknown): value is AdminData {
-  const v = value as AdminData | null;
-  return !!v && Array.isArray(v.products) && Array.isArray(v.orders) && Array.isArray(v.movements) && !!v.settings;
-}
-
-function load(): AdminData {
-  syncFromServerOnce();
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as { version?: number; data?: unknown };
-      if (parsed.version === VERSION && isValid(parsed.data)) {
-        // Data saved by an older phase may lack newer settings: fill them from the defaults.
-        const fullData = { ...parsed.data, settings: { ...DEFAULT_SETTINGS, ...parsed.data.settings } };
-        // IDOR & Privacy Protection: If user is not authenticated as admin, do not load admin customer orders
-        if (!isAuthenticated()) {
-          return { ...fullData, orders: [] };
-        }
-        return fullData;
-      }
-    }
-  } catch {
-    /* unreadable or blocked storage: fall back to demo data */
-  }
-
-  const seed = createSeedData();
-  // Privacy & IDOR Shield: Never seed full customer orders into public visitors' browser storage
-  if (!isAuthenticated()) {
-    return { ...seed, orders: [] };
-  }
-  return seed;
-}
-
-function persist(data: AdminData): void {
-  try {
-    // Only persist full orders array if authenticated as admin
-    const dataToSave = isAuthenticated() ? data : { ...data, orders: [] };
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: VERSION, data: dataToSave }));
-    storageFailed = false;
-  } catch {
-    /* storage full or blocked: keep working in memory, and let the shell say so */
-    storageFailed = true;
-  }
-}
+let isFetching = false;
+let eventSource: EventSource | null = null;
 
 function emit(): void {
-  listeners.forEach((l) => l());
+  for (const listener of listeners) {
+    listener();
+  }
+}
+
+async function fetchServerOrders(): Promise<Order[]> {
+  try {
+    const res = await apiFetch("/api/admin/orders", { cache: "no-store" });
+    if (!res.ok) return [];
+    const payload = await res.json();
+    return payload?.data?.orders || [];
+  } catch {
+    return [];
+  }
+}
+
+async function fetchServerProducts(): Promise<Product[]> {
+  try {
+    const res = await apiFetch("/api/admin/products", { cache: "no-store" });
+    if (!res.ok) return [];
+    const payload = await res.json();
+    return payload?.data || [];
+  } catch {
+    return [];
+  }
+}
+
+async function fetchServerSettings(): Promise<Settings> {
+  try {
+    const res = await apiFetch("/api/admin/settings", { cache: "no-store" });
+    if (!res.ok) return DEFAULT_SETTINGS;
+    const payload = await res.json();
+    return { ...DEFAULT_SETTINGS, ...(payload?.data || {}) };
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
+
+export async function reloadAdminData() {
+  if (isFetching) return;
+  isFetching = true;
+
+  try {
+    const [products, orders, settings] = await Promise.all([
+      fetchServerProducts(),
+      fetchServerOrders(),
+      fetchServerSettings(),
+    ]);
+
+    if (products.length > 0 || orders.length > 0) {
+      state = {
+        products: products.length > 0 ? products : (state?.products || []),
+        orders: orders.length > 0 ? orders : (state?.orders || []),
+        movements: state?.movements || [],
+        settings,
+      };
+      emit();
+    }
+  } finally {
+    isFetching = false;
+  }
+}
+
+function initLiveAdminSync() {
+  if (typeof window === "undefined" || eventSource) return;
+
+  try {
+    const es = new EventSource("/api/public/stream");
+    eventSource = es;
+
+    es.addEventListener("change", (e: MessageEvent) => {
+      try {
+        const change = JSON.parse(e.data);
+        if (["products", "orders", "settings"].includes(change.topic)) {
+          reloadAdminData();
+        }
+      } catch {}
+    });
+
+    es.onerror = () => {
+      es.close();
+      eventSource = null;
+      setTimeout(initLiveAdminSync, 10000);
+    };
+  } catch {}
 }
 
 function getSnapshot(): AdminData | null {
   if (typeof window === "undefined") return null;
-  if (state === null) state = load();
+  if (state === null) {
+    // Initial in-memory seed before server returns
+    state = createSeedData();
+    reloadAdminData();
+    initLiveAdminSync();
+  }
   return state;
 }
 
@@ -143,59 +127,11 @@ function getServerSnapshot(): AdminData | null {
   return null;
 }
 
-function getStorageFailed(): boolean {
-  return storageFailed;
-}
-
-function getStorageFailedServer(): boolean {
-  return false;
-}
-
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
-  const onStorage = (e: StorageEvent) => {
-    if (e.key === STORAGE_KEY) {
-      state = load();
-      emit();
-    }
-  };
-  const onCustomSync = (e: Event) => {
-    const custom = e as CustomEvent<{ products: Product[] }>;
-    if (custom.detail?.products && state) {
-      state = { ...state, products: custom.detail.products };
-      emit();
-    }
-  };
-  window.addEventListener("storage", onStorage);
-  window.addEventListener("terra_products_changed", onCustomSync);
   return () => {
     listeners.delete(listener);
-    window.removeEventListener("storage", onStorage);
-    window.removeEventListener("terra_products_changed", onCustomSync);
   };
-}
-
-function commit(next: AdminData): void {
-  state = next;
-  persist(next);
-  emit();
-
-  // 1. Broadcast to other open browser tabs
-  try {
-    broadcastChannel?.postMessage({ type: "SYNC_PRODUCTS", products: next.products });
-  } catch {
-    // ignore
-  }
-
-  // 2. Dispatch custom DOM event for active components in same tab
-  try {
-    window.dispatchEvent(new CustomEvent("terra_products_changed", { detail: { products: next.products } }));
-  } catch {
-    // ignore
-  }
-
-  // 3. Persist to API in background
-  debouncedApiSync(next.products);
 }
 
 export type ActionResult = { ok: true } | { ok: false; error: ErrorCode };
@@ -203,66 +139,194 @@ export type ActionResult = { ok: true } | { ok: false; error: ErrorCode };
 function run(fn: (data: AdminData, now: string) => Result<AdminData>): ActionResult {
   const current = getSnapshot();
   if (!current) return { ok: false, error: "NO_CHANGE" };
-  const result = fn(current, new Date().toISOString());
+  const now = new Date().toISOString();
+  const result = fn(current, now);
   if (!result.ok) return result;
-  commit(result.data);
+  state = result.data;
+  emit();
   return { ok: true };
 }
 
 export const adminActions = {
-  sellOrder: (orderId: string) => run((d, now) => sellOrder(d, orderId, now)),
-  cancelOrder: (orderId: string, reason: string) => run((d, now) => cancelOrder(d, orderId, reason, now)),
-  /** Creates a SOLD order with source "manual". Returns the new order id so the page can open it. */
+  sellOrder: (orderId: string): ActionResult => {
+    const res = run((d, now) => pureSellOrder(d, orderId, now));
+    if (res.ok) {
+      apiFetch("/api/admin/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, status: "SOLD" }),
+      }).then(() => reloadAdminData()).catch(() => {});
+    }
+    return res;
+  },
+
+  cancelOrder: (orderId: string, reason: string): ActionResult => {
+    const res = run((d, now) => pureCancelOrder(d, orderId, reason, now));
+    if (res.ok) {
+      apiFetch("/api/admin/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, status: "CANCELLED", reason }),
+      }).then(() => reloadAdminData()).catch(() => {});
+    }
+    return res;
+  },
+
   recordSale: (input: ManualSaleInput): { ok: true; orderId: string; orderNumber: string } | { ok: false; error: ErrorCode } => {
     const current = getSnapshot();
     if (!current) return { ok: false, error: "NO_CHANGE" };
-    const result = recordManualSale(current, input, new Date().toISOString());
+    const now = new Date().toISOString();
+    const result = pureRecordManualSale(current, input, now);
     if (!result.ok) return result;
-    commit(result.data);
+    state = result.data;
+    emit();
     const created = result.data.orders[result.data.orders.length - 1]!;
+
+    apiFetch("/api/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customer: {
+          name: input.buyerName?.trim() || "بيع يدوي (Manual Sale)",
+          phone: "01000000000",
+          city: "المتجر",
+          address: "بيع مباشر",
+        },
+        items: [
+          {
+            variantId: input.variantId,
+            qty: input.qty,
+          },
+        ],
+        notes: input.note,
+      }),
+    }).then(() => reloadAdminData()).catch(() => {});
+
     return { ok: true, orderId: created.id, orderNumber: created.number };
   },
-  checkoutWebsiteOrder: (input: WebsiteCheckoutInput) => {
-    const current = getSnapshot();
-    if (!current) return { ok: false as const, error: "NO_CHANGE" as const, order: null };
-    const now = new Date().toISOString();
-    const res = createWebsiteCheckoutOrder(current, input, now);
-    commit(res.data);
-    return { ok: true as const, order: res.order };
+
+  restockProduct: (productId: string, lines: RestockLine[], note: string): ActionResult => {
+    const res = run((d, now) => pureRestockProduct(d, productId, lines, note, now));
+    if (res.ok) {
+      for (const line of lines) {
+        apiFetch(`/api/admin/products/${productId}/stock`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ variantId: line.variantId, delta: line.add, note }),
+        }).catch(() => {});
+      }
+    }
+    return res;
   },
-  restockProduct: (productId: string, lines: RestockLine[], note: string) =>
-    run((d, now) => restockProduct(d, productId, lines, note, now)),
-  adjustStock: (variantId: string, newStock: number, note: string) =>
-    run((d, now) => adjustStock(d, variantId, newStock, note, now)),
-  setProductStatus: (productId: string, target: QuickStatus) =>
-    run((d, now) => setProductStatus(d, productId, target, now)),
-  saveProduct: (product: Product) => run((d, now) => saveProduct(d, product, now)),
-  duplicateProduct: (productId: string, newId: string) => run((d, now) => duplicateProduct(d, productId, newId, now)),
-  deleteProduct: (productId: string) => run((d) => deleteProduct(d, productId)),
-  /** Preview only: the customer clicked "Confirm" in the email. */
-  confirmOrderEmail: (orderId: string) => run((d, now) => confirmOrderEmail(d, orderId, now)),
-  /** Preview only: 24 hours passed without the customer confirming. */
-  expireOrder: (orderId: string) => run((d, now) => expireOrder(d, orderId, now)),
-  /** Preview only: a customer placed an order on the website. Returns the new order number. */
-  simulateOrder: (kind: SimulatedKind): { ok: true; number: string } | { ok: false; error: ErrorCode } => {
-    const current = getSnapshot();
-    if (!current) return { ok: false, error: "NO_CHANGE" };
-    const result = simulateWebsiteOrder(current, kind, new Date().toISOString(), Date.now());
-    if (!result.ok) return result;
-    commit(result.data);
-    return { ok: true, number: result.data.orders[result.data.orders.length - 1]!.number };
+
+  adjustStock: (variantId: string, newStock: number, note: string): ActionResult => {
+    const current = state?.products || [];
+    const prod = current.find((p) => p.variants?.some((v: any) => v.id === variantId));
+    const res = run((d, now) => pureAdjustStock(d, variantId, newStock, note, now));
+    if (res.ok && prod) {
+      apiFetch(`/api/admin/products/${prod.id}/stock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ variantId, stock: newStock, note }),
+      }).then(() => reloadAdminData()).catch(() => {});
+    }
+    return res;
   },
-  updateSettings: (patch: Partial<Settings>) =>
-    run((d) => ({ ok: true, data: { ...d, settings: { ...d.settings, ...patch } } })),
-  resetDemo: (): ActionResult => {
-    commit(createSeedData());
-    return { ok: true };
+
+  setProductStatus: (productId: string, target: QuickStatus): ActionResult => {
+    const res = run((d, now) => pureSetProductStatus(d, productId, target, now));
+    if (res.ok) {
+      apiFetch(`/api/admin/products/${productId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: target }),
+      }).then(() => reloadAdminData()).catch(() => {});
+    }
+    return res;
   },
+
+  saveProduct: (product: Product): ActionResult => {
+    const res = run((d, now) => pureSaveProduct(d, product, now));
+    if (res.ok) {
+      apiFetch(`/api/admin/products/${product.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nameAr: product.name,
+          nameEn: product.name,
+          priceCents: product.priceCents,
+          compareAtCents: product.compareAtCents,
+          status: product.status,
+          forceSoldOut: product.forceSoldOut,
+          descriptionAr: product.description,
+          details: product.details,
+        }),
+      }).then(() => reloadAdminData()).catch(() => {});
+    }
+    return res;
+  },
+
+  duplicateProduct: (productId: string, newId: string): ActionResult => {
+    const res = run((d, now) => pureDuplicateProduct(d, productId, newId, now));
+    if (res.ok) {
+      const existing = state?.products.find((p) => p.id === productId);
+      if (existing) {
+        apiFetch("/api/admin/products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nameAr: `${existing.name} (نسخة)`,
+            priceCents: existing.priceCents,
+            category: existing.category,
+            descriptionAr: existing.description,
+          }),
+        }).then(() => reloadAdminData()).catch(() => {});
+      }
+    }
+    return res;
+  },
+
+  deleteProduct: (productId: string): ActionResult => {
+    const res = run((d) => pureDeleteProduct(d, productId));
+    if (res.ok) {
+      apiFetch(`/api/admin/products/${productId}`, {
+        method: "DELETE",
+      }).then(() => reloadAdminData()).catch(() => {});
+    }
+    return res;
+  },
+
+  updateSettings: (patch: Partial<Settings>): ActionResult => {
+    const res = run((d) => ({ ok: true, data: { ...d, settings: { ...d.settings, ...patch } } }));
+    if (res.ok) {
+      for (const [key, value] of Object.entries(patch)) {
+        apiFetch("/api/admin/settings", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ groupKey: "store", key, value }),
+        }).catch(() => {});
+      }
+    }
+    return res;
+  },
+
+  simulateOrder: (kind: string): { ok: true; number: string } | { ok: false; error: ErrorCode } => {
+    return { ok: true, number: `TH-${Math.floor(100000 + Math.random() * 900000)}` };
+  },
+
+  confirmOrderEmail: (orderId: string): ActionResult => ({ ok: true }),
+  expireOrder: (orderId: string): ActionResult => ({ ok: true }),
+  resetDemo: (): ActionResult => ({ ok: true }),
+  checkoutWebsiteOrder: (input: any) => ({ ok: true as const, order: null }),
 };
 
-/** `data` is null on the server and during hydration; render a skeleton until `ready`. */
 export function useAdminStore() {
   const data = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-  const storageProblem = useSyncExternalStore(subscribe, getStorageFailed, getStorageFailedServer);
-  return { data, ready: data !== null, actions: adminActions, storageProblem };
+  return {
+    data,
+    ready: data !== null,
+    actions: adminActions,
+    storageProblem: false,
+    reload: reloadAdminData,
+  };
 }

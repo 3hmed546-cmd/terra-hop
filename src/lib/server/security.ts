@@ -105,3 +105,63 @@ export function constantTimeCompare(a: string, b: string): boolean {
     return false;
   }
 }
+
+/**
+ * Scrypt-based password hashing (secure against GPU/ASIC brute forcing)
+ */
+export function hashPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const derivedKey = crypto.scryptSync(password.normalize("NFKC"), salt, 64, {
+    N: 16384,
+    r: 8,
+    p: 1,
+  });
+  return `${salt}:${derivedKey.toString("hex")}`;
+}
+
+/**
+ * Verifies a plaintext password against a stored scrypt hash in constant time
+ */
+export function verifyPassword(password: string, storedHash: string): boolean {
+  try {
+    const parts = storedHash.split(":");
+    if (parts.length !== 2) return false;
+    const [salt, expectedKeyHex] = parts;
+    const derivedKey = crypto.scryptSync(password.normalize("NFKC"), salt, 64, {
+      N: 16384,
+      r: 8,
+      p: 1,
+    });
+    const keyBuf = derivedKey;
+    const expectedBuf = Buffer.from(expectedKeyHex, "hex");
+    if (keyBuf.length !== expectedBuf.length) return false;
+    return crypto.timingSafeEqual(keyBuf, expectedBuf);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Generate CSRF token cryptographically bound to the session
+ */
+export function generateCsrfToken(sessionId: string): string {
+  const secret = getSecretKey();
+  return crypto.createHmac("sha256", secret).update(`csrf:${sessionId}`).digest("hex");
+}
+
+/**
+ * Verify CSRF token
+ */
+export function verifyCsrfToken(sessionId: string, token: string): boolean {
+  if (!sessionId || !token) return false;
+  const expected = generateCsrfToken(sessionId);
+  try {
+    const a = Buffer.from(token);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
+

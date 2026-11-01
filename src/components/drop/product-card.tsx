@@ -6,16 +6,16 @@ import { images } from "@/content/images";
 import { formatPrice } from "@/lib/format";
 import { StatusLabel } from "@/components/ui/status-label";
 import { useLocale } from "@/lib/locale-context";
-import { useAdminStore } from "@/lib/admin/store";
+import { useLive } from "@/lib/use-live";
 import type { Product } from "@/content/home";
 
 // The whole card is one link. The second image fades in on hover only.
 export function ProductCard({ product }: { product: Product }) {
   const { locale, t } = useLocale();
-  const { data: adminData } = useAdminStore();
-  const matchedAdmin = adminData?.products.find(
-    (p) => p.slug === product.slug || p.id === product.slug
-  );
+  const { data: liveProducts } = useLive("products");
+  const matchedAdmin = Array.isArray(liveProducts)
+    ? liveProducts.find((p: any) => p.slug === product.slug || p.id === product.slug)
+    : null;
 
   const sizes = "(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw";
 

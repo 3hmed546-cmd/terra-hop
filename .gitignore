@@ -34,6 +34,14 @@ yarn-error.log*
 .env*
 !.env.example
 
+# storage and databases
+/storage/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+/data/secure-vault/orders.vault.enc
+
 # vercel
 .vercel
 

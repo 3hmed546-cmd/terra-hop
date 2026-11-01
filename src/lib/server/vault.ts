@@ -94,6 +94,15 @@ function decryptData(encryptedBuffer: Buffer): string {
   return decrypted.toString("utf8");
 }
 
+export function encryptCustomer(data: any): Buffer {
+  return encryptData(JSON.stringify(data));
+}
+
+export function decryptCustomer(buf: Buffer): any {
+  const jsonStr = decryptData(buf);
+  return JSON.parse(jsonStr);
+}
+
 /**
  * Ensures the secure vault directory exists on disk
  */

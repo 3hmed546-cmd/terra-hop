@@ -1,19 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Play, Pause } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { ButtonLink } from "@/components/ui/button";
 import { AnimatedLogo } from "@/components/motion/animated-logo";
 import { loginHoodies, loginHoodieIntervalMs, type LoginHoodie } from "@/content/login-hoodies";
-import {
-  loadGalleryImages,
-  saveGalleryImages,
-  getDeletedImageIds,
-  GALLERY_CHANNEL_NAME,
-  type GalleryImage,
-} from "@/lib/admin/gallery";
+import { useLive } from "@/lib/use-live";
 import { useLocale } from "@/lib/locale-context";
 import type { home } from "@/content/home";
 
@@ -24,88 +18,47 @@ export function Hero({ hero }: HeroProps) {
   const [playing, setPlaying] = useState(true);
   const [reduced, setReduced] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [hoodiesList, setHoodiesList] = useState<LoginHoodie[]>(loginHoodies);
   const { t, locale } = useLocale();
 
-  // Sync active header hoodies from live gallery
-  const syncGallery = useCallback((customGallery?: GalleryImage[]) => {
-    const gallery = customGallery || loadGalleryImages();
-    const activeHeaders = gallery.filter((g) => g.category === "header");
-    const activeSrcs = new Set(activeHeaders.map((g) => g.src));
+  // Real-time live data from SSE stream (/api/public/stream & /api/public/site)
+  const { data: liveSite } = useLive("media");
 
-    // Standard hoodies still in gallery
-    const filteredStandard = loginHoodies.filter((h) => activeSrcs.has(h.src));
-
-    // Custom headers added in gallery
-    const customHeaders = activeHeaders.filter(
-      (g) => !loginHoodies.some((lh) => lh.src === g.src)
-    );
-    const extraHoodies: LoginHoodie[] = customHeaders.map((g) => ({
-      src: g.src,
-      name: g.title,
-      glow: "#232323",
-      caption: {
-        ar: { prefix: "تميز", accent: "بأسلوبك", sub: g.title },
-        en: { prefix: "STAND OUT", accent: "YOUR WAY", sub: g.title },
-      },
-    }));
-
-    const nextList = [...filteredStandard, ...extraHoodies];
-    if (nextList.length > 0) {
-      setHoodiesList(nextList);
-      setIndex((curr) => (curr >= nextList.length ? 0 : curr));
+  // Derive active hero hoodies from server database live slots
+  const hoodiesList = useMemo<LoginHoodie[]>(() => {
+    const heroPlacements = liveSite?.slots?.hero_carousel;
+    if (Array.isArray(heroPlacements)) {
+      if (heroPlacements.length === 0) {
+        // If user deleted all images, list is truly empty (or fallback banner if desired)
+        return [];
+      }
+      return heroPlacements.map((p: any) => {
+        const meta = p.meta || {};
+        return {
+          src: p.url,
+          name: p.alt?.ar || p.alt?.en || meta.name || "TERRA HOP",
+          glow: meta.glow || "#34445c",
+          caption: meta.caption || {
+            ar: { prefix: "تميز", accent: "بأسلوبك", sub: p.alt?.ar || "مجموعة الهوديز الجديدة" },
+            en: { prefix: "STAND OUT", accent: "YOUR WAY", sub: p.alt?.en || "New Hoodies Collection" },
+          },
+        };
+      });
     }
-  }, []);
+
+    // Initial pre-fetch fallback
+    return loginHoodies;
+  }, [liveSite]);
 
   useEffect(() => {
     setMounted(true);
-    syncGallery();
+  }, []);
 
-    const fetchServerGallery = () => {
-      fetch("/api/media", { cache: "no-store" })
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.images && Array.isArray(data.images)) {
-            const localDeleted = new Set(getDeletedImageIds());
-            const clean = data.images.filter((img: GalleryImage) => !localDeleted.has(img.id));
-            saveGalleryImages(clean, false);
-            syncGallery(clean);
-          }
-        })
-        .catch(() => {});
-    };
-
-    // 1. Fetch immediately on mount so customer sees any newly added images without delay
-    fetchServerGallery();
-
-    // 2. Instant cross-tab real-time sync with BroadcastChannel
-    let channel: BroadcastChannel | null = null;
-    if (typeof BroadcastChannel !== "undefined") {
-      try {
-        channel = new BroadcastChannel(GALLERY_CHANNEL_NAME);
-        channel.onmessage = (e) => {
-          if (e.data?.type === "UPDATE") {
-            syncGallery(e.data.images);
-          }
-        };
-      } catch {
-        // ignore
-      }
+  // Ensure index stays in bounds if images were deleted
+  useEffect(() => {
+    if (hoodiesList.length > 0 && index >= hoodiesList.length) {
+      setIndex(0);
     }
-
-    // 4. Same-tab and storage events
-    const onSync = () => syncGallery();
-    window.addEventListener("terra_gallery_changed", onSync);
-    window.addEventListener("storage", onSync);
-    window.addEventListener("focus", fetchServerGallery);
-
-    return () => {
-      channel?.close();
-      window.removeEventListener("terra_gallery_changed", onSync);
-      window.removeEventListener("storage", onSync);
-      window.removeEventListener("focus", fetchServerGallery);
-    };
-  }, [syncGallery]);
+  }, [hoodiesList.length, index]);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -115,7 +68,7 @@ export function Hero({ hero }: HeroProps) {
     return () => mq.removeEventListener("change", update);
   }, []);
 
-  const running = playing && !reduced;
+  const running = playing && !reduced && hoodiesList.length > 1;
 
   useEffect(() => {
     if (!running || hoodiesList.length === 0) return;
@@ -125,12 +78,12 @@ export function Hero({ hero }: HeroProps) {
     return () => window.clearInterval(id);
   }, [running, index, hoodiesList.length]);
 
-  const current = hoodiesList[index] ?? hoodiesList[0] ?? loginHoodies[0];
+  const current = hoodiesList[index] ?? hoodiesList[0];
   const currentCaption = current
     ? locale === "ar"
       ? current.caption.ar
       : current.caption.en
-    : loginHoodies[0].caption.ar;
+    : { prefix: "TERRA", accent: "HOP", sub: "Streetwear Culture" };
 
   return (
     <section
@@ -178,7 +131,7 @@ export function Hero({ hero }: HeroProps) {
         </div>
       </div>
 
-      {/* Rotating Hoodie Images Showcase - Mobile (Large & Fills space with NO bottom gap, matching Image 2) */}
+      {/* Rotating Hoodie Images Showcase - Mobile (Large & Fills space with NO bottom gap) */}
       <div className="flex md:hidden absolute inset-x-0 bottom-0 top-[235px] sm:top-[250px] -z-10 pointer-events-none items-end justify-center overflow-hidden">
         <div className="relative h-[78vh] w-full max-w-[480px]">
           {hoodiesList.map((h, i) => (
@@ -240,14 +193,14 @@ export function Hero({ hero }: HeroProps) {
 
       {/* MOBILE LAYOUT (< md) */}
       <div className="flex md:hidden flex-col items-center justify-start flex-1 px-4 pt-16 z-10">
-        {/* Big White TERRA HOP Logo in Mobile (no bottom margin so gap to caption is exact) */}
+        {/* Big White TERRA HOP Logo in Mobile */}
         <h1 className="w-full max-w-[280px] sm:max-w-[320px] text-center mb-0">
           <AnimatedLogo>
             <Logo className="w-full drop-shadow-md" />
           </AnimatedLogo>
         </h1>
 
-        {/* Mobile Upper Caption (Centered, exactly 15px below Logo, ~20px above model's head, 30% larger font) */}
+        {/* Mobile Upper Caption (Centered, exactly 15px below Logo, ~20px above model head, 30% larger font) */}
         <div
           dir={locale === "ar" ? "rtl" : "ltr"}
           className="flex flex-col items-center text-center mt-[15px] z-10 select-none"
@@ -285,7 +238,7 @@ export function Hero({ hero }: HeroProps) {
         </div>
       </div>
 
-      {/* Bottom Bar: CTA on left, Carousel Indicator on right (Responsive for both Mobile & Desktop) */}
+      {/* Bottom Bar: CTA on left, Carousel Indicator on right */}
       <div className="flex items-end justify-between gap-4 px-4 pb-6 md:px-6 lg:px-10 lg:pb-12 z-10 text-left">
         {/* Shopping CTA Button - Smooth entrance animation from bottom settling into place */}
         <motion.div
@@ -307,45 +260,47 @@ export function Hero({ hero }: HeroProps) {
           </ButtonLink>
         </motion.div>
 
-        {/* Hoodie Carousel Controls (Dashes indicator & Play/Pause button) */}
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{
-            duration: 0.75,
-            delay: 0.45,
-            ease: [0.22, 1, 0.36, 1],
-          }}
-          className="flex items-center gap-3 text-xs font-mono uppercase tracking-widest text-graphite pb-1"
-        >
-          <ul className="flex gap-1" aria-hidden="true">
-            {hoodiesList.map((h, i) => (
-              <li
-                key={h.name}
-                className={`h-1 w-2.5 sm:w-4 rounded-full transition-colors duration-300 ${
-                  i === index ? "bg-off-white" : "bg-concrete/40"
-                }`}
-              />
-            ))}
-          </ul>
+        {/* Hoodie Carousel Controls */}
+        {hoodiesList.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: 0.75,
+              delay: 0.45,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+            className="flex items-center gap-3 text-xs font-mono uppercase tracking-widest text-graphite pb-1"
+          >
+            <ul className="flex gap-1" aria-hidden="true">
+              {hoodiesList.map((h, i) => (
+                <li
+                  key={h.src}
+                  className={`h-1 w-2.5 sm:w-4 rounded-full transition-colors duration-300 ${
+                    i === index ? "bg-off-white" : "bg-concrete/40"
+                  }`}
+                />
+              ))}
+            </ul>
 
-          {!reduced && (
-            <button
-              type="button"
-              onClick={() => setPlaying((p) => !p)}
-              aria-pressed={!playing}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/40 text-off-white backdrop-blur-xs hover:border-white/60 hover:bg-black/60 transition cursor-pointer"
-              title={playing ? t.hero.pause : t.hero.play}
-              aria-label={playing ? t.hero.pause : t.hero.play}
-            >
-              {playing ? (
-                <Pause className="h-3.5 w-3.5 fill-current" />
-              ) : (
-                <Play className="h-3.5 w-3.5 fill-current ml-0.5" />
-              )}
-            </button>
-          )}
-        </motion.div>
+            {!reduced && hoodiesList.length > 1 && (
+              <button
+                type="button"
+                onClick={() => setPlaying((p) => !p)}
+                aria-pressed={!playing}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/40 text-off-white backdrop-blur-xs hover:border-white/60 hover:bg-black/60 transition cursor-pointer"
+                title={playing ? t.hero.pause : t.hero.play}
+                aria-label={playing ? t.hero.pause : t.hero.play}
+              >
+                {playing ? (
+                  <Pause className="h-3.5 w-3.5 fill-current" />
+                ) : (
+                  <Play className="h-3.5 w-3.5 fill-current ml-0.5" />
+                )}
+              </button>
+            )}
+          </motion.div>
+        )}
       </div>
     </section>
   );

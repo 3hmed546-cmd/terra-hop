@@ -16,16 +16,12 @@ import {
 } from "lucide-react";
 import {
   GalleryImage,
-  INITIAL_GALLERY_IMAGES,
-  loadGalleryImages,
-  deleteGalleryImage,
-  addGalleryImage,
-  resetGalleryImages,
-  saveGalleryImages,
-  getDeletedImageIds,
-  getCustomImages,
+  fetchHeroImages,
+  deleteHeroImage,
+  addHeroImage,
   GALLERY_CHANNEL_NAME,
 } from "@/lib/admin/gallery";
+import { apiFetch } from "@/lib/admin-auth";
 import { resizeImageToDataUrl } from "@/lib/admin/image-resize";
 import { useAdminStore } from "@/lib/admin/store";
 import { formatPrice } from "@/lib/format";
@@ -36,7 +32,7 @@ type ConfirmDeleteTarget =
   | { type: "product"; product: Product; image: ProductImage };
 
 export function MediaGallery() {
-  const [images, setImages] = useState<GalleryImage[]>(INITIAL_GALLERY_IMAGES);
+  const [images, setImages] = useState<GalleryImage[]>([]);
   const [mounted, setMounted] = useState(false);
 
   // Admin store for live synchronized products
@@ -53,6 +49,7 @@ export function MediaGallery() {
   const [addProductTarget, setAddProductTarget] = useState<Product | null>(null);
 
   const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
 
   // Add Form state
   const [newTitle, setNewTitle] = useState("");
@@ -63,30 +60,18 @@ export function MediaGallery() {
   // Selected product filter for albums
   const [selectedProductFilter, setSelectedProductFilter] = useState<string>("all");
 
-  const refreshGallery = useCallback(() => {
-    setImages(loadGalleryImages());
+  const refreshGallery = useCallback(async () => {
+    try {
+      const liveImages = await fetchHeroImages();
+      setImages(liveImages);
+    } catch {
+      // Keep existing state if offline
+    }
   }, []);
 
   useEffect(() => {
     refreshGallery();
     setMounted(true);
-
-    // Initial gentle fetch from server to sync if any other device made changes
-    fetch("/api/media", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.images && Array.isArray(data.images)) {
-          const localDeleted = new Set(getDeletedImageIds());
-          const cleanServerImages = data.images.filter((img: GalleryImage) => !localDeleted.has(img.id));
-          const localCustom = getCustomImages();
-          const missingCustom = localCustom.filter((c) => !cleanServerImages.some((s: GalleryImage) => s.id === c.id));
-          const merged = [...missingCustom, ...cleanServerImages];
-
-          saveGalleryImages(merged, false);
-          setImages(merged);
-        }
-      })
-      .catch(() => {});
 
     // Listen to real-time events across tabs
     let channel: BroadcastChannel | null = null;
@@ -98,19 +83,11 @@ export function MediaGallery() {
             refreshGallery();
           }
         };
-      } catch {
-        // ignore
-      }
+      } catch {}
     }
-
-    const onSync = () => refreshGallery();
-    window.addEventListener("terra_gallery_changed", onSync);
-    window.addEventListener("storage", onSync);
 
     return () => {
       channel?.close();
-      window.removeEventListener("terra_gallery_changed", onSync);
-      window.removeEventListener("storage", onSync);
     };
   }, [refreshGallery]);
 
@@ -122,61 +99,42 @@ export function MediaGallery() {
 
     if (confirmTarget.type === "header") {
       const target = confirmTarget.image;
-      const nextImages = await deleteGalleryImage(target.id);
-      setImages(nextImages);
-      setConfirmTarget(null);
-      setSuccessDeletedName(`صورة الهيدر "${target.title}"`);
+      try {
+        await deleteHeroImage(target.id);
+        const next = await fetchHeroImages();
+        setImages(next);
+        setConfirmTarget(null);
+        setSuccessDeletedName(`صورة الهيدر "${target.title}"`);
+      } catch (err: any) {
+        setConfirmTarget(null);
+        alert(err.message || "فشل حذف صورة الهيدر من الخادم.");
+      }
       return;
     }
 
     if (confirmTarget.type === "product") {
       const { product, image } = confirmTarget;
-      const filteredImages = (product.images || []).filter((img) => img.id !== image.id && img.url !== image.url);
-      const updatedProduct: Product = {
-        ...product,
-        images: filteredImages,
-        updatedAt: new Date().toISOString(),
-      };
-
-      // 1. Update in local memory & broadcast to all tabs
-      adminActions.saveProduct(updatedProduct);
-
-      // 2. Persist to API
       try {
-        fetch("/api/products", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "delete_image",
-            productId: product.id,
-            imageId: image.id,
-          }),
-        }).catch(() => {});
-      } catch {
-        // ignore
+        await apiFetch(`/api/admin/slots/product/items/${encodeURIComponent(image.id)}`, {
+          method: "DELETE",
+        });
+        await adminActions.saveProduct(product);
+        setConfirmTarget(null);
+        setSuccessDeletedName(`صورة ${image.alt || product.name} من ألبوم (${product.name})`);
+      } catch (err: any) {
+        setConfirmTarget(null);
+        alert(err.message || "فشل حذف صورة المنتج من الخادم.");
       }
-
-      setConfirmTarget(null);
-      setSuccessDeletedName(`صورة ${image.alt || product.name} من ألبوم (${product.name})`);
     }
   }
 
   // Handle Setting Primary Image for a Product
-  function handleSetPrimaryImage(product: Product, imageId: string) {
+  async function handleSetPrimaryImage(product: Product, imageId: string) {
     const targetImg = product.images.find((img) => img.id === imageId);
     if (!targetImg) return;
     const reordered = [targetImg, ...product.images.filter((img) => img.id !== imageId)];
     const updated: Product = { ...product, images: reordered, updatedAt: new Date().toISOString() };
-    adminActions.saveProduct(updated);
-    try {
-      fetch("/api/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "save", product: updated }),
-      }).catch(() => {});
-    } catch {
-      // ignore
-    }
+    await adminActions.saveProduct(updated);
   }
 
   // Handle Add Image Execution
@@ -186,77 +144,73 @@ export function MediaGallery() {
       setAddError("يرجى إدخال اسم أو وصف للصورة");
       return;
     }
-    if (!newSrc.trim()) {
+    if (!newSrc.trim() && !uploadFile) {
       setAddError("يرجى اختيار ملف صورة أو إدخال رابط الصورة");
       return;
     }
 
-    if (addMode === "header") {
-      const newImage: GalleryImage = {
-        id: `img-${Date.now()}`,
-        title: newTitle.trim(),
-        src: newSrc.trim(),
-        category: "header",
-        tag: newTag.trim() || "هيدر كاروسيل",
-        addedAt: new Date().toISOString().split("T")[0],
-      };
+    setIsProcessingFile(true);
+    setAddError(null);
 
-      const nextImages = await addGalleryImage(newImage);
-      setImages(nextImages);
+    try {
+      if (addMode === "header") {
+        await addHeroImage({
+          file: uploadFile || undefined,
+          title: newTitle.trim(),
+          meta: { tag: newTag.trim() || "هيدر كاروسيل" },
+        });
 
-      const addedTitle = newImage.title;
-      resetAddForm();
-      setSuccessAddedName(`صورة الهيدر "${addedTitle}"`);
-      return;
-    }
-
-    if (addMode === "product" && addProductTarget) {
-      const product = addProductTarget;
-      const newProductImage: ProductImage = {
-        id: `pimg-${Date.now()}`,
-        url: newSrc.trim(),
-        alt: newTitle.trim(),
-      };
-
-      const updatedImages = [...(product.images || []), newProductImage];
-      const updatedProduct: Product = {
-        ...product,
-        images: updatedImages,
-        updatedAt: new Date().toISOString(),
-      };
-
-      adminActions.saveProduct(updatedProduct);
-
-      try {
-        fetch("/api/products", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "add_image",
-            productId: product.id,
-            image: newProductImage,
-          }),
-        }).catch(() => {});
-      } catch {
-        // ignore
+        const next = await fetchHeroImages();
+        setImages(next);
+        const addedTitle = newTitle.trim();
+        resetAddForm();
+        setSuccessAddedName(`صورة الهيدر "${addedTitle}"`);
+        return;
       }
 
-      const pName = product.name;
-      resetAddForm();
-      setSuccessAddedName(`صورة جديدة لألبوم (${pName})`);
+      if (addMode === "product" && addProductTarget) {
+        const product = addProductTarget;
+        const formData = new FormData();
+        if (uploadFile) {
+          formData.append("file", uploadFile);
+        }
+        formData.append("altAr", newTitle.trim());
+        formData.append("altEn", newTitle.trim());
+        formData.append("ownerId", product.id);
+
+        const res = await apiFetch("/api/admin/slots/product/items", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error?.message || "فشل إضافة الصورة لهذا المنتج.");
+        }
+
+        await adminActions.saveProduct(product);
+        const pName = product.name;
+        resetAddForm();
+        setSuccessAddedName(`صورة جديدة لألبوم (${pName})`);
+      }
+    } catch (err: any) {
+      setAddError(err.message || "حدث خطأ أثناء رفع وحفظ الصورة.");
+    } finally {
+      setIsProcessingFile(false);
     }
   }
 
   function resetAddForm() {
     setAddMode(null);
     setAddProductTarget(null);
+    setUploadFile(null);
     setNewTitle("");
     setNewTag("");
     setNewSrc("");
     setAddError(null);
   }
 
-  // Handle File Input conversion to optimized lightweight base64 DataURL
+  // Handle File Input conversion to preview
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -266,6 +220,7 @@ export function MediaGallery() {
       return;
     }
 
+    setUploadFile(file);
     setIsProcessingFile(true);
     setAddError(null);
 
@@ -293,13 +248,9 @@ export function MediaGallery() {
     }
   }
 
-  // Restore Default Images
+  // Refresh from Server
   async function handleResetDefaults() {
-    if (confirm("هل تريد استعادة جميع الصور الأولية؟")) {
-      const reset = await resetGalleryImages();
-      setImages(reset);
-      setSuccessAddedName("تمت استعادة صور المعرض الأصلية بنجاح");
-    }
+    await refreshGallery();
   }
 
   if (!mounted) {

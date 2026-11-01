@@ -6,7 +6,6 @@ import Link from "next/link";
 import { CheckCircle2, ShieldCheck, Truck, Mail, Phone, MapPin, ArrowRight, ArrowLeft } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { useLocale } from "@/lib/locale-context";
-import { useAdminStore } from "@/lib/admin/store";
 import { images } from "@/content/images";
 import { formatPrice } from "@/lib/format";
 import type { Product } from "@/content/home";
@@ -41,7 +40,6 @@ const EGYPT_GOVERNORATES = [
 export function CheckoutView({ products }: { products: Product[] }) {
   const { lines, clear } = useCart();
   const { locale, t, dir } = useLocale();
-  const { data, actions } = useAdminStore();
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -98,7 +96,7 @@ export function CheckoutView({ products }: { products: Product[] }) {
   });
 
   const subtotal = rows.reduce((sum, r) => sum + r.product.price * r.qty, 0);
-  const shippingFee = (data?.settings.shippingCents ?? 6000) / 100;
+  const shippingFee = 50; // Standard shipping (flat 50 EGP)
   // Free shipping offer if 2 items or more
   const totalItemCount = rows.reduce((sum, r) => sum + r.qty, 0);
   const isFreeShipping = totalItemCount >= 2;
@@ -309,14 +307,13 @@ export function CheckoutView({ products }: { products: Product[] }) {
       });
       const resData = await apiRes.json();
 
-      if (apiRes.ok && resData.ok && resData.order) {
-        // Also register in local admin preview store if in test environment
-        actions.checkoutWebsiteOrder(checkoutInput);
+      const order = resData.data || resData.order;
+      if (apiRes.ok && resData.ok && order) {
         clear();
-        setPlacedOrder(resData.order);
+        setPlacedOrder(order);
         window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
-        setFormErrors({ submit: resData.error || "حدث خطأ أثناء تسجيل الطلب. يرجى المحاولة مرة أخرى." });
+        setFormErrors({ submit: resData.error?.message || resData.error || "حدث خطأ أثناء تسجيل الطلب. يرجى المحاولة مرة أخرى." });
       }
     } catch {
       setFormErrors({ submit: "تعذر الاتصال بالخادم لتسجيل الطلب. يرجى التحقق من اتصالك بالإنترنت." });

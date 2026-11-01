@@ -16,12 +16,13 @@ export function proxy(request: NextRequest) {
   const sessionCookie = request.cookies.get("terra_admin_session")?.value;
   const isAuthedSession = verifySessionToken(sessionCookie).valid;
 
-  // Exempt authenticated admins, APIs, and Next.js internal RSC prefetches from DoS blocking
+  // Exempt authenticated admins, internal Next.js assets, public media, and live SSE stream from aggressive DoS blocking
   const isExemptFromDos =
     isAuthedSession ||
-    pathname.startsWith("/api/") ||
-    request.nextUrl.searchParams.has("_rsc") ||
-    pathname.startsWith("/_next/");
+    pathname.startsWith("/_next/") ||
+    pathname.startsWith("/media/") ||
+    pathname === "/api/public/stream" ||
+    request.nextUrl.searchParams.has("_rsc");
 
   // 1. DoS & Flooding Protection Check (for public unauthenticated traffic only):
   if (!isExemptFromDos) {
