@@ -24,10 +24,8 @@ import {
   GALLERY_CHANNEL_NAME,
 } from "@/lib/admin/gallery";
 import { resizeImageToDataUrl } from "@/lib/admin/image-resize";
-import { useToast } from "@/components/admin/ui/Toast";
 
 export function MediaGallery() {
-  const toast = useToast();
   const [images, setImages] = useState<GalleryImage[]>(INITIAL_GALLERY_IMAGES);
   const [mounted, setMounted] = useState(false);
 
@@ -120,7 +118,6 @@ export function MediaGallery() {
     // 2. Close confirm popup & open success popup
     setConfirmTarget(null);
     setSuccessDeletedName(target.title);
-    toast.push(`تم حذف "${target.title}" بنجاح وتحديث المتجر فوراً`);
   }
 
   // Handle Add Image Execution
@@ -155,7 +152,6 @@ export function MediaGallery() {
     setNewSrc("");
     setAddError(null);
     setSuccessAddedName(addedTitle);
-    toast.push(`تمت إضافة "${addedTitle}" وتحديث المتجر فوراً`);
   }
 
   // Handle File Input conversion to optimized lightweight base64 DataURL
@@ -202,7 +198,7 @@ export function MediaGallery() {
     if (confirm("هل تريد استعادة جميع الصور الأولية؟")) {
       const reset = await resetGalleryImages();
       setImages(reset);
-      toast.push("تمت استعادة صور المعرض الأصلية بنجاح");
+      setSuccessAddedName("تمت استعادة صور المعرض الأصلية بنجاح");
     }
   }
 
