@@ -169,10 +169,10 @@ export function Hero({ hero }: HeroProps) {
           </AnimatedLogo>
         </div>
 
-        {/* 2. Caption Centered Horizontally Exactly 50px Below Logo (+15px more down as requested) */}
+        {/* 2. Caption Centered Horizontally Exactly 40px Below Logo (Shifted 10px up as requested) */}
         <div
           dir={locale === "ar" ? "rtl" : "ltr"}
-          className="mt-[50px] flex flex-col items-center text-center w-full max-w-sm mx-auto select-none"
+          className="mt-[40px] flex flex-col items-center text-center w-full max-w-sm mx-auto select-none"
         >
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
