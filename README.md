@@ -1,6 +1,7 @@
-# TERRA HOP — Frontend Preview
+# TERRA HOP — Storefront
 
-Homepage-only preview of the TERRA HOP store. No backend, no admin dashboard, no login page, no API.
+Official e-commerce storefront for TERRA HOP streetwear brand.
+Connected to GitHub & Vercel for continuous deployment.
 The build plan is `Terra_Hop_Frontend_Homepage_Plan.md`. Progress is recorded in its Section 12.
 
 ## Run it (three commands)
