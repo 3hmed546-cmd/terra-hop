@@ -1,11 +1,12 @@
 import crypto from "crypto";
 import fs from "fs/promises";
 import path from "path";
+import os from "os";
 
 /**
  * Encrypted Server-Side Data Vault (AES-256-GCM)
  * Provides military-grade encryption at rest for customer Personally Identifiable Information (PII)
- * and order records. Stored in an isolated directory (data/secure-vault/) away from public web roots.
+ * and order records. Works seamlessly on both cPanel/VPS (persistent local disk) and Vercel/Serverless (/tmp fallback).
  */
 
 export interface VaultOrderCustomer {
@@ -40,8 +41,17 @@ export interface VaultOrder {
   soldAt?: string | null;
 }
 
-const VAULT_DIR = path.join(process.cwd(), "data", "secure-vault");
-const VAULT_FILE = path.join(VAULT_DIR, "orders.vault.enc");
+function getVaultDir(): string {
+  // In serverless environments (Vercel / AWS Lambda), the root filesystem is read-only.
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    return path.join(os.tmpdir(), "terra-secure-vault");
+  }
+  return path.join(process.cwd(), "data", "secure-vault");
+}
+
+function getVaultFile(): string {
+  return path.join(getVaultDir(), "orders.vault.enc");
+}
 
 // Derive 32-byte (256-bit) encryption key from SESSION_SECRET
 function getVaultKey(): Buffer {
@@ -88,10 +98,16 @@ function decryptData(encryptedBuffer: Buffer): string {
  * Ensures the secure vault directory exists on disk
  */
 async function ensureVaultDir(): Promise<void> {
+  const dir = getVaultDir();
   try {
-    await fs.mkdir(VAULT_DIR, { recursive: true });
+    await fs.mkdir(dir, { recursive: true });
   } catch {
-    // Already exists
+    // If permission or read-only error on current directory, fallback to os.tmpdir()
+    try {
+      await fs.mkdir(path.join(os.tmpdir(), "terra-secure-vault"), { recursive: true });
+    } catch {
+      // Best-effort
+    }
   }
 }
 
@@ -100,8 +116,9 @@ async function ensureVaultDir(): Promise<void> {
  */
 export async function getOrdersFromVault(): Promise<VaultOrder[]> {
   await ensureVaultDir();
+  const file = getVaultFile();
   try {
-    const raw = await fs.readFile(VAULT_FILE);
+    const raw = await fs.readFile(file);
     if (!raw || raw.length === 0) return [];
     const decryptedJson = decryptData(raw);
     const parsed = JSON.parse(decryptedJson);
@@ -122,6 +139,7 @@ export async function getOrdersFromVault(): Promise<VaultOrder[]> {
  */
 export async function saveOrderToVault(order: VaultOrder): Promise<void> {
   await ensureVaultDir();
+  const file = getVaultFile();
   const existing = await getOrdersFromVault();
   
   // Prepend new order
@@ -129,9 +147,9 @@ export async function saveOrderToVault(order: VaultOrder): Promise<void> {
   
   const encrypted = encryptData(JSON.stringify(updated));
   // Write atomically using temporary file to prevent partial writes
-  const tempFile = `${VAULT_FILE}.${Date.now()}.tmp`;
+  const tempFile = `${file}.${Date.now()}.tmp`;
   await fs.writeFile(tempFile, encrypted);
-  await fs.rename(tempFile, VAULT_FILE);
+  await fs.rename(tempFile, file);
 }
 
 /**
@@ -142,6 +160,7 @@ export async function updateOrderStatusInVault(
   status: VaultOrder["status"]
 ): Promise<boolean> {
   await ensureVaultDir();
+  const file = getVaultFile();
   const existing = await getOrdersFromVault();
   const index = existing.findIndex((o) => o.id === orderId);
   
@@ -153,8 +172,8 @@ export async function updateOrderStatusInVault(
   }
 
   const encrypted = encryptData(JSON.stringify(existing));
-  const tempFile = `${VAULT_FILE}.${Date.now()}.tmp`;
+  const tempFile = `${file}.${Date.now()}.tmp`;
   await fs.writeFile(tempFile, encrypted);
-  await fs.rename(tempFile, VAULT_FILE);
+  await fs.rename(tempFile, file);
   return true;
 }

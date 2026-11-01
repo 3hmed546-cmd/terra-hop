@@ -45,15 +45,15 @@ export function Signup({ signup }: { signup: typeof home.signup }) {
               {/* Exclusive Perks Badges */}
               <div className="mt-6 flex flex-wrap gap-2.5 sm:gap-3">
                 <div className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3.5 py-2 text-xs sm:text-sm font-bold text-obsidian shadow-2xs">
-                  <span className="text-amber-500 text-base leading-none">⚡</span>
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
                   <span>{t.signup.perks.codes}</span>
                 </div>
                 <div className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3.5 py-2 text-xs sm:text-sm font-bold text-obsidian shadow-2xs">
-                  <span className="text-red-500 text-base leading-none">🔥</span>
+                  <span className="h-1.5 w-1.5 rounded-full bg-obsidian" />
                   <span>{t.signup.perks.drops}</span>
                 </div>
                 <div className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3.5 py-2 text-xs sm:text-sm font-bold text-obsidian shadow-2xs">
-                  <span className="text-purple-500 text-base leading-none">🎁</span>
+                  <span className="h-1.5 w-1.5 rounded-full bg-stone-400" />
                   <span>{t.signup.perks.deals}</span>
                 </div>
               </div>
