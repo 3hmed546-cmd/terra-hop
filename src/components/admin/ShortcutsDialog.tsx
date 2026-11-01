@@ -28,7 +28,7 @@ export function ShortcutsDialog({ open, onClose, enabled }: { open: boolean; onC
             <span className="adm-num">
               {item.keys.map((k, i) => (
                 <span key={k}>
-                  {i > 0 ? <span className="adm-muted"> then </span> : null}
+                  {i > 0 ? <span className="adm-muted"> ثم </span> : null}
                   <kbd className="adm-kbd">{k}</kbd>
                 </span>
               ))}

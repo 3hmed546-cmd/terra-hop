@@ -15,14 +15,14 @@ const DATE_ONLY = new Intl.DateTimeFormat("en-GB", {
   timeZone: "Africa/Cairo",
 });
 
-/** 140000 -> "EGP 1,400"; 140050 -> "EGP 1,400.50" */
+/** 140000 -> "1,400 ج.م"; 140050 -> "1,400.50 ج.م" */
 export function formatMoney(cents: number): string {
   const whole = cents % 100 === 0;
   const value = cents / 100;
   const text = whole
     ? NUMBER.format(value)
     : value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return `EGP ${text}`;
+  return `${text} ج.م`;
 }
 
 export function formatNumber(n: number): string {

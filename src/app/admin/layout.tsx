@@ -4,7 +4,7 @@ import { AdminShell } from "@/components/admin/AdminShell";
 import "./admin.css";
 
 export const metadata: Metadata = {
-  title: { default: "Admin", template: "%s · Terra Hop Admin" },
+  title: { default: "لوحة التحكم", template: "%s · لوحة تحكم تيرا هوب" },
   robots: { index: false, follow: false, nocache: true },
 };
 

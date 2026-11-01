@@ -12,8 +12,8 @@
   --adm-line: rgb(8 8 8 / 0.14);
   --adm-tint: rgb(8 8 8 / 0.04);
   --adm-radius: 2px;
-  --adm-font-head: var(--font-archivo, "Archivo", system-ui, sans-serif);
-  --adm-font-body: var(--font-inter, "Inter", system-ui, sans-serif);
+  --adm-font-head: 'Cairo', var(--font-archivo, "Archivo", system-ui, sans-serif);
+  --adm-font-body: 'Cairo', var(--font-inter, "Inter", system-ui, sans-serif);
 
   min-height: 100vh;
   background: var(--adm-offwhite);
@@ -266,3 +266,19 @@ textarea.adm-input { min-height: 96px; resize: vertical; }
   .adm-plink { display: inline-flex; align-items: center; min-height: 44px; }
   .adm-dl a { display: inline-flex; align-items: center; min-height: 44px; }
 }
+
+/* ---------- RTL Polish ---------- */
+.adm[dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+}
+.adm[dir="rtl"] .adm-table caption { text-align: right; }
+.adm[dir="rtl"] .adm-table th { text-align: right; }
+.adm[dir="rtl"] .adm-table .is-end { text-align: left; }
+.adm[dir="rtl"] .adm-skip { right: 8px; left: auto; }
+.adm[dir="rtl"] .adm-nav-button { text-align: right; }
+.adm[dir="rtl"] .adm-actions { justify-content: flex-start; }
+.adm[dir="rtl"] .adm-dialog-foot { justify-content: flex-start; }
+.adm[dir="rtl"] .adm-toasts { align-items: flex-start; left: 16px; right: auto; }
+.adm[dir="rtl"] .adm-affix-text:first-child { border-right: 1px solid var(--adm-graphite); border-left: 0; }
+.adm[dir="rtl"] .adm-affix-text:last-child { border-left: 1px solid var(--adm-graphite); border-right: 0; }

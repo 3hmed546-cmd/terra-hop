@@ -110,7 +110,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   return (
     <ToastProvider>
       <ShortcutHelpProvider value={{ open: openHelp }}>
-      <div className="adm">
+      <div className="adm" dir="rtl">
         <a className="adm-skip" href="#adm-main">{ADMIN_STRINGS.skipToContent}</a>
         <div className="adm-shell">
           <aside className="adm-sidebar">

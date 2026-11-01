@@ -212,11 +212,12 @@ export function Hero({ hero }: HeroProps) {
             delay: 0.3,
             ease: [0.22, 1, 0.36, 1],
           }}
+          className="mb-[30px] ml-[15px]"
         >
           <ButtonLink
             href="/shop"
             variant="secondary"
-            className="border-off-white! text-xs sm:text-sm py-2.5 px-5 shadow-lg backdrop-blur-xs hover:scale-105 active:scale-95 transition-all"
+            className="border-off-white! text-xs sm:text-sm py-2.5 px-5 hover:scale-105 active:scale-95 transition-all bg-transparent"
           >
             {locale === "ar" ? "تسوق الآن ←" : `${t.hero.cta} →`}
           </ButtonLink>
