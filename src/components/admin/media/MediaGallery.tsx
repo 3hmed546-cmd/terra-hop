@@ -19,6 +19,8 @@ import {
   addGalleryImage,
   resetGalleryImages,
   saveGalleryImages,
+  getDeletedImageIds,
+  getCustomImages,
   GALLERY_CHANNEL_NAME,
 } from "@/lib/admin/gallery";
 import { resizeImageToDataUrl } from "@/lib/admin/image-resize";
@@ -55,8 +57,24 @@ export function MediaGallery() {
       .then((r) => r.json())
       .then((data) => {
         if (data.images && Array.isArray(data.images)) {
-          saveGalleryImages(data.images, false);
-          setImages(data.images);
+          const localDeleted = new Set(getDeletedImageIds());
+          const cleanServerImages = data.images.filter((img: GalleryImage) => !localDeleted.has(img.id));
+          const localCustom = getCustomImages();
+          const missingCustom = localCustom.filter((c) => !cleanServerImages.some((s: GalleryImage) => s.id === c.id));
+          const merged = [...missingCustom, ...cleanServerImages];
+
+          saveGalleryImages(merged, false);
+          setImages(merged);
+
+          // If the server still had deleted items, sync our authoritative clean state back to server
+          const serverHadDeleted = data.images.some((img: GalleryImage) => localDeleted.has(img.id));
+          if (serverHadDeleted || missingCustom.length > 0) {
+            fetch("/api/media", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "sync", images: merged, deletedIds: Array.from(localDeleted) }),
+            }).catch(() => {});
+          }
         }
       })
       .catch(() => {});
