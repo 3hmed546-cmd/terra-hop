@@ -79,30 +79,34 @@ export function productToForm(p: Product): ProductForm {
 
 /** Sizes the form can show: the standard list plus any custom size the product already has. */
 export function sizeChoices(form: ProductForm): string[] {
-  const extra = form.sizes.filter((s) => !(SIZE_OPTIONS as readonly string[]).includes(s));
+  const safeSizes = Array.isArray(form?.sizes) ? form.sizes : [];
+  const extra = safeSizes.filter((s) => !(SIZE_OPTIONS as readonly string[]).includes(s));
   return [...SIZE_OPTIONS, ...extra];
 }
 
 /** Ids stay stable when a colour is renamed, so existing orders keep pointing at the right stock. */
 export function nextColorId(colors: ColorOption[]): string {
-  let n = colors.length + 1;
-  while (colors.some((c) => c.id === `color-${n}`)) n += 1;
+  const safeColors = Array.isArray(colors) ? colors : [];
+  let n = safeColors.length + 1;
+  while (safeColors.some((c) => c.id === `color-${n}`)) n += 1;
   return `color-${n}`;
 }
 
 function orderSizes(sizes: string[]): string[] {
+  const safeSizes = Array.isArray(sizes) ? sizes : [];
   const rank = (s: string) => {
     const i = (SIZE_OPTIONS as readonly string[]).indexOf(s);
     return i === -1 ? SIZE_OPTIONS.length : i;
   };
-  return [...sizes].sort((a, b) => rank(a) - rank(b));
+  return [...safeSizes].sort((a, b) => rank(a) - rank(b));
 }
 
 /** Rebuilds the colour x size grid after colours or sizes change, keeping numbers already typed. */
 export function withGrid(form: ProductForm, patch: Partial<Pick<ProductForm, "colors" | "sizes">>): ProductForm {
-  const colors = patch.colors ?? form.colors;
-  const sizes = patch.sizes ? orderSizes(patch.sizes) : form.sizes;
-  return { ...form, colors, sizes, variants: generateVariants(form.productId, colors, sizes, form.variants) };
+  const colors = patch.colors ? (Array.isArray(patch.colors) ? patch.colors : []) : (Array.isArray(form?.colors) ? form.colors : []);
+  const sizes = patch.sizes ? orderSizes(patch.sizes) : (Array.isArray(form?.sizes) ? form.sizes : []);
+  const safeVariants = Array.isArray(form?.variants) ? form.variants : [];
+  return { ...form, colors, sizes, variants: generateVariants(form.productId, colors, sizes, safeVariants) };
 }
 
 export function setCellStock(form: ProductForm, variantId: string, stock: number): ProductForm {

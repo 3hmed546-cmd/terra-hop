@@ -132,7 +132,7 @@ export function Hero({ hero }: HeroProps) {
       </div>
 
       {/* Rotating Hoodie Images Showcase - Mobile (Large & Fills space with NO bottom gap) */}
-      <div className="flex md:hidden absolute inset-x-0 bottom-0 top-[235px] sm:top-[250px] -z-10 pointer-events-none items-end justify-center overflow-hidden">
+      <div className="flex md:hidden absolute inset-x-0 bottom-0 top-[260px] sm:top-[275px] -z-10 pointer-events-none items-end justify-center overflow-hidden">
         <div className="relative h-[78vh] w-full max-w-[480px]">
           {hoodiesList.map((h, i) => (
             // eslint-disable-next-line @next/next/no-img-element
@@ -191,8 +191,8 @@ export function Hero({ hero }: HeroProps) {
         </AnimatePresence>
       </div>
 
-      {/* MOBILE LAYOUT (< md) */}
-      <div className="flex md:hidden flex-col items-center justify-start flex-1 px-4 pt-16 z-10">
+      {/* MOBILE LAYOUT (< md) - Moved caption up 20px, 15px below logo, 20px above model head, font +30% */}
+      <div className="flex md:hidden flex-col items-center justify-start flex-1 px-4 pt-[44px] z-10">
         {/* Big White TERRA HOP Logo in Mobile */}
         <h1 className="w-full max-w-[280px] sm:max-w-[320px] text-center mb-0">
           <AnimatedLogo>
@@ -215,10 +215,10 @@ export function Hero({ hero }: HeroProps) {
               className="flex flex-col items-center"
             >
               <div className="flex items-center justify-center gap-2.5">
-                <span className="text-[26px] sm:text-[31px] font-extrabold text-white tracking-tight drop-shadow-sm leading-tight">
+                <span className="text-[34px] sm:text-[40px] font-extrabold text-white tracking-tight drop-shadow-sm leading-tight">
                   {currentCaption.prefix}
                 </span>
-                <span className="bg-[#b31428] text-white text-[23px] sm:text-[26px] font-extrabold px-3.5 py-1 rounded-md shadow-md leading-tight">
+                <span className="bg-[#b31428] text-white text-[30px] sm:text-[34px] font-extrabold px-3.5 py-1 rounded-md shadow-md leading-tight">
                   {currentCaption.accent}
                 </span>
               </div>
@@ -229,7 +229,7 @@ export function Hero({ hero }: HeroProps) {
                       ? "'Cairo', var(--font-inter), system-ui, sans-serif"
                       : "inherit",
                 }}
-                className="mt-2.5 text-[15px] sm:text-[18px] font-semibold text-stone-200/95 tracking-wide drop-shadow-md text-center max-w-[340px] sm:max-w-md"
+                className="mt-2.5 text-[20px] sm:text-[23px] font-semibold text-stone-200/95 tracking-wide drop-shadow-md text-center max-w-[340px] sm:max-w-md"
               >
                 {currentCaption.sub}
               </p>

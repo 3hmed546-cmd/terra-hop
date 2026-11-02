@@ -1,283 +1,207 @@
 [
   {
-    "id": "phantom-obsidian-hoodie",
-    "slug": "phantom-obsidian-hoodie",
-    "name": "Phantom Obsidian Hoodie",
-    "description": "هودي ستريت وير أسود فاحم مصنوع من قطن مصري 100% ثقيل (450 GSM). غطاء رأس مزدوج، جيب كانغرو مبطن، وتطريز كوكبي فاخر عالي الكثافة على الصدر.",
+    "id": "oversized-burgundy-hoodie",
+    "slug": "oversized-burgundy-hoodie",
+    "name": "هودي عنابي أوفرسايز (Burgundy Oversized Hoodie)",
+    "description": "هودي ستريت وير عنابي (Maroon/Burgundy) بقصة بوكسي دروب شولدر مريحة جداً. مصنوع من قطن مصري 100% ثقيل وفاخر (460 GSM). شعار TERRA HOP مطبوع بجودة عالية على الصدر مع تفاصيل عصرية للشتاء.",
+    "category": "hoodie",
+    "priceCents": 125000,
+    "compareAtCents": 160000,
+    "status": "active",
+    "forceSoldOut": false,
+    "lowStockThreshold": 3,
+    "details": {
+      "material": "100% Heavy Combed Egyptian Cotton Fleece, 460 GSM",
+      "weight": "460 GSM",
+      "care": "غسيل آلي بماء بارد مقلوب للحفاظ على لون وخامة القطن",
+      "sizeChart": "S, M, L, XL, XXL - قصة أوفرسايز واسعة وعصرية"
+    },
+    "colors": [
+      { "id": "burgundy", "name": "عنابي مارون (Burgundy Maroon)", "hex": "#7B1824" }
+    ],
+    "sizes": ["S", "M", "L", "XL", "XXL"],
+    "variants": [
+      { "id": "v-obh-s", "colorId": "burgundy", "size": "S", "stock": 14 },
+      { "id": "v-obh-m", "colorId": "burgundy", "size": "M", "stock": 22 },
+      { "id": "v-obh-l", "colorId": "burgundy", "size": "L", "stock": 25 },
+      { "id": "v-obh-xl", "colorId": "burgundy", "size": "XL", "stock": 18 },
+      { "id": "v-obh-xxl", "colorId": "burgundy", "size": "XXL", "stock": 9 }
+    ],
+    "images": [
+      { "id": "obh-img-1", "url": "/products/burgundy-hoodie-model.jpg", "alt": "موديل يرتدي هودي عنابي أوفرسايز من TERRA HOP في جلسة تصوير ستريت وير" },
+      { "id": "obh-img-2", "url": "/preview-images/look-3.jpg", "alt": "تفاصيل قصة وأكمام الهودي العنابي" }
+    ],
+    "createdAt": "2026-11-02T12:00:00.000Z",
+    "updatedAt": "2026-11-02T12:00:00.000Z"
+  },
+  {
+    "id": "obsidian-puff-print-hoodie",
+    "slug": "obsidian-puff-print-hoodie",
+    "name": "هودي أسود باف برينت (Obsidian Puff-Print Hoodie)",
+    "description": "هودي ستريت وير أسود فاحم مزود بطباعة باف برينت مجسمة ثلاثية الأبعاد لشعار TERRA HOP على الصدر والظهر. قصة ثقيلة وقبعة مزدوجة تمنحك إطلالة فريدة.",
+    "category": "hoodie",
+    "priceCents": 129000,
+    "compareAtCents": 165000,
+    "status": "active",
+    "forceSoldOut": false,
+    "lowStockThreshold": 3,
+    "details": {
+      "material": "100% Ultra-Heavy Combed Cotton, 480 GSM",
+      "weight": "480 GSM",
+      "care": "غسيل مقلوب بماء بارد - تجنب الكي المباشر على الطباعة الباف",
+      "sizeChart": "M, L, XL, XXL - قصة ستريت وير دروب شولدر"
+    },
+    "colors": [
+      { "id": "black", "name": "أسود أوبسيديان (Obsidian Black)", "hex": "#080808" }
+    ],
+    "sizes": ["M", "L", "XL", "XXL"],
+    "variants": [
+      { "id": "v-opph-m", "colorId": "black", "size": "M", "stock": 18 },
+      { "id": "v-opph-l", "colorId": "black", "size": "L", "stock": 30 },
+      { "id": "v-opph-xl", "colorId": "black", "size": "XL", "stock": 20 },
+      { "id": "v-opph-xxl", "colorId": "black", "size": "XXL", "stock": 10 }
+    ],
+    "images": [
+      { "id": "opph-img-1", "url": "/products/black-hoodie-model.jpg", "alt": "موديل يرتدي هودي أسود باف برينت في استوديو معماري بتصميم TERRA HOP" },
+      { "id": "opph-img-2", "url": "/preview-images/hoodie-1.jpg", "alt": "صورة كاملة لهودي أسود باف برينت" }
+    ],
+    "createdAt": "2026-11-02T12:00:00.000Z",
+    "updatedAt": "2026-11-02T12:00:00.000Z"
+  },
+  {
+    "id": "vintage-cream-boxy-hoodie",
+    "slug": "vintage-cream-boxy-hoodie",
+    "name": "هودي كريمي بوكسي (Vintage Cream Boxy Hoodie)",
+    "description": "هودي أوف وايت كريمي دافئ مريح بتطريز تايبوغرافي ناعم على الصدر. تصميم بوكسي واسع يناسب كل الإطلالات اليومية مع خامات فاخرة ناعمة الملمس.",
     "category": "hoodie",
     "priceCents": 125000,
     "compareAtCents": 155000,
     "status": "active",
     "forceSoldOut": false,
-    "lowStockThreshold": null,
+    "lowStockThreshold": 3,
     "details": {
-      "material": "100% Heavy Combed Cotton Fleece, 450 GSM",
-      "weight": "450 GSM",
-      "care": "غسيل آلي بماء بارد ومقلوب",
-      "sizeChart": "S, M, L, XL, XXL - قصة أوفرسايز دروب شولدر"
+      "material": "100% Combed Cotton Fleece, 430 GSM",
+      "weight": "430 GSM",
+      "care": "غسيل مقلوب مع ألوان فاتحة",
+      "sizeChart": "S, M, L, XL - قصة بوكسي مريحة"
     },
     "colors": [
-      { "id": "black", "name": "أسود ملكي (Obsidian Black)", "hex": "#080808" }
+      { "id": "cream", "name": "كريمي أوف وايت (Vintage Cream)", "hex": "#F4F1EB" }
     ],
-    "sizes": ["S", "M", "L", "XL", "XXL"],
+    "sizes": ["S", "M", "L", "XL"],
     "variants": [
-      { "id": "v-poh-s", "colorId": "black", "size": "S", "stock": 12 },
-      { "id": "v-poh-m", "colorId": "black", "size": "M", "stock": 20 },
-      { "id": "v-poh-l", "colorId": "black", "size": "L", "stock": 28 },
-      { "id": "v-poh-xl", "colorId": "black", "size": "XL", "stock": 18 },
-      { "id": "v-poh-xxl", "colorId": "black", "size": "XXL", "stock": 8 }
+      { "id": "v-vcbh-s", "colorId": "cream", "size": "S", "stock": 12 },
+      { "id": "v-vcbh-m", "colorId": "cream", "size": "M", "stock": 25 },
+      { "id": "v-vcbh-l", "colorId": "cream", "size": "L", "stock": 22 },
+      { "id": "v-vcbh-xl", "colorId": "cream", "size": "XL", "stock": 14 }
     ],
     "images": [
-      { "id": "poh-img-1", "url": "/login-hoodies/hoodie-black.webp", "alt": "Phantom Obsidian Hoodie - الموديل يرتدي هودي أسود فاحم" },
-      { "id": "poh-img-2", "url": "/preview-images/hoodie-1.jpg", "alt": "Phantom Obsidian Hoodie - زاوية كاملة للإطلالة" },
-      { "id": "poh-img-3", "url": "/preview-images/hoodie-2.jpg", "alt": "Phantom Obsidian Hoodie - تفاصيل التطريز والجيب" }
+      { "id": "vcbh-img-1", "url": "/products/cream-hoodie-model.jpg", "alt": "موديل يرتدي هودي كريمي بوكسي ستريت وير في ضوء النهار الطبيعي" },
+      { "id": "vcbh-img-2", "url": "/preview-images/look-2.jpg", "alt": "تفاصيل الظهر والطباعة الفنية للهودي الكريمي" }
     ],
-    "createdAt": "2026-10-01T10:00:00.000Z",
-    "updatedAt": "2026-11-01T20:00:00.000Z"
+    "createdAt": "2026-11-02T12:00:00.000Z",
+    "updatedAt": "2026-11-02T12:00:00.000Z"
   },
   {
-    "id": "dusty-cobalt-hoodie",
-    "slug": "dusty-cobalt-hoodie",
-    "name": "Dusty Cobalt Streetwear Hoodie",
-    "description": "لون أزرق ترابي استثنائي مستوحى من ألوان الشارع العصرية. قصة أوفرسايز دروب شولدر وأكمام مضلعة سميكة لراحة فائقة في كل حركة.",
+    "id": "emerald-forest-heavyweight-hoodie",
+    "slug": "emerald-forest-heavyweight-hoodie",
+    "name": "هودي إميرالد أخضر زمردي (Emerald Heavyweight Hoodie)",
+    "description": "درجة الأخضر الزمردي الغامق الفاخرة بقماش قطني متين ودافئ. مظهر راقي مع تطريز دقيق لشعار المتجر وجيب كانغرو عملي.",
     "category": "hoodie",
-    "priceCents": 120000,
-    "compareAtCents": 150000,
+    "priceCents": 130000,
+    "compareAtCents": 165000,
     "status": "active",
     "forceSoldOut": false,
-    "lowStockThreshold": null,
+    "lowStockThreshold": 3,
     "details": {
-      "material": "100% Combed Cotton Fleece, 420 GSM",
-      "weight": "420 GSM",
-      "care": "غسيل آلي بماء بارد ومقلوب",
-      "sizeChart": "S, M, L, XL, XXL - قصة أوفرسايز دروب شولدر"
+      "material": "100% Egyptian Combed Cotton, 460 GSM",
+      "weight": "460 GSM",
+      "care": "غسيل مقلوب للحفاظ على عمق اللون الزمردي",
+      "sizeChart": "M, L, XL, XXL - قصة أوفرسايز ستريت وير"
     },
     "colors": [
-      { "id": "dusty-blue", "name": "أزرق ترابي (Dusty Blue)", "hex": "#34445C" }
+      { "id": "emerald", "name": "أخضر زمردي (Emerald Forest)", "hex": "#1E392A" }
     ],
-    "sizes": ["S", "M", "L", "XL", "XXL"],
+    "sizes": ["M", "L", "XL", "XXL"],
     "variants": [
-      { "id": "v-dch-s", "colorId": "dusty-blue", "size": "S", "stock": 10 },
-      { "id": "v-dch-m", "colorId": "dusty-blue", "size": "M", "stock": 16 },
-      { "id": "v-dch-l", "colorId": "dusty-blue", "size": "L", "stock": 24 },
-      { "id": "v-dch-xl", "colorId": "dusty-blue", "size": "XL", "stock": 15 },
-      { "id": "v-dch-xxl", "colorId": "dusty-blue", "size": "XXL", "stock": 6 }
+      { "id": "v-efhh-m", "colorId": "emerald", "size": "M", "stock": 16 },
+      { "id": "v-efhh-l", "colorId": "emerald", "size": "L", "stock": 24 },
+      { "id": "v-efhh-xl", "colorId": "emerald", "size": "XL", "stock": 19 },
+      { "id": "v-efhh-xxl", "colorId": "emerald", "size": "XXL", "stock": 8 }
     ],
     "images": [
-      { "id": "dch-img-1", "url": "/login-hoodies/hoodie-dusty-blue.webp", "alt": "Dusty Cobalt Streetwear Hoodie - الموديل بهودي أزرق ترابي" },
-      { "id": "dch-img-2", "url": "/login-hoodies/hoodie-slate-navy.webp", "alt": "Dusty Cobalt Streetwear Hoodie - زاوية جانبية" }
+      { "id": "efhh-img-1", "url": "/products/forest-hoodie-model.jpg", "alt": "موديل يرتدي هودي إميرالد أخضر زمردي في لوفت ستوديو حديث" },
+      { "id": "efhh-img-2", "url": "/preview-images/look-5.jpg", "alt": "إطلالة كاملة مع بنطال كارجو للهودي الزمردي" }
     ],
-    "createdAt": "2026-10-02T10:00:00.000Z",
-    "updatedAt": "2026-11-01T20:00:00.000Z"
+    "createdAt": "2026-11-02T12:00:00.000Z",
+    "updatedAt": "2026-11-02T12:00:00.000Z"
   },
   {
-    "id": "vintage-mocha-hoodie",
-    "slug": "vintage-mocha-hoodie",
-    "name": "Vintage Mocha Brown Hoodie",
-    "description": "إطلالة شتوية غنية بلون الشوكولاتة العتيقة وتأثير فينتاج دافئ. قطن مغسول ناعم الملمس متين ومقاوم للوبر.",
-    "category": "hoodie",
-    "priceCents": 120000,
-    "compareAtCents": 150000,
-    "status": "active",
-    "forceSoldOut": false,
-    "lowStockThreshold": null,
-    "details": {
-      "material": "100% Pre-shrunk Cotton, 420 GSM",
-      "weight": "420 GSM",
-      "care": "غسيل آلي بماء بارد ومقلوب",
-      "sizeChart": "S, M, L, XL, XXL - قصة أوفرسايز دروب شولدر"
-    },
-    "colors": [
-      { "id": "chocolate", "name": "بني شوكولاتة فينتاج (Vintage Brown)", "hex": "#4A3B30" }
-    ],
-    "sizes": ["S", "M", "L", "XL", "XXL"],
-    "variants": [
-      { "id": "v-vmh-s", "colorId": "chocolate", "size": "S", "stock": 8 },
-      { "id": "v-vmh-m", "colorId": "chocolate", "size": "M", "stock": 14 },
-      { "id": "v-vmh-l", "colorId": "chocolate", "size": "L", "stock": 20 },
-      { "id": "v-vmh-xl", "colorId": "chocolate", "size": "XL", "stock": 12 },
-      { "id": "v-vmh-xxl", "colorId": "chocolate", "size": "XXL", "stock": 5 }
-    ],
-    "images": [
-      { "id": "vmh-img-1", "url": "/login-hoodies/hoodie-chocolate.webp", "alt": "Vintage Mocha Brown Hoodie - الموديل بهودي بني كاكاو" },
-      { "id": "vmh-img-2", "url": "/login-hoodies/hoodie-sand-beige.webp", "alt": "Vintage Mocha Brown Hoodie - تناسق لوني" }
-    ],
-    "createdAt": "2026-10-03T10:00:00.000Z",
-    "updatedAt": "2026-11-01T20:00:00.000Z"
-  },
-  {
-    "id": "alpine-forest-hoodie",
-    "slug": "alpine-forest-hoodie",
-    "name": "Alpine Forest Green Hoodie",
-    "description": "درجة خضراء غنية وفاخرة مع لوجو أبيض متباين. بطانة داخلية فائقة النعومة وتطريز متقن على المعصم والصدر.",
+    "id": "mocha-brown-acid-wash-hoodie",
+    "slug": "mocha-brown-acid-wash-hoodie",
+    "name": "هودي موكا براون أسيد (Mocha Brown Acid-Wash Hoodie)",
+    "description": "لون بني موكا كلاسيكي بمظهر معتق جذاب مستوحى من أزياء الشارع العالمية. أطراف مضلعة متماسكة وخامة ثقيلة تتحمل الارتداء اليومي.",
     "category": "hoodie",
     "priceCents": 125000,
-    "compareAtCents": 155000,
+    "compareAtCents": 160000,
     "status": "active",
     "forceSoldOut": false,
-    "lowStockThreshold": null,
+    "lowStockThreshold": 3,
     "details": {
-      "material": "100% Heavy Combed Cotton, 440 GSM",
+      "material": "100% Combed Cotton Fleece, 440 GSM",
       "weight": "440 GSM",
-      "care": "غسيل آلي بماء بارد ومقلوب",
-      "sizeChart": "S, M, L, XL, XXL - قصة أوفرسايز دروب شولدر"
+      "care": "غسيل مقلوب بماء بارد",
+      "sizeChart": "S, M, L, XL - قصة دروب شولدر عصرية"
     },
     "colors": [
-      { "id": "olive", "name": "أخضر غابات (Forest Green)", "hex": "#2E3B2E" }
+      { "id": "mocha", "name": "بني موكا (Vintage Mocha)", "hex": "#4A3728" }
     ],
-    "sizes": ["S", "M", "L", "XL", "XXL"],
+    "sizes": ["S", "M", "L", "XL"],
     "variants": [
-      { "id": "v-afh-s", "colorId": "olive", "size": "S", "stock": 9 },
-      { "id": "v-afh-m", "colorId": "olive", "size": "M", "stock": 18 },
-      { "id": "v-afh-l", "colorId": "olive", "size": "L", "stock": 22 },
-      { "id": "v-afh-xl", "colorId": "olive", "size": "XL", "stock": 14 },
-      { "id": "v-afh-xxl", "colorId": "olive", "size": "XXL", "stock": 6 }
+      { "id": "v-mbah-s", "colorId": "mocha", "size": "S", "stock": 11 },
+      { "id": "v-mbah-m", "colorId": "mocha", "size": "M", "stock": 20 },
+      { "id": "v-mbah-l", "colorId": "mocha", "size": "L", "stock": 22 },
+      { "id": "v-mbah-xl", "colorId": "mocha", "size": "XL", "stock": 15 }
     ],
     "images": [
-      { "id": "afh-img-1", "url": "/login-hoodies/hoodie-forest.webp", "alt": "Alpine Forest Green Hoodie - الموديل بهودي أخضر غامق" },
-      { "id": "afh-img-2", "url": "/login-hoodies/hoodie-deep-teal.webp", "alt": "Alpine Forest Green Hoodie - تفاصيل النسيج" }
+      { "id": "mbah-img-1", "url": "/products/brown-hoodie-model.jpg", "alt": "موديل يرتدي هودي موكا براون في إضاءة سينمائية دافئة" },
+      { "id": "mbah-img-2", "url": "/preview-images/hoodie-2.jpg", "alt": "تفاصيل قبعة وتطريز هودي موكا براون" }
     ],
-    "createdAt": "2026-10-04T10:00:00.000Z",
-    "updatedAt": "2026-11-01T20:00:00.000Z"
+    "createdAt": "2026-11-02T12:00:00.000Z",
+    "updatedAt": "2026-11-02T12:00:00.000Z"
   },
   {
-    "id": "charcoal-acid-hoodie",
-    "slug": "charcoal-acid-hoodie",
-    "name": "Charcoal Acid-Wash Hoodie",
-    "description": "معالجة غسيل أسيد فريدة تعطي كل قطعة شخصية حصرية مستقلة. قصة دروب عريضة وجيوب معززة بدرزات ثلاثية.",
+    "id": "midnight-navy-raw-edge-hoodie",
+    "slug": "midnight-navy-raw-edge-hoodie",
+    "name": "هودي ميدنايت كحلي أوفرسايز (Midnight Navy Raw Hoodie)",
+    "description": "أزرق كحلي ليلي غني ومميز بتصميم أوفرسايز مريح وشعار TERRA HOP مطرز باللون الأبيض الناصع. توازن مثالي بين الفخامة والبساطة.",
     "category": "hoodie",
     "priceCents": 128000,
     "compareAtCents": 160000,
     "status": "active",
     "forceSoldOut": false,
-    "lowStockThreshold": null,
+    "lowStockThreshold": 3,
     "details": {
-      "material": "100% Acid-Washed Cotton Fleece, 450 GSM",
+      "material": "100% Premium Egyptian Cotton, 450 GSM",
       "weight": "450 GSM",
-      "care": "غسيل آلي بماء بارد ومقلوب",
-      "sizeChart": "S, M, L, XL, XXL - قصة أوفرسايز دروب شولدر"
+      "care": "غسيل آلي مقلوب بماء بارد",
+      "sizeChart": "M, L, XL, XXL - قصة أوفرسايز دروب شولدر"
     },
     "colors": [
-      { "id": "charcoal", "name": "رمادي فحمي مغسول (Charcoal)", "hex": "#232323" }
+      { "id": "navy", "name": "كحلي ليلي (Midnight Navy)", "hex": "#172439" }
     ],
-    "sizes": ["S", "M", "L", "XL", "XXL"],
+    "sizes": ["M", "L", "XL", "XXL"],
     "variants": [
-      { "id": "v-cah-s", "colorId": "charcoal", "size": "S", "stock": 7 },
-      { "id": "v-cah-m", "colorId": "charcoal", "size": "M", "stock": 15 },
-      { "id": "v-cah-l", "colorId": "charcoal", "size": "L", "stock": 25 },
-      { "id": "v-cah-xl", "colorId": "charcoal", "size": "XL", "stock": 16 },
-      { "id": "v-cah-xxl", "colorId": "charcoal", "size": "XXL", "stock": 7 }
+      { "id": "v-mnrh-m", "colorId": "navy", "size": "M", "stock": 15 },
+      { "id": "v-mnrh-l", "colorId": "navy", "size": "L", "stock": 25 },
+      { "id": "v-mnrh-xl", "colorId": "navy", "size": "XL", "stock": 21 },
+      { "id": "v-mnrh-xxl", "colorId": "navy", "size": "XXL", "stock": 9 }
     ],
     "images": [
-      { "id": "cah-img-1", "url": "/login-hoodies/hoodie-charcoal.webp", "alt": "Charcoal Acid-Wash Hoodie - الموديل بهودي رمادي فحمي" },
-      { "id": "cah-img-2", "url": "/login-hoodies/hoodie-washed-black.webp", "alt": "Charcoal Acid-Wash Hoodie - مظهر الأسيد واش الفينتاج" }
+      { "id": "mnrh-img-1", "url": "/products/navy-hoodie-model.jpg", "alt": "موديل يرتدي هودي ميدنايت كحلي في شوارع ليلية مع أضواء بوكيه" },
+      { "id": "mnrh-img-2", "url": "/preview-images/look-4.jpg", "alt": "تفاصيل التطريز الأبيض الناصع على الهودي الكحلي" }
     ],
-    "createdAt": "2026-10-05T10:00:00.000Z",
-    "updatedAt": "2026-11-01T20:00:00.000Z"
-  },
-  {
-    "id": "deep-ocean-teal-hoodie",
-    "slug": "deep-ocean-teal-hoodie",
-    "name": "Deep Ocean Teal Hoodie",
-    "description": "لون بترولي داكن عميق يجمع بين الغموض والأناقة المعاصرة. تصميم مينيمالي نقي مع تفاصيل متقنة وتشطيب فاخر.",
-    "category": "hoodie",
-    "priceCents": 120000,
-    "compareAtCents": 150000,
-    "status": "active",
-    "forceSoldOut": false,
-    "lowStockThreshold": null,
-    "details": {
-      "material": "100% Combed Cotton, 420 GSM",
-      "weight": "420 GSM",
-      "care": "غسيل آلي بماء بارد ومقلوب",
-      "sizeChart": "S, M, L, XL, XXL - قصة أوفرسايز دروب شولدر"
-    },
-    "colors": [
-      { "id": "deep-teal", "name": "أزرق تيل بترولي (Deep Teal)", "hex": "#1D3A44" }
-    ],
-    "sizes": ["S", "M", "L", "XL", "XXL"],
-    "variants": [
-      { "id": "v-dth-s", "colorId": "deep-teal", "size": "S", "stock": 6 },
-      { "id": "v-dth-m", "colorId": "deep-teal", "size": "M", "stock": 12 },
-      { "id": "v-dth-l", "colorId": "deep-teal", "size": "L", "stock": 18 },
-      { "id": "v-dth-xl", "colorId": "deep-teal", "size": "XL", "stock": 10 },
-      { "id": "v-dth-xxl", "colorId": "deep-teal", "size": "XXL", "stock": 4 }
-    ],
-    "images": [
-      { "id": "dth-img-1", "url": "/login-hoodies/hoodie-deep-teal.webp", "alt": "Deep Ocean Teal Hoodie - الموديل بهودي أزرق بترولي" },
-      { "id": "dth-img-2", "url": "/login-hoodies/hoodie-forest.webp", "alt": "Deep Ocean Teal Hoodie - زاوية جانبية" }
-    ],
-    "createdAt": "2026-10-06T10:00:00.000Z",
-    "updatedAt": "2026-11-01T20:00:00.000Z"
-  },
-  {
-    "id": "midnight-slate-navy-hoodie",
-    "slug": "midnight-slate-navy-hoodie",
-    "name": "Midnight Slate Navy Hoodie",
-    "description": "تون كحلي أردوازي ملكي ثقيل بتشطيب قطن فاخر. أربطة هودي عريضة بحليات معدنية غير لامعة وغطاء رأس مبطن.",
-    "category": "hoodie",
-    "priceCents": 125000,
-    "compareAtCents": 155000,
-    "status": "active",
-    "forceSoldOut": false,
-    "lowStockThreshold": null,
-    "details": {
-      "material": "100% Heavy Cotton Fleece, 440 GSM",
-      "weight": "440 GSM",
-      "care": "غسيل آلي بماء بارد ومقلوب",
-      "sizeChart": "S, M, L, XL, XXL - قصة أوفرسايز دروب شولدر"
-    },
-    "colors": [
-      { "id": "slate-navy", "name": "كحلي أردوازي (Slate Navy)", "hex": "#1A2744" }
-    ],
-    "sizes": ["S", "M", "L", "XL", "XXL"],
-    "variants": [
-      { "id": "v-mnh-s", "colorId": "slate-navy", "size": "S", "stock": 8 },
-      { "id": "v-mnh-m", "colorId": "slate-navy", "size": "M", "stock": 16 },
-      { "id": "v-mnh-l", "colorId": "slate-navy", "size": "L", "stock": 22 },
-      { "id": "v-mnh-xl", "colorId": "slate-navy", "size": "XL", "stock": 14 },
-      { "id": "v-mnh-xxl", "colorId": "slate-navy", "size": "XXL", "stock": 5 }
-    ],
-    "images": [
-      { "id": "mnh-img-1", "url": "/login-hoodies/hoodie-slate-navy.webp", "alt": "Midnight Slate Navy Hoodie - الموديل بهودي كحلي أردوازي" },
-      { "id": "mnh-img-2", "url": "/login-hoodies/hoodie-dusty-blue.webp", "alt": "Midnight Slate Navy Hoodie - تفاصيل الأربطة والغطاء" }
-    ],
-    "createdAt": "2026-10-07T10:00:00.000Z",
-    "updatedAt": "2026-11-01T20:00:00.000Z"
-  },
-  {
-    "id": "desert-sand-dunes-hoodie",
-    "slug": "desert-sand-dunes-hoodie",
-    "name": "Desert Sand Dunes Hoodie",
-    "description": "تون بيج رملي دافئ ومريح مناسب للإطلالات اليومية الهادئة. نسيج قطني ناعم جداً على البشرة ومقاوم للتجعد.",
-    "category": "hoodie",
-    "priceCents": 118000,
-    "compareAtCents": 148000,
-    "status": "active",
-    "forceSoldOut": false,
-    "lowStockThreshold": null,
-    "details": {
-      "material": "100% Combed Cotton Fleece, 420 GSM",
-      "weight": "420 GSM",
-      "care": "غسيل آلي بماء بارد ومقلوب",
-      "sizeChart": "S, M, L, XL, XXL - قصة أوفرسايز دروب شولدر"
-    },
-    "colors": [
-      { "id": "sand-beige", "name": "بيج رملي صحراوي (Sand Beige)", "hex": "#E3D8C8" }
-    ],
-    "sizes": ["S", "M", "L", "XL", "XXL"],
-    "variants": [
-      { "id": "v-dsd-s", "colorId": "sand-beige", "size": "S", "stock": 7 },
-      { "id": "v-dsd-m", "colorId": "sand-beige", "size": "M", "stock": 14 },
-      { "id": "v-dsd-l", "colorId": "sand-beige", "size": "L", "stock": 19 },
-      { "id": "v-dsd-xl", "colorId": "sand-beige", "size": "XL", "stock": 11 },
-      { "id": "v-dsd-xxl", "colorId": "sand-beige", "size": "XXL", "stock": 4 }
-    ],
-    "images": [
-      { "id": "dsd-img-1", "url": "/login-hoodies/hoodie-sand-beige.webp", "alt": "Desert Sand Dunes Hoodie - الموديل بهودي بيج صحراوي" },
-      { "id": "dsd-img-2", "url": "/login-hoodies/hoodie-chocolate.webp", "alt": "Desert Sand Dunes Hoodie - زاوية جانبية" }
-    ],
-    "createdAt": "2026-10-08T10:00:00.000Z",
-    "updatedAt": "2026-11-01T20:00:00.000Z"
+    "createdAt": "2026-11-02T12:00:00.000Z",
+    "updatedAt": "2026-11-02T12:00:00.000Z"
   }
 ]

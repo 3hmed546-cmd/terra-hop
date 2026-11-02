@@ -30,25 +30,25 @@ function emit(): void {
   }
 }
 
-async function fetchServerOrders(): Promise<Order[]> {
+async function fetchServerOrders(): Promise<{ ok: boolean; orders: Order[] }> {
   try {
     const res = await apiFetch("/api/admin/orders", { cache: "no-store" });
-    if (!res.ok) return [];
+    if (!res.ok) return { ok: false, orders: [] };
     const payload = await res.json();
-    return payload?.data?.orders || [];
+    return { ok: true, orders: payload?.data?.orders || [] };
   } catch {
-    return [];
+    return { ok: false, orders: [] };
   }
 }
 
-async function fetchServerProducts(): Promise<Product[]> {
+async function fetchServerProducts(): Promise<{ ok: boolean; products: Product[] }> {
   try {
     const res = await apiFetch("/api/admin/products", { cache: "no-store" });
-    if (!res.ok) return [];
+    if (!res.ok) return { ok: false, products: [] };
     const payload = await res.json();
-    return payload?.data || [];
+    return { ok: true, products: payload?.data || [] };
   } catch {
-    return [];
+    return { ok: false, products: [] };
   }
 }
 
@@ -68,16 +68,16 @@ export async function reloadAdminData() {
   isFetching = true;
 
   try {
-    const [products, orders, settings] = await Promise.all([
+    const [prodRes, orderRes, settings] = await Promise.all([
       fetchServerProducts(),
       fetchServerOrders(),
       fetchServerSettings(),
     ]);
 
-    if (products.length > 0 || orders.length > 0) {
+    if (prodRes.ok || orderRes.ok) {
       state = {
-        products: products.length > 0 ? products : (state?.products || []),
-        orders: orders.length > 0 ? orders : (state?.orders || []),
+        products: prodRes.ok ? prodRes.products : (state?.products || []),
+        orders: orderRes.ok ? orderRes.orders : (state?.orders || []),
         movements: state?.movements || [],
         settings,
       };
@@ -115,8 +115,13 @@ function initLiveAdminSync() {
 function getSnapshot(): AdminData | null {
   if (typeof window === "undefined") return null;
   if (state === null) {
-    // Initial in-memory seed before server returns
-    state = createSeedData();
+    // Initial empty state before server authoritative data returns
+    state = {
+      products: [],
+      orders: [],
+      movements: [],
+      settings: DEFAULT_SETTINGS,
+    };
     reloadAdminData();
     initLiveAdminSync();
   }

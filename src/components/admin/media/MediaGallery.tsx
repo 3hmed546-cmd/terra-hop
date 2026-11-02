@@ -44,6 +44,21 @@ export function MediaGallery() {
   const [successDeletedName, setSuccessDeletedName] = useState<string | null>(null);
   const [successAddedName, setSuccessAddedName] = useState<string | null>(null);
 
+  // Auto-dismiss floating notifications after 3.5 seconds
+  useEffect(() => {
+    if (successDeletedName) {
+      const timer = setTimeout(() => setSuccessDeletedName(null), 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [successDeletedName]);
+
+  useEffect(() => {
+    if (successAddedName) {
+      const timer = setTimeout(() => setSuccessAddedName(null), 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [successAddedName]);
+
   // Add Target: header image or specific product
   const [addMode, setAddMode] = useState<"header" | "product" | null>(null);
   const [addProductTarget, setAddProductTarget] = useState<Product | null>(null);
@@ -701,39 +716,6 @@ export function MediaGallery() {
       )}
 
       {/* ======================================================== */}
-      {/* نافذة نجاح الحذف (Success Popup / Modal)                 */}
-      {/* ======================================================== */}
-      {successDeletedName && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div
-            className="bg-off-white border-2 border-emerald-600 rounded-xl max-w-sm w-full p-6 shadow-2xl text-center space-y-4"
-            dir="rtl"
-          >
-            <div className="w-14 h-14 bg-emerald-100 border border-emerald-300 rounded-full flex items-center justify-center mx-auto text-emerald-600">
-              <CheckCircle2 className="w-8 h-8" />
-            </div>
-
-            <div>
-              <h3 className="text-base font-extrabold text-obsidian">تم الحذف بنجاح!</h3>
-              <p className="text-xs text-graphite mt-1 leading-relaxed">
-                تم حذف <strong>"{successDeletedName}"</strong> بنجاح وتحديث المحتوى المعروض في المتجر لحظياً.
-              </p>
-            </div>
-
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={() => setSuccessDeletedName(null)}
-                className="w-full py-2.5 bg-obsidian hover:bg-charcoal text-off-white text-xs font-bold rounded shadow transition-all cursor-pointer"
-              >
-                حسناً
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
       {/* نافذة إضافة صورة جديدة (Add New Image Modal)             */}
       {/* ======================================================== */}
       {addMode && (
@@ -865,34 +847,49 @@ export function MediaGallery() {
       )}
 
       {/* ======================================================== */}
-      {/* نافذة نجاح الإضافة (Success Add Popup / Modal)            */}
+      {/* إشعار عائم فوري للنجاح والحذف (Floating Live Notification) */}
       {/* ======================================================== */}
-      {successAddedName && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+      {(successDeletedName || successAddedName) && (
+        <div className="fixed bottom-6 left-6 z-[300] max-w-md w-full animate-in fade-in slide-in-from-bottom-4 duration-200 pointer-events-auto">
           <div
-            className="bg-off-white border-2 border-emerald-600 rounded-xl max-w-sm w-full p-6 shadow-2xl text-center space-y-4"
+            className={`border rounded-xl p-4 shadow-2xl flex items-center justify-between gap-3 text-off-white bg-obsidian/95 backdrop-blur-md ${
+              successDeletedName ? "border-red-500/80 ring-1 ring-red-500/30" : "border-emerald-500/80 ring-1 ring-emerald-500/30"
+            }`}
             dir="rtl"
           >
-            <div className="w-14 h-14 bg-emerald-100 border border-emerald-300 rounded-full flex items-center justify-center mx-auto text-emerald-600">
-              <CheckCircle2 className="w-8 h-8" />
-            </div>
-
-            <div>
-              <h3 className="text-base font-extrabold text-obsidian">تمت الإضافة بنجاح!</h3>
-              <p className="text-xs text-graphite mt-1 leading-relaxed">
-                تمت إضافة <strong>"{successAddedName}"</strong> بنجاح وتحديث المتجر مباشرة بدون ريلود (Live Static).
-              </p>
-            </div>
-
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={() => setSuccessAddedName(null)}
-                className="w-full py-2.5 bg-obsidian hover:bg-charcoal text-off-white text-xs font-bold rounded shadow transition-all cursor-pointer"
+            <div className="flex items-center gap-3 min-w-0">
+              <div
+                className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+                  successDeletedName
+                    ? "bg-red-950 text-red-400 border border-red-800"
+                    : "bg-emerald-950 text-emerald-400 border border-emerald-800"
+                }`}
               >
-                حسناً
-              </button>
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-white truncate">
+                  {successDeletedName ? "تم الحذف بنجاح!" : "تمت الإضافة بنجاح!"}
+                </p>
+                <p className="text-[11px] text-stone-300 truncate mt-0.5">
+                  {successDeletedName
+                    ? `تم حذف "${successDeletedName}" وتحديث المتجر لحظياً.`
+                    : `تمت إضافة "${successAddedName}" وتحديث المتجر لحظياً.`}
+                </p>
+              </div>
             </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSuccessDeletedName(null);
+                setSuccessAddedName(null);
+              }}
+              className="text-stone-400 hover:text-white p-1 rounded hover:bg-charcoal text-xs font-bold shrink-0 cursor-pointer"
+              title="إغلاق"
+            >
+              ✕
+            </button>
           </div>
         </div>
       )}
