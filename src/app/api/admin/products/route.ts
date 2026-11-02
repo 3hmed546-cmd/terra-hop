@@ -86,6 +86,7 @@ export async function GET(request: NextRequest) {
       position: p.position,
       revision: p.revision,
       colors: colorsByProd.get(p.id) || [],
+      sizes: Array.from(new Set(prodVariants.map((v) => v.size).filter(Boolean))),
       variants: prodVariants,
       images: imagesByProd.get(p.id) || [],
       totalStock,

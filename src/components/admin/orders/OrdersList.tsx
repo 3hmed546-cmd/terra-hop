@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useDebounce } from "@/lib/use-debounce";
 import { ADMIN_STRINGS } from "@/lib/admin/admin-strings";
 import { formatDateTime, formatMoney } from "@/lib/admin/format";
 import {
@@ -55,10 +56,14 @@ export function OrdersList() {
   const toast = useToast();
   const [tab, setTab] = useState<OrderTab>("needs_action");
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 250);
 
   const orders = data?.orders;
   const counts = useMemo(() => (orders ? countOrderTabs(orders) : null), [orders]);
-  const visible = useMemo(() => (orders ? queryOrders(orders, { tab, search }) : []), [orders, tab, search]);
+  const visible = useMemo(
+    () => (orders ? queryOrders(orders, { tab, search: debouncedSearch }) : []),
+    [orders, tab, debouncedSearch],
+  );
 
   const simulate = (kind: SimulatedKind) => {
     const result = actions.simulateOrder(kind);

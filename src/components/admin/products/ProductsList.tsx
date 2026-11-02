@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useDebounce } from "@/lib/use-debounce";
 import { ADMIN_STRINGS } from "@/lib/admin/admin-strings";
 import { formatDate, formatMoney, formatNumber } from "@/lib/admin/format";
 import {
@@ -155,7 +156,15 @@ export function ProductsList() {
 
   const threshold = data?.settings.lowStockThreshold ?? 3;
   const products = data?.products;
-  const visible = useMemo(() => (products ? queryProducts(products, query, threshold) : []), [products, query, threshold]);
+  const debouncedSearch = useDebounce(query.search, 250);
+  const effectiveQuery = useMemo(
+    () => ({ ...query, search: debouncedSearch }),
+    [query, debouncedSearch],
+  );
+  const visible = useMemo(
+    () => (products ? queryProducts(products, effectiveQuery, threshold) : []),
+    [products, effectiveQuery, threshold],
+  );
   const counts = useMemo(() => (products ? countByStatus(products, threshold) : null), [products, threshold]);
 
   const header = (

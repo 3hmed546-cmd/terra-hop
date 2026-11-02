@@ -54,22 +54,26 @@ export function emptyForm(productId: string): ProductForm {
 }
 
 export function productToForm(p: Product): ProductForm {
+  const derivedSizes = Array.isArray(p.sizes)
+    ? [...p.sizes]
+    : Array.from(new Set((p.variants || []).map((v) => v.size).filter(Boolean)));
+
   return {
     productId: p.id,
-    name: p.name,
+    name: p.name || (p as any).nameAr || "",
     slug: p.slug,
     slugTouched: true,
-    description: p.description,
+    description: p.description || (p as any).descriptionAr || "",
     category: p.category,
-    price: p.priceCents / 100,
-    compareAt: p.compareAtCents === null ? null : p.compareAtCents / 100,
-    images: p.images.map((i) => ({ ...i })),
-    colors: p.colors.map((c) => ({ ...c })),
-    sizes: [...p.sizes],
-    variants: p.variants.map((v) => ({ ...v })),
+    price: (p.priceCents || 0) / 100,
+    compareAt: p.compareAtCents === null || p.compareAtCents === undefined ? null : p.compareAtCents / 100,
+    images: (p.images || []).map((i) => ({ ...i })),
+    colors: (p.colors || []).map((c) => ({ ...c })),
+    sizes: derivedSizes,
+    variants: (p.variants || []).map((v) => ({ ...v })),
     status: p.status === "draft" ? "draft" : p.forceSoldOut ? "sold_out" : "available",
-    lowStock: p.lowStockThreshold,
-    details: { ...p.details },
+    lowStock: p.lowStockThreshold ?? null,
+    details: { ...(p.details || {}) },
   };
 }
 

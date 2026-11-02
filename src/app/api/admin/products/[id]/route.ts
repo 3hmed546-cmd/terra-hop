@@ -51,9 +51,21 @@ export async function GET(
     };
   });
 
+  const sizes = Array.from(new Set(variants.map((v) => v.size).filter(Boolean)));
+
   return apiSuccess({
     ...product,
+    name: product.name_ar,
+    nameAr: product.name_ar,
+    nameEn: product.name_en,
+    description: product.description_ar,
+    descriptionAr: product.description_ar,
+    descriptionEn: product.description_en,
+    priceCents: product.price_cents,
+    compareAtCents: product.compare_at_cents,
+    forceSoldOut: product.force_sold_out === 1,
     colors,
+    sizes,
     variants,
     images,
   });
