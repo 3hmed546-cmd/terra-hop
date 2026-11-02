@@ -131,10 +131,10 @@ export function lookupAndValidateCode(
       return { ok: false, message: "كود الخصم لم يبدأ تفعيله بعد.", status: 400 };
     }
     if (refCode.valid_until && refCode.valid_until < now) {
-      return { ok: false, message: "كود الخصم منتهي الصلاحية.", status: 400 };
+      return { ok: false, message: "انتهى هذا العرض، ترقب عروضنا قريباً", status: 400 };
     }
     if (refCode.max_uses && refCode.used_count >= refCode.max_uses) {
-      return { ok: false, message: "تم استنفاد الحد الأقصى لاستخدام هذا الكود.", status: 400 };
+      return { ok: false, message: "انتهى هذا العرض، ترقب عروضنا قريباً", status: 400 };
     }
 
     // Self-referral prevention (Ambassador cannot buy using their own code)
@@ -169,8 +169,14 @@ export function lookupAndValidateCode(
 
       // Filter cart items matching eligible products
       for (const item of cartItems) {
-        const prod = db.prepare("SELECT id, slug FROM products WHERE id = ? OR slug = ?").get(item.productId, item.productId) as any;
-        const matches = prod && (eligibleProductIds.includes(prod.id) || eligibleProductIds.includes(prod.slug));
+        const prod = db
+          .prepare("SELECT id, slug FROM products WHERE id = ? OR slug = ?")
+          .get(item.productId || item.productSlug, item.productSlug || item.productId) as any;
+        const matches =
+          (prod && (eligibleProductIds.includes(prod.id) || eligibleProductIds.includes(prod.slug))) ||
+          (item.productId && eligibleProductIds.includes(item.productId)) ||
+          (item.productSlug && eligibleProductIds.includes(item.productSlug));
+
         if (matches) {
           eligibleSubtotalCents += item.priceCents * item.qty;
         }
@@ -179,7 +185,7 @@ export function lookupAndValidateCode(
       if (cartItems.length > 0 && eligibleSubtotalCents === 0) {
         return {
           ok: false,
-          message: "كود الخصم غير صالح للمنتجات الموجودة في سلتك حالياً.",
+          message: "هذا الكود غير مخصص للمنتجات الموجودة في سلتك.",
           status: 400,
         };
       }
@@ -200,7 +206,7 @@ export function lookupAndValidateCode(
       discountCents,
       appliesTo: refCode.applies_to,
       eligibleProductIds,
-      message: `تم تطبيق كود السفير: خصم ${discountPercent}% على مشترياتك المؤهلة.`,
+      message: `تم تطبيق خصم السفير بنجاح بنسبة ${discountPercent}% على المنتجات المؤهلة.`,
     };
   }
 
@@ -210,8 +216,8 @@ export function lookupAndValidateCode(
   const p = db.prepare("SELECT * FROM promo_codes WHERE code = ? AND active = 1").get(normalized) as any;
   if (p) {
     if (p.starts_at && p.starts_at > now) return { ok: false, message: "كود الخصم لم يبدأ بعد.", status: 400 };
-    if (p.expires_at && p.expires_at < now) return { ok: false, message: "كود الخصم منتهي الصلاحية.", status: 400 };
-    if (p.max_uses && p.used >= p.max_uses) return { ok: false, message: "تم استنفاد استخدامات هذا الكود.", status: 400 };
+    if (p.expires_at && p.expires_at < now) return { ok: false, message: "انتهى هذا العرض، ترقب عروضنا قريباً", status: 400 };
+    if (p.max_uses && p.used >= p.max_uses) return { ok: false, message: "انتهى هذا العرض، ترقب عروضنا قريباً", status: 400 };
     if (subtotalCents > 0 && subtotalCents < (p.min_subtotal_cents ?? 0)) {
       return { ok: false, message: "قيمة الطلب أقل من الحد الأدنى لاستخدام هذا الكود.", status: 400 };
     }
@@ -227,7 +233,7 @@ export function lookupAndValidateCode(
       code: p.code,
       discountCents,
       discountPercent: p.kind === "percent" ? p.value : undefined,
-      message: p.kind === "percent" ? `تم تطبيق خصم ${p.value}%` : `تم تطبيق خصم ${Math.round(discountCents / 100)} ج.م`,
+      message: p.kind === "percent" ? `تم تطبيق خصم ${p.value}% بنجاح.` : `تم تطبيق خصم ${Math.round(discountCents / 100)} ج.م بنجاح.`,
     };
   }
 

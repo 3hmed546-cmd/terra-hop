@@ -43,15 +43,28 @@ export async function GET(
     .prepare("SELECT * FROM referral_codes WHERE ambassador_id = ? ORDER BY created_at DESC")
     .all(id) as any[];
 
-  const codes = codeRows.map((r) => ({
-    id: r.id,
-    code: decryptCode(r.encrypted_code),
-    discountPercent: r.discount_percent,
-    appliesTo: r.applies_to,
-    isActive: r.is_active === 1,
-    usedCount: r.used_count,
-    createdAt: r.created_at,
-  }));
+  const codes = codeRows.map((r) => {
+    const scopedProducts =
+      r.applies_to === "SELECTED"
+        ? (db
+            .prepare(
+              "SELECT p.id, p.name_ar, p.slug FROM discount_code_products dcp JOIN products p ON dcp.product_id = p.id WHERE dcp.code_id = ?"
+            )
+            .all(r.id) as any[])
+        : [];
+
+    return {
+      id: r.id,
+      code: decryptCode(r.encrypted_code),
+      discountPercent: r.discount_percent,
+      appliesTo: r.applies_to,
+      maxUses: r.max_uses ?? null,
+      isActive: r.is_active === 1,
+      usedCount: r.used_count,
+      createdAt: r.created_at,
+      products: scopedProducts,
+    };
+  });
 
   // Milestones
   const milestones = db

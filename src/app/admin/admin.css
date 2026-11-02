@@ -135,8 +135,21 @@ textarea.adm-input { min-height: 96px; resize: vertical; }
 .adm-tab-count { min-width: 22px; padding: 0 6px; text-align: center; font-size: 12px; border: 1px solid currentColor; font-variant-numeric: tabular-nums; }
 
 /* ---------- dialog ---------- */
-.adm-dialog { width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; background: var(--adm-offwhite); color: var(--adm-obsidian); border: 2px solid var(--adm-obsidian); }
-.adm-dialog::backdrop { background: rgb(8 8 8 / 0.6); }
+.adm-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: 0;
+  background: var(--adm-offwhite);
+  color: var(--adm-obsidian);
+  border: 2px solid var(--adm-obsidian);
+  box-shadow: 0 24px 48px rgba(8, 8, 8, 0.35);
+  z-index: 1000;
+}
+.adm-dialog::backdrop { background: rgb(8 8 8 / 0.6); backdrop-filter: blur(2px); }
 .adm-dialog-body { padding: 24px; display: flex; flex-direction: column; gap: 16px; }
 .adm-dialog-body p { margin: 0; color: var(--adm-graphite); }
 .adm-dialog-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
@@ -313,6 +326,19 @@ textarea.adm-input { min-height: 96px; resize: vertical; }
 .adm-amb-head .adm-badge { border-color: var(--adm-offwhite); color: var(--adm-offwhite); }
 .adm-fulfil { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--adm-line); display: flex; flex-direction: column; gap: 12px; }
 .adm-fulfil-note { padding: 12px; border: 1px dashed var(--adm-obsidian); background: var(--adm-tint); }
+
+/* product picker for discount scoping */
+.adm-product-picker { border: 1px solid var(--adm-line); background: #ffffff; padding: 14px; display: flex; flex-direction: column; gap: 12px; margin-top: 12px; border-radius: 4px; }
+.adm-product-picker-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-bottom: 8px; border-bottom: 1px solid var(--adm-line); }
+.adm-product-picker-actions { display: flex; gap: 8px; }
+.adm-product-picker-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; max-height: 240px; overflow-y: auto; padding: 4px; }
+.adm-product-picker-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--adm-line); background: var(--adm-offwhite); cursor: pointer; transition: all 0.15s ease; border-radius: 4px; }
+.adm-product-picker-item:hover { border-color: var(--adm-obsidian); }
+.adm-product-picker-item.is-selected { border-color: var(--adm-obsidian); background: #ffffff; outline: 2px solid var(--adm-obsidian); }
+.adm-product-picker-thumb { width: 40px; height: 40px; object-fit: cover; border: 1px solid var(--adm-line); border-radius: 2px; flex-shrink: 0; }
+.adm-product-picker-info { display: flex; flex-direction: column; min-width: 0; }
+.adm-product-picker-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--adm-obsidian); }
+.adm-product-picker-meta { font-size: 11px; }
 
 /* portal hero: the one dark block on the page, like the sidebar */
 .amb-hero { display: grid; gap: 24px; padding: 24px; margin-bottom: 40px; background: var(--adm-obsidian); color: var(--adm-offwhite); }

@@ -96,7 +96,18 @@ export function CheckoutView({ products }: { products: Product[] }) {
       const res = await fetch("/api/promo/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: clean, subtotalCents }),
+        body: JSON.stringify({
+          code: clean,
+          subtotalCents,
+          items: rows.map((r) => ({
+            productId: (r.product as any).id || r.product.slug,
+            productSlug: r.product.slug,
+            qty: r.qty,
+            priceCents: r.product.price * 100,
+          })),
+          phone: phone.trim() || undefined,
+          email: email.trim().toLowerCase() || undefined,
+        }),
       });
       const data = await res.json();
       if (res.ok && (data.ok || data.valid)) {
@@ -113,17 +124,17 @@ export function CheckoutView({ products }: { products: Product[] }) {
           text:
             data.message ||
             (data.discountPercent
-              ? `تم تطبيق خصم ${data.discountPercent}%!`
-              : `تم تطبيق خصم ${Math.round(discCents / 100)} ج.م!`),
+              ? `تم تطبيق خصم ${data.discountPercent}% بنجاح على مشترياتك المؤهلة.`
+              : `تم تطبيق خصم ${Math.round(discCents / 100)} ج.م بنجاح.`),
         });
       } else {
         setPromoMessage({
           type: "error",
-          text: data.error || "كود الخصم غير صحيح أو منتهي الصلاحية",
+          text: data.error || "كود الخصم غير صحيح أو غير متاح حالياً.",
         });
       }
     } catch {
-      setPromoMessage({ type: "error", text: "تعذر التحقق من كود الخصم حالياً" });
+      setPromoMessage({ type: "error", text: "تعذر التحقق من كود الخصم حالياً." });
     } finally {
       setPromoLoading(false);
     }

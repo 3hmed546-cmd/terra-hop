@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Check, Copy, Plus, RefreshCw } from "lucide-react";
 import { PageHeader } from "../PageHeader";
 import { Button, Dialog, EmptyState, StatCard, Table, TextInput, useToast, type Column } from "../ui";
+import { useAdminStore } from "@/lib/admin/store";
 
 interface AmbassadorItem {
   id: string;
@@ -38,7 +39,7 @@ interface OverviewKPIs {
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Detail = any;
 
-const scopeText = (s: AmbassadorItem["appliesTo"]) => (s === "SELECTED" ? "الهوديز فقط" : "كل المنتجات");
+const scopeText = (s: AmbassadorItem["appliesTo"]) => (s === "SELECTED" ? "منتجات محددة" : "كل المنتجات");
 
 function AmbStatus({ status }: { status: AmbassadorItem["status"] }) {
   return status === "ACTIVE" ? (
@@ -70,11 +71,15 @@ const EMPTY_FORM = {
   code: "",
   discount: "10",
   appliesTo: "ALL_PRODUCTS" as "ALL_PRODUCTS" | "SELECTED",
+  maxUses: "",
   password: "",
 };
 
 export function AmbassadorsManager() {
   const toast = useToast();
+  const { data: adminData } = useAdminStore();
+  const products = adminData?.products || [];
+
   const [items, setItems] = useState<AmbassadorItem[]>([]);
   const [overview, setOverview] = useState<OverviewKPIs | null>(null);
   const [loading, setLoading] = useState(true);
@@ -83,6 +88,7 @@ export function AmbassadorsManager() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -92,6 +98,12 @@ export function AmbassadorsManager() {
   const [suspendTarget, setSuspendTarget] = useState<AmbassadorItem | null>(null);
 
   const set = <K extends keyof typeof EMPTY_FORM>(k: K, v: (typeof EMPTY_FORM)[K]) => setForm((f) => ({ ...f, [k]: v }));
+
+  const openCreate = () => {
+    setForm(EMPTY_FORM);
+    setSelectedProductIds(products.map((p) => p.id));
+    setCreateOpen(true);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -160,6 +172,11 @@ export function AmbassadorsManager() {
 
   const submitCreate = async (e: FormEvent) => {
     e.preventDefault();
+    if (form.appliesTo === "SELECTED" && selectedProductIds.length === 0) {
+      toast.push("يرجى اختيار منتج واحد على الأقل مشمول في كود الخصم.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const res = await fetch("/api/admin/ambassadors", {
@@ -175,6 +192,8 @@ export function AmbassadorsManager() {
           code: form.code || form.fullName.slice(0, 8),
           discountPercent: Number(form.discount) || 10,
           appliesTo: form.appliesTo,
+          eligibleProductIds: form.appliesTo === "SELECTED" ? selectedProductIds : [],
+          maxUses: form.maxUses ? Number(form.maxUses) : null,
           password: form.password || form.phone,
         }),
       });
@@ -275,7 +294,7 @@ export function AmbassadorsManager() {
               <RefreshCw className={loading ? "adm-spin" : undefined} aria-hidden="true" />
               <span>تحديث</span>
             </Button>
-            <Button onClick={() => setCreateOpen(true)}>
+            <Button onClick={openCreate}>
               <Plus aria-hidden="true" />
               <span>إضافة سفير</span>
             </Button>
@@ -343,7 +362,7 @@ export function AmbassadorsManager() {
             <EmptyState
               title={q ? "مفيش نتائج" : "لا يوجد سفراء بعد"}
               description={q ? "جرب اسم أو كود تاني." : "أضف أول سفير، وهيتولد له كود خصم وحساب دخول للبورتال فوراً."}
-              action={!q ? <Button onClick={() => setCreateOpen(true)}><Plus aria-hidden="true" /><span>إضافة سفير</span></Button> : undefined}
+              action={!q ? <Button onClick={openCreate}><Plus aria-hidden="true" /><span>إضافة سفير</span></Button> : undefined}
             />
           }
         />
@@ -384,16 +403,118 @@ export function AmbassadorsManager() {
               <TextInput label="الكود" required dir="ltr" placeholder="AHMED10" value={form.code} onChange={(e) => set("code", e.target.value.toUpperCase().replace(/\s+/g, ""))} />
               <TextInput label="خصم العميل (%)" type="number" min={1} max={100} dir="ltr" value={form.discount} onChange={(e) => set("discount", e.target.value)} />
             </div>
-            <div className="adm-radios" role="radiogroup" aria-label="نطاق الخصم">
+
+            <div className="adm-form-grid" style={{ marginTop: 12 }}>
+              <TextInput
+                label="حد الاستخدام الأقصى (مرات)"
+                hint="اتركه فارغاً للاستخدام غير المحدود."
+                type="number"
+                min={1}
+                dir="ltr"
+                placeholder="مثال: 50"
+                value={form.maxUses}
+                onChange={(e) => set("maxUses", e.target.value)}
+              />
+            </div>
+
+            <div className="adm-radios" role="radiogroup" aria-label="نطاق تطبيق الخصم" style={{ marginTop: 16 }}>
               <label className="adm-check">
-                <input type="radio" name="appliesTo" checked={form.appliesTo === "ALL_PRODUCTS"} onChange={() => set("appliesTo", "ALL_PRODUCTS")} />
-                <span className="adm-check-text"><strong>كل المنتجات</strong></span>
+                <input
+                  type="radio"
+                  name="appliesTo"
+                  checked={form.appliesTo === "ALL_PRODUCTS"}
+                  onChange={() => set("appliesTo", "ALL_PRODUCTS")}
+                />
+                <span className="adm-check-text">
+                  <strong>كل المنتجات</strong>
+                  <span className="adm-field-hint">يطبق على أي منتج يضاف للسلة</span>
+                </span>
               </label>
               <label className="adm-check">
-                <input type="radio" name="appliesTo" checked={form.appliesTo === "SELECTED"} onChange={() => set("appliesTo", "SELECTED")} />
-                <span className="adm-check-text"><strong>الهوديز فقط</strong><span className="adm-field-hint">الموصى به</span></span>
+                <input
+                  type="radio"
+                  name="appliesTo"
+                  checked={form.appliesTo === "SELECTED"}
+                  onChange={() => {
+                    set("appliesTo", "SELECTED");
+                    if (selectedProductIds.length === 0 && products.length > 0) {
+                      setSelectedProductIds(products.map((p) => p.id));
+                    }
+                  }}
+                />
+                <span className="adm-check-text">
+                  <strong>منتجات محددة (إظهار المنتجات المتضمنة للكود)</strong>
+                  <span className="adm-field-hint">اختر المنتجات المشمولة في كود الخصم</span>
+                </span>
               </label>
             </div>
+
+            {form.appliesTo === "SELECTED" && (
+              <div className="adm-product-picker">
+                <div className="adm-product-picker-header">
+                  <div>
+                    <span className="adm-label" style={{ fontWeight: 700 }}>
+                      المنتجات المتضمنة للكود ({selectedProductIds.length} من {products.length})
+                    </span>
+                    <span className="adm-field-hint">الخصم هيطبق فقط على المنتجات التي تم اختيارها</span>
+                  </div>
+                  <div className="adm-product-picker-actions">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => setSelectedProductIds(products.map((p) => p.id))}
+                    >
+                      تحديد الكل
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => setSelectedProductIds([])}
+                    >
+                      إلغاء التحديد
+                    </Button>
+                  </div>
+                </div>
+
+                {products.length === 0 ? (
+                  <p className="adm-muted" style={{ padding: 12 }}>لا توجد منتجات مسجلة في المتجر حالياً.</p>
+                ) : (
+                  <div className="adm-product-picker-list">
+                    {products.map((p) => {
+                      const isSelected = selectedProductIds.includes(p.id);
+                      const thumb = p.images?.[0]?.url;
+                      return (
+                        <label
+                          key={p.id}
+                          className={`adm-product-picker-item ${isSelected ? "is-selected" : ""}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedProductIds((prev) => [...prev, p.id]);
+                              } else {
+                                setSelectedProductIds((prev) => prev.filter((id) => id !== p.id));
+                              }
+                            }}
+                          />
+                          {thumb && (
+                            <img src={thumb} alt={p.name} className="adm-product-picker-thumb" />
+                          )}
+                          <div className="adm-product-picker-info">
+                            <span className="adm-product-picker-name">{p.name}</span>
+                            <span className="adm-product-picker-meta adm-muted adm-num">
+                              {Math.round((p.priceCents || 0) / 100)} ج.م · {p.category}
+                            </span>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </fieldset>
 
           <fieldset className="adm-fieldset adm-form-section">

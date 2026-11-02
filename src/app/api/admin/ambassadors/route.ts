@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
       codeId: codeRow?.id || null,
       discountPercent: codeRow?.discount_percent ?? 10,
       appliesTo: codeRow?.applies_to ?? "ALL_PRODUCTS",
+      maxUses: codeRow?.max_uses ?? null,
       usedCount: codeRow?.used_count ?? 0,
       netSales: amb.net_count ?? 0,
       pendingSales: amb.pending_count ?? 0,
@@ -155,6 +156,7 @@ export async function POST(request: NextRequest) {
   const discountPercent = Math.max(0, Math.min(100, Number(body.discountPercent) || 10));
   const appliesTo = body.appliesTo === "SELECTED" ? "SELECTED" : "ALL_PRODUCTS";
   const eligibleProductIds: string[] = Array.isArray(body.eligibleProductIds) ? body.eligibleProductIds : [];
+  const maxUses = body.maxUses ? Math.max(1, Math.floor(Number(body.maxUses))) : null;
 
   const ambassadorId = `amb_${crypto.randomUUID()}`;
   const codeId = `rc_${crypto.randomUUID()}`;
@@ -189,8 +191,8 @@ export async function POST(request: NextRequest) {
     db.prepare(`
       INSERT INTO referral_codes (
         id, ambassador_id, code_hash, encrypted_code, discount_percent,
-        applies_to, is_active, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+        applies_to, max_uses, is_active, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
     `).run(
       codeId,
       ambassadorId,
@@ -198,6 +200,7 @@ export async function POST(request: NextRequest) {
       encryptedCode,
       discountPercent,
       appliesTo,
+      maxUses,
       now
     );
 
