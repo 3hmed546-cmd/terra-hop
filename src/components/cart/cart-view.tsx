@@ -43,7 +43,11 @@ export function CartView({ products }: Props) {
     <div className="mt-10 grid gap-12 lg:grid-cols-12 items-start">
       <ul className="border-b border-line-light lg:col-span-8">
         {rows.map(({ product, size, qty }) => {
-          const img = images[product.images[0]];
+          const firstImg = product.images[0];
+          const isDirectUrl = typeof firstImg === "string" && (firstImg.startsWith("/") || firstImg.startsWith("http"));
+          const matchedImg = isDirectUrl ? null : images[firstImg];
+          const imgSrc = isDirectUrl ? firstImg : (matchedImg?.src || "/products/burgundy-hoodie-model.jpg");
+          const imgAlt = matchedImg?.alt || product.name;
           const translatedName = t.products[product.slug]?.name || product.name;
 
           return (
@@ -53,10 +57,10 @@ export function CartView({ products }: Props) {
             >
               <Link href={product.href} className="block w-24 shrink-0 sm:w-32">
                 <Image
-                  src={img.src}
-                  alt={img.alt}
-                  width={img.width}
-                  height={img.height}
+                  src={imgSrc}
+                  alt={imgAlt}
+                  width={900}
+                  height={1100}
                   sizes="128px"
                   className="aspect-[4/5] w-full bg-charcoal object-cover"
                 />

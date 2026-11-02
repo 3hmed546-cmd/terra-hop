@@ -609,13 +609,17 @@ export function CheckoutView({ products }: { products: Product[] }) {
           {/* Items List */}
           <ul className="divide-y divide-line-light max-h-80 overflow-y-auto pr-1">
             {rows.map(({ product, size, qty }) => {
-              const img = images[product.images[0]];
+              const firstImg = product.images[0];
+              const isDirectUrl = typeof firstImg === "string" && (firstImg.startsWith("/") || firstImg.startsWith("http"));
+              const matchedImg = isDirectUrl ? null : images[firstImg];
+              const imgSrc = isDirectUrl ? firstImg : (matchedImg?.src || "/products/burgundy-hoodie-model.jpg");
+              const imgAlt = matchedImg?.alt || product.name;
               return (
                 <li key={`${product.slug}-${size}`} className="py-3 flex gap-3 items-center">
                   <div className="relative h-16 w-14 shrink-0 overflow-hidden rounded bg-charcoal">
                     <Image
-                      src={img.src}
-                      alt={img.alt}
+                      src={imgSrc}
+                      alt={imgAlt}
                       fill
                       sizes="64px"
                       className="object-cover"

@@ -60,7 +60,7 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
         };
       });
     }
-    return product.images.map((slot) => images[slot] || resolveImage(slot));
+    return product.images.map((slot) => resolveImage(slot));
   }, [matchedAdmin?.images, product.images, product.name]);
 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -682,7 +682,7 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
             {relatedProducts.slice(0, 4).map((rel) => {
-              const relImg = images[rel.images[0]];
+              const relImg = resolveImage(rel.images[0]);
               const relName =
                 locale === "ar" && t.products[rel.slug]?.name
                   ? t.products[rel.slug].name

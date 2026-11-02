@@ -19,21 +19,33 @@ export function ProductCard({ product }: { product: Product }) {
 
   const sizes = "(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw";
 
-  // Dynamic image resolution: prioritizes live admin store, falls back to static content
-  const fallbackFirst = images[product.images[0]] || {
-    src: "/login-hoodies/hoodie-black.webp",
-    alt: product.name,
-    width: 900,
-    height: 1100,
+  // Dynamic image resolution: handles direct URLs, objects, and legacy keys
+  const resolveImgSrc = (img: any): string => {
+    if (!img) return "";
+    if (typeof img === "object" && img.url) return img.url;
+    if (typeof img === "string") {
+      if (img.startsWith("/") || img.startsWith("http") || img.startsWith("data:")) return img;
+      if (images[img]?.src) return images[img].src;
+    }
+    return "";
   };
-  const fallbackSecond = images[product.images[1]] || fallbackFirst;
 
   const adminFirst = matchedAdmin?.images?.[0];
   const adminSecond = matchedAdmin?.images?.[1];
 
-  const firstSrc = adminFirst?.url || fallbackFirst.src;
-  const firstAlt = adminFirst?.alt || fallbackFirst.alt || product.name;
-  const secondSrc = adminSecond?.url || (adminFirst ? adminFirst.url : fallbackSecond.src);
+  const firstSrc =
+    resolveImgSrc(adminFirst) ||
+    resolveImgSrc(product.images?.[0]) ||
+    "/products/burgundy-hoodie-model.jpg";
+
+  const firstAlt =
+    (typeof adminFirst === "object" ? adminFirst?.alt : null) ||
+    product.name;
+
+  const secondSrc =
+    resolveImgSrc(adminSecond) ||
+    resolveImgSrc(product.images?.[1]) ||
+    firstSrc;
 
   const localizedName =
     locale === "ar" && t.products[product.slug]?.name

@@ -5,7 +5,7 @@ const tile = (src: string, alt: string): ImageAsset => ({ src: `/preview-images/
 const hoodie = (file: string, alt: string): ImageAsset => ({ src: `/login-hoodies/${file}.webp`, width: 900, height: 1100, alt, demo: true });
 
 // Premium product and lookbook imagery for TERRA HOP
-export const images = {
+export const images: Record<string, ImageAsset> = {
   hero: {
     src: "/preview-images/hero.jpg",
     width: 1932,
@@ -49,12 +49,13 @@ export const images = {
   "tee-offwhite-2": hoodie("hoodie-dusty-blue", "هودي أزرق"),
   "tee-grey-1": hoodie("hoodie-charcoal", "هودي رمادي"),
   "tee-grey-2": hoodie("hoodie-washed-black", "هودي أسيد واش"),
-} satisfies Record<string, ImageAsset>;
+};
 
-export type ImageSlot = keyof typeof images;
+export type ImageSlot = string;
 
 export function resolveImage(slotOrUrl: string): ImageAsset {
-  if (images[slotOrUrl as ImageSlot]) return images[slotOrUrl as ImageSlot];
+  const found = images[slotOrUrl];
+  if (found) return found;
   return { src: slotOrUrl, width: 900, height: 1100, alt: "TERRA HOP Hoodie", demo: true };
 }
 
