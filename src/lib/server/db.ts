@@ -1,17 +1,65 @@
 import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
+import os from "os";
+import { seedDatabaseIfNeeded } from "./seed-db";
 
 let dbInstance: Database.Database | null = null;
+
+export function getBaseStorageDir(): string {
+  if (process.env.STORAGE_DIR) {
+    try {
+      if (!fs.existsSync(process.env.STORAGE_DIR)) {
+        fs.mkdirSync(process.env.STORAGE_DIR, { recursive: true });
+      }
+      return process.env.STORAGE_DIR;
+    } catch {
+      // fallback
+    }
+  }
+
+  // 1. On Vercel or AWS Lambda, process.cwd() is read-only (/var/task)
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    const tmpStorage = path.join(os.tmpdir(), "terra-storage");
+    try {
+      if (!fs.existsSync(tmpStorage)) {
+        fs.mkdirSync(tmpStorage, { recursive: true });
+      }
+      return tmpStorage;
+    } catch {
+      return os.tmpdir();
+    }
+  }
+
+  // 2. Standard persistent server (VPS, cPanel, local dev)
+  const localDir = path.join(process.cwd(), "storage");
+  try {
+    if (!fs.existsSync(localDir)) {
+      fs.mkdirSync(localDir, { recursive: true });
+    }
+    const testFile = path.join(localDir, ".perm_test");
+    fs.writeFileSync(testFile, "1");
+    fs.unlinkSync(testFile);
+    return localDir;
+  } catch {
+    // If not writable (e.g. read-only container), fallback to os.tmpdir()
+    const tmpStorage = path.join(os.tmpdir(), "terra-storage");
+    try {
+      if (!fs.existsSync(tmpStorage)) {
+        fs.mkdirSync(tmpStorage, { recursive: true });
+      }
+      return tmpStorage;
+    } catch {
+      return os.tmpdir();
+    }
+  }
+}
 
 export function getDatabasePath(): string {
   if (process.env.DATABASE_PATH) {
     return process.env.DATABASE_PATH;
   }
-  const storageDir = path.join(process.cwd(), "storage");
-  if (!fs.existsSync(storageDir)) {
-    fs.mkdirSync(storageDir, { recursive: true });
-  }
+  const storageDir = getBaseStorageDir();
   return path.join(storageDir, "terra.db");
 }
 
@@ -24,13 +72,33 @@ export function getDb(): Database.Database {
   const db = new Database(dbPath);
 
   // Performance & Integrity PRAGMAs
-  db.pragma("journal_mode = WAL");
-  db.pragma("busy_timeout = 5000");
-  db.pragma("foreign_keys = ON");
-  db.pragma("synchronous = NORMAL");
+  try {
+    db.pragma("journal_mode = WAL");
+  } catch {
+    try {
+      db.pragma("journal_mode = DELETE");
+    } catch {
+      // pragma ignored if unsupported
+    }
+  }
+  try {
+    db.pragma("busy_timeout = 5000");
+    db.pragma("foreign_keys = ON");
+    db.pragma("synchronous = NORMAL");
+  } catch {
+    // ignore
+  }
 
   initializeSchema(db);
   dbInstance = db;
+
+  // Automatically seed initial data if fresh database
+  try {
+    seedDatabaseIfNeeded(db, false);
+  } catch (err) {
+    console.error("Auto seed error:", err);
+  }
+
   return db;
 }
 

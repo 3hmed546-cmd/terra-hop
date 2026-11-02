@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import sharp, { type Metadata } from "sharp";
-import { getDb, recordAudit, recordChange } from "../db";
+import { getDb, getBaseStorageDir, recordAudit, recordChange } from "../db";
 
 export interface AssetRecord {
   id: string;
@@ -17,9 +17,19 @@ export interface AssetRecord {
 }
 
 export function getUploadsDir(): string {
-  const dir = path.join(process.cwd(), "storage", "uploads");
+  if (process.env.UPLOADS_DIR) {
+    if (!fs.existsSync(process.env.UPLOADS_DIR)) {
+      try {
+        fs.mkdirSync(process.env.UPLOADS_DIR, { recursive: true });
+      } catch {}
+    }
+    return process.env.UPLOADS_DIR;
+  }
+  const dir = path.join(getBaseStorageDir(), "uploads");
   if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+    } catch {}
   }
   return dir;
 }

@@ -2,7 +2,8 @@ import { NextRequest } from "next/server";
 import { getDb, getLatestRevision } from "@/lib/server/db";
 
 export async function GET(request: NextRequest) {
-  const db = getDb();
+  try {
+    const db = getDb();
 
   // Read last seen ID from Last-Event-ID header if reconnecting
   const lastEventIdHeader = request.headers.get("last-event-id");
@@ -88,12 +89,19 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream; charset=utf-8",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
-      "X-Accel-Buffering": "no", // Disable nginx / cPanel reverse-proxy buffering
-    },
-  });
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no", // Disable nginx / cPanel reverse-proxy buffering
+      },
+    });
+  } catch (error: any) {
+    if (error?.digest?.startsWith?.("NEXT_") || error?.message?.includes?.("bail out")) {
+      throw error;
+    }
+    console.error("Stream SSE error:", error);
+    return new Response("Service Unavailable", { status: 503 });
+  }
 }

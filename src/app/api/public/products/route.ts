@@ -2,11 +2,12 @@ import { NextRequest } from "next/server";
 import crypto from "crypto";
 import { getDb, getLatestRevision } from "@/lib/server/db";
 import { seedDatabaseIfNeeded } from "@/lib/server/seed-db";
-import { apiSuccess } from "@/lib/server/api-envelope";
+import { apiSuccess, apiError } from "@/lib/server/api-envelope";
 
 export async function GET(request: NextRequest) {
-  seedDatabaseIfNeeded();
-  const db = getDb();
+  try {
+    seedDatabaseIfNeeded();
+    const db = getDb();
 
   const products = db
     .prepare("SELECT * FROM products WHERE status = 'active' ORDER BY position ASC, created_at DESC")
@@ -112,4 +113,11 @@ export async function GET(request: NextRequest) {
       "Cache-Control": "public, max-age=5, stale-while-revalidate=30",
     },
   });
+  } catch (error: any) {
+    if (error?.digest?.startsWith?.("NEXT_") || error?.message?.includes?.("bail out")) {
+      throw error;
+    }
+    console.error("Public products route error:", error);
+    return apiError("INTERNAL_ERROR", "حدث خطأ في تحميل قائمة المنتجات.", 500);
+  }
 }

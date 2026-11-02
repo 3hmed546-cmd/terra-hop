@@ -45,6 +45,7 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   /* config options here */
+  serverExternalPackages: ["better-sqlite3", "sharp"],
   cacheComponents: true,
   partialPrefetching: true,
   async headers() {

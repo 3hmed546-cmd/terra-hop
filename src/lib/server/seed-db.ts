@@ -5,8 +5,8 @@ import { getDb, recordChange } from "./db";
 import { hashPassword } from "./security";
 import { loginHoodies } from "@/content/login-hoodies";
 
-export function seedDatabaseIfNeeded(force = false): boolean {
-  const db = getDb();
+export function seedDatabaseIfNeeded(targetDb?: any, force = false): boolean {
+  const db = targetDb || getDb();
 
   const isSeeded = db.prepare("SELECT value FROM meta WHERE key = 'seeded_at'").get() as
     | { value: string }
