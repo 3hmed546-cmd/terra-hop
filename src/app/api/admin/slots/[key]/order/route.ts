@@ -47,11 +47,11 @@ export async function PUT(
     const updateStmt = db.prepare(`
       UPDATE image_placements
       SET position = ?
-      WHERE id = ? AND slot_key = ?
+      WHERE (id = ? OR asset_id = ?) AND slot_key = ?
     `);
 
     ids.forEach((id, index) => {
-      updateStmt.run(index + 1, id, key);
+      updateStmt.run(index + 1, id, id, key);
     });
 
     db.prepare("UPDATE image_slots SET revision = ? WHERE key = ?").run(nextRevision, key);

@@ -94,23 +94,23 @@ export async function DELETE(
   const db = getDb();
 
   const placement = db
-    .prepare("SELECT * FROM image_placements WHERE id = ? AND slot_key = ?")
-    .get(id, key) as any;
+    .prepare("SELECT * FROM image_placements WHERE (id = ? OR asset_id = ?) AND slot_key = ?")
+    .get(id, id, key) as any;
 
   if (!placement) {
-    return apiError("NOT_FOUND", "عنصر الصورة غير موجود أو تم حذفه مسبقاً.", 404);
+    return apiSuccess({ deleted: true, id, alreadyDeleted: true });
   }
 
   const slot = db.prepare("SELECT * FROM image_slots WHERE key = ?").get(key) as any;
   const nextRevision = (slot?.revision || 1) + 1;
 
   db.transaction(() => {
-    db.prepare("DELETE FROM image_placements WHERE id = ?").run(id);
+    db.prepare("DELETE FROM image_placements WHERE id = ?").run(placement.id);
     db.prepare("UPDATE image_slots SET revision = ? WHERE key = ?").run(nextRevision, key);
   })();
 
   // Protocol B3: Read-back verification - must be gone!
-  const checkDeleted = db.prepare("SELECT id FROM image_placements WHERE id = ?").get(id);
+  const checkDeleted = db.prepare("SELECT id FROM image_placements WHERE id = ?").get(placement.id);
   if (checkDeleted) {
     return apiError("WRITE_NOT_VERIFIED", "فشل التحقق من إزالة الصورة من قاعدة البيانات.", 500);
   }

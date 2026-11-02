@@ -275,54 +275,30 @@ export function OrderDetail({ orderId }: { orderId: string }) {
               </div>
             ) : null}
 
-            {/* Street Ambassador & Fulfilment Actions (Revision 2 - R3 / R4) */}
-            <div style={{ marginTop: "1.25rem", paddingTop: "1rem", borderTop: "1px solid #333" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-                <span style={{ fontSize: "12px", fontWeight: "bold", color: "#F5F5F5" }}>
-                  حالة التسليم والتحصيل الفعلي (COD):
-                </span>
-                <span
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: "bold",
-                    padding: "2px 8px",
-                    borderRadius: "4px",
-                    backgroundColor: order.fulfilmentStatus === "DELIVERED" ? "rgba(16, 185, 129, 0.15)" : "rgba(56, 189, 248, 0.15)",
-                    color: order.fulfilmentStatus === "DELIVERED" ? "#34D399" : "#38BDF8",
-                    border: `1px solid ${order.fulfilmentStatus === "DELIVERED" ? "rgba(16, 185, 129, 0.3)" : "rgba(56, 189, 248, 0.3)"}`,
-                  }}
-                >
-                  {order.fulfilmentStatus === "DELIVERED" ? "تم التسليم والتحصيل بنجاح" : "قيد الشحن والتوصيل"}
-                </span>
+            {/* Street Ambassador & COD fulfilment */}
+            <div className="adm-fulfil">
+              <div className="adm-row" style={{ justifyContent: "space-between" }}>
+                <span className="adm-label adm-muted">التسليم والتحصيل · دفع عند الاستلام</span>
+                {order.fulfilmentStatus === "DELIVERED" ? (
+                  <span className="adm-badge adm-badge-sold">تم التسليم والتحصيل</span>
+                ) : (
+                  <span className="adm-badge adm-badge-amb">قيد الشحن والتوصيل</span>
+                )}
               </div>
 
-              {order.ambassadorCode && (
-                <div
-                  style={{
-                    padding: "8px 12px",
-                    backgroundColor: "rgba(245, 158, 11, 0.08)",
-                    border: "1px solid rgba(245, 158, 11, 0.25)",
-                    borderRadius: "6px",
-                    fontSize: "12px",
-                    marginBottom: "0.75rem",
-                    color: "#FCD34D",
-                  }}
-                >
-                  منسوب لسفير الشارع: <strong>{order.ambassadorCode}</strong> (يُحتسب له عند تأكيد التسليم)
-                </div>
-              )}
+              {order.ambassadorCode ? (
+                <p className="adm-fulfil-note adm-nomargin">
+                  منسوب لسفير الشارع <strong dir="ltr">{order.ambassadorCode}</strong>. تُحتسب له المبيعة عند تأكيد التسليم.
+                </p>
+              ) : null}
 
-              {order.fulfilmentStatus !== "DELIVERED" && order.status !== "CANCELLED" && (
-                <div style={{ marginTop: "0.5rem" }}>
-                  <Button
-                    variant="primary"
-                    disabled={delivering}
-                    onClick={() => handleMarkDeliveredPaid(order.id)}
-                  >
-                    {delivering ? "جاري التأكيد..." : "تأكيد التسليم والتحصيل (Delivered & Paid)"}
+              {order.fulfilmentStatus !== "DELIVERED" && order.status !== "CANCELLED" ? (
+                <div>
+                  <Button disabled={delivering} aria-busy={delivering} onClick={() => handleMarkDeliveredPaid(order.id)}>
+                    {delivering ? "جاري التأكيد…" : "تأكيد التسليم والتحصيل"}
                   </Button>
                 </div>
-              )}
+              ) : null}
             </div>
           </section>
 

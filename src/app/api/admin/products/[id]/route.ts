@@ -203,6 +203,10 @@ export async function DELETE(
   db.transaction(() => {
     // Delete product images placement
     db.prepare("DELETE FROM image_placements WHERE slot_key = 'product' AND owner_id = ?").run(product.id);
+    // Delete discount code relations if any
+    try {
+      db.prepare("DELETE FROM discount_code_products WHERE product_id = ?").run(product.id);
+    } catch {}
     // Delete variants & colors (cascade)
     db.prepare("DELETE FROM variants WHERE product_id = ?").run(product.id);
     db.prepare("DELETE FROM product_colors WHERE product_id = ?").run(product.id);

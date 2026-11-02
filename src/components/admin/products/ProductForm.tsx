@@ -320,7 +320,7 @@ export function ProductForm({ productId }: { productId?: string }) {
   }
   if (!productId) return <Editor key={newId} initial={emptyForm(newId)} existing={null} isNew tab="details" onTab={setTab} focusLogRef={focusLogRef} />;
 
-  const existing = data.products.find((p) => p.id === productId) ?? null;
+  const existing = data.products.find((p) => p.id === productId || p.slug === productId) ?? null;
   if (!existing) {
     return (
       <>

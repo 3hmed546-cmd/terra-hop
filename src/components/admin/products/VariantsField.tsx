@@ -16,10 +16,14 @@ interface Props {
 }
 
 export function VariantsField({ form, onChange, errors }: Props) {
-  const rowTotal = (colorId: string) => form.variants.filter((v) => v.colorId === colorId).reduce((s, v) => s + v.stock, 0);
+  const safeSizes = Array.isArray(form?.sizes) ? form.sizes : [];
+  const safeColors = Array.isArray(form?.colors) ? form.colors : [];
+  const safeVariants = Array.isArray(form?.variants) ? form.variants : [];
+
+  const rowTotal = (colorId: string) => safeVariants.filter((v) => v.colorId === colorId).reduce((s, v) => s + v.stock, 0);
 
   const setColor = (id: string, patch: Partial<{ name: string; hex: string }>) =>
-    onChange(withGrid(form, { colors: form.colors.map((c) => (c.id === id ? { ...c, ...patch } : c)) }));
+    onChange(withGrid(form, { colors: safeColors.map((c) => (c.id === id ? { ...c, ...patch } : c)) }));
 
   return (
     <div className="adm-stack">
@@ -72,8 +76,8 @@ export function VariantsField({ form, onChange, errors }: Props) {
             <Checkbox
               key={size}
               label={size}
-              checked={form.sizes.includes(size)}
-              onChange={(e) => onChange(withGrid(form, { sizes: e.target.checked ? [...form.sizes, size] : form.sizes.filter((s) => s !== size) }))}
+              checked={safeSizes.includes(size)}
+              onChange={(e) => onChange(withGrid(form, { sizes: e.target.checked ? [...safeSizes, size] : safeSizes.filter((s) => s !== size) }))}
             />
           ))}
         </div>
@@ -82,7 +86,7 @@ export function VariantsField({ form, onChange, errors }: Props) {
 
       <div>
         <h3 className="adm-h3">{V.gridTitle}</h3>
-        {form.colors.length === 0 || form.sizes.length === 0 ? (
+        {safeColors.length === 0 || safeSizes.length === 0 ? (
           <p className="adm-muted">{V.emptyGrid}</p>
         ) : (
           <div className="adm-table-wrap">
@@ -91,20 +95,20 @@ export function VariantsField({ form, onChange, errors }: Props) {
               <thead>
                 <tr>
                   <th scope="col">{V.colorsLegend}</th>
-                  {form.sizes.map((s) => (
+                  {safeSizes.map((s) => (
                     <th key={s} scope="col" className="is-end">{s}</th>
                   ))}
                   <th scope="col" className="is-end">{V.rowTotal}</th>
                 </tr>
               </thead>
               <tbody>
-                {form.colors.map((c) => (
+                {safeColors.map((c) => (
                   <tr key={c.id}>
                     <th scope="row" className="adm-grid-rowhead">
                       <span className="adm-swatch" style={{ background: c.hex }} aria-hidden="true" /> {c.name || "—"}
                     </th>
-                    {form.sizes.map((size) => {
-                      const cell = form.variants.find((v) => v.colorId === c.id && v.size === size);
+                    {safeSizes.map((size) => {
+                      const cell = safeVariants.find((v) => v.colorId === c.id && v.size === size);
                       if (!cell) return <td key={size} />;
                       return (
                         <td key={size} className="is-end">

@@ -286,7 +286,7 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
 
             {/* Size Chips - Testatoro style: Solid black when selected, clean white when unselected, NO red background */}
             <div role="group" aria-label="Select Size" className="flex flex-wrap gap-2.5">
-              {product.sizes.map((s) => {
+              {(product.sizes || []).map((s) => {
                 const isSelected = s === selectedSize;
                 return (
                   <button

@@ -73,9 +73,12 @@ export function generateVariants(
   sizes: string[],
   existing: Variant[] = [],
 ): Variant[] {
-  const previous = new Map(existing.map((v) => [v.id, v.stock]));
-  return colors.flatMap((color) =>
-    sizes.map((size) => {
+  const safeColors = Array.isArray(colors) ? colors : [];
+  const safeSizes = Array.isArray(sizes) ? sizes : [];
+  const safeExisting = Array.isArray(existing) ? existing : [];
+  const previous = new Map(safeExisting.map((v) => [v.id, v.stock]));
+  return safeColors.flatMap((color) =>
+    safeSizes.map((size) => {
       const id = variantId(productId, color.id, size);
       return { id, colorId: color.id, size, stock: previous.get(id) ?? 0 };
     }),
