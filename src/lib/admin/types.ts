@@ -110,6 +110,15 @@ export interface Order {
   cancelledAt: string | null;
   cancelReason: string | null;
   timeline: TimelineEvent[];
+  ambassadorId?: string | null;
+  ambassadorCode?: string | null;
+  fulfilmentStatus?: "NOT_SHIPPED" | "SHIPPED" | "DELIVERED" | "RETURNED" | "DELIVERY_FAILED";
+  paymentStatus?: "UNPAID" | "PAID" | "REFUNDED";
+  deliveredAt?: string | null;
+  paidAt?: string | null;
+  courierReference?: string | null;
+  discountCents?: number;
+  subtotalCents?: number;
 }
 
 export type StockReason = "sale" | "cancel_restock" | "manual_adjust" | "initial";

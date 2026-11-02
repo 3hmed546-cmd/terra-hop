@@ -7,6 +7,7 @@ import { apiSuccess, apiError, type ApiErrorCode } from "@/lib/server/api-envelo
 import { seedDatabaseIfNeeded } from "@/lib/server/seed-db";
 import { getShippingRules, calcShippingCents } from "@/lib/server/shipping";
 import { evaluatePromo } from "@/lib/server/promo";
+import { lookupAndValidateCode } from "@/lib/server/ambassadors/codes";
 import { normalizePhone, EGYPT_MOBILE } from "@/lib/server/phone";
 import { getPaymentHandler } from "@/lib/server/payment";
 import type Database from "better-sqlite3";
@@ -155,12 +156,29 @@ export async function POST(request: NextRequest) {
 
   let discountCents = 0;
   let appliedPromo: string | null = null;
+  let ambassadorId: string | null = null;
+  let ambassadorCode: string | null = null;
+  let referralCodeId: string | null = null;
+  let voucherId: string | null = null;
+  let codeDiscountPercent: number | null = null;
+
   const rawPromo = cleanText(body?.promoCode, 40);
   if (rawPromo) {
-    const promo = evaluatePromo(db, rawPromo, subtotalCents);
-    if (!promo.ok) return apiError("VALIDATION", promo.message, 400, "promoCode");
-    appliedPromo = promo.code;
-    discountCents = promo.discountCents;
+    const codeResult = lookupAndValidateCode(db, rawPromo, verifiedItems, subtotalCents, { phone, email });
+    if (!codeResult.ok) return apiError("VALIDATION", codeResult.message, 400, "promoCode");
+
+    appliedPromo = codeResult.code;
+    discountCents = codeResult.discountCents;
+
+    if (codeResult.kind === "ambassador") {
+      ambassadorId = codeResult.ambassadorId || null;
+      ambassadorCode = codeResult.code;
+      referralCodeId = codeResult.referralCodeId || null;
+      codeDiscountPercent = codeResult.discountPercent || null;
+    } else if (codeResult.kind === "voucher") {
+      voucherId = codeResult.voucherId || null;
+      codeDiscountPercent = codeResult.discountPercent || 80;
+    }
   }
 
   const totalCents = Math.max(0, subtotalCents - discountCents) + shippingCents;
@@ -189,23 +207,43 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      if (appliedPromo) {
-        const r = db
+      // معالجة كود الخصم ذرّياً حسب نوعه
+      if (voucherId) {
+        // قفل واستهلاك كود المكافأة
+        const vRes = db
           .prepare(
-            "UPDATE promo_codes SET used = used + 1 WHERE code = ? AND (max_uses IS NULL OR max_uses = 0 OR used < max_uses)",
+            "UPDATE reward_vouchers SET status = 'REDEEMED', redeemed_order_id = ?, redeemed_at = ? WHERE id = ? AND status = 'ACTIVE'"
           )
-          .run(appliedPromo);
-        if (r.changes === 0) {
-          throw new CheckoutError("VALIDATION", "تم استنفاد الحد الأقصى لاستخدام كود الخصم.", 409, "promoCode");
+          .run(orderId, now, voucherId);
+
+        if (vRes.changes === 0) {
+          throw new CheckoutError("VALIDATION", "كود المكافأة تم استخدامه مسبقاً أو غير متاح.", 409, "promoCode");
         }
+
+        // تحديث حالة المكافأة التابعة
+        db.prepare(
+          "UPDATE ambassador_rewards SET status = 'REDEEMED' WHERE id = (SELECT reward_id FROM reward_vouchers WHERE id = ?)"
+        ).run(voucherId);
+      } else if (referralCodeId) {
+        // تحديث عدد استخدامات كود السفير
+        db.prepare(
+          "UPDATE referral_codes SET used_count = used_count + 1 WHERE id = ?"
+        ).run(referralCodeId);
+      } else if (appliedPromo) {
+        // كود برومو تقليدي
+        db.prepare(
+          "UPDATE promo_codes SET used = used + 1 WHERE code = ? AND (max_uses IS NULL OR max_uses = 0 OR used < max_uses)"
+        ).run(appliedPromo);
       }
 
       db.prepare(
         `INSERT INTO orders (
            id, number, source, status, customer_enc, notes,
            subtotal_cents, shipping_cents, discount_cents, promo_code, total_cents,
+           ambassador_id, ambassador_code, referral_code_id, attribution_locked_at,
+           fulfilment_status, payment_status, code_discount_percent_applied, code_discount_cents,
            created_at, revision
-         ) VALUES (?, ?, 'website', 'AWAITING_APPROVAL', ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+         ) VALUES (?, ?, 'website', 'AWAITING_APPROVAL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NOT_SHIPPED', 'UNPAID', ?, ?, ?, 1)`,
       ).run(
         orderId,
         orderNumber,
@@ -216,6 +254,12 @@ export async function POST(request: NextRequest) {
         discountCents,
         appliedPromo,
         totalCents,
+        ambassadorId,
+        ambassadorCode,
+        referralCodeId,
+        ambassadorId ? now : null,
+        codeDiscountPercent,
+        discountCents,
         now,
       );
 

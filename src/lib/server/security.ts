@@ -168,3 +168,154 @@ export function verifyCsrfToken(sessionId: string, token: string): boolean {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Encrypted & Hashed Discount / Referral Codes & Vouchers
+// "الكبونات بتاعة الخصم تكون مشفره لعدم قرائتها"
+// ---------------------------------------------------------------------------
+
+function getVoucherCipherKey(): Buffer {
+  const secret = getSecretKey();
+  return crypto.createHash("sha256").update(`${secret}:voucher_aes256_key`).digest();
+}
+
+/**
+ * Hash lookup for referral & voucher codes.
+ * Enables O(1) indexed database lookups without storing plaintext codes.
+ */
+export function hashLookupCode(rawCode: string): string {
+  const normalized = (rawCode || "").trim().toUpperCase().replace(/[^A-Z0-9-]/g, "");
+  return crypto.createHash("sha256").update(`TH_VOUCHER_SALT_2026:${normalized}`).digest("hex");
+}
+
+/**
+ * Encrypt a voucher or referral code with AES-256-GCM.
+ * Stored in database so no plaintext code is ever exposed or readable directly.
+ */
+export function encryptCode(rawCode: string): string {
+  const normalized = (rawCode || "").trim().toUpperCase();
+  const key = getVoucherCipherKey();
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const encrypted = Buffer.concat([cipher.update(normalized, "utf-8"), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return `${iv.toString("hex")}:${authTag.toString("hex")}:${encrypted.toString("hex")}`;
+}
+
+/**
+ * Decrypt an AES-256-GCM encrypted voucher or referral code.
+ */
+export function decryptCode(payload: string): string {
+  if (!payload || !payload.includes(":")) return "";
+  try {
+    const [ivHex, tagHex, dataHex] = payload.split(":");
+    if (!ivHex || !tagHex || !dataHex) return "";
+    const key = getVoucherCipherKey();
+    const iv = Buffer.from(ivHex, "hex");
+    const authTag = Buffer.from(tagHex, "hex");
+    const data = Buffer.from(dataHex, "hex");
+
+    const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+    decipher.setAuthTag(authTag);
+    const decrypted = Buffer.concat([decipher.update(data), decipher.final()]);
+    return decrypted.toString("utf-8");
+  } catch {
+    return "";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Ambassador Session Management (Separate Auth Realm)
+// ---------------------------------------------------------------------------
+
+function getAmbassadorSecretKey(): string {
+  return process.env.AMBASSADOR_SESSION_SECRET || `${getSecretKey()}:ambassador_realm`;
+}
+
+export function signAmbassadorSessionToken(
+  ambassadorId: string,
+  email: string,
+  sessionId?: string
+): string {
+  const secret = getAmbassadorSecretKey();
+  const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "TERRA-AMBASSADOR" })).toString("base64url");
+  const sid = sessionId || crypto.randomUUID();
+
+  const payload = Buffer.from(
+    JSON.stringify({
+      sub: email,
+      ambId: ambassadorId,
+      sid,
+      role: "ambassador",
+      aud: "terra_ambassador",
+      iat: Date.now(),
+      exp: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30 days
+      nonce: crypto.randomBytes(16).toString("hex"),
+    })
+  ).toString("base64url");
+
+  const signature = crypto
+    .createHmac("sha256", secret)
+    .update(`${header}.${payload}`)
+    .digest("base64url");
+
+  return `${header}.${payload}.${signature}`;
+}
+
+export interface VerifyAmbassadorResult {
+  valid: boolean;
+  ambassadorId?: string;
+  email?: string;
+  sessionId?: string;
+  expired?: boolean;
+}
+
+export function verifyAmbassadorSessionToken(
+  token: string | undefined | null
+): VerifyAmbassadorResult {
+  if (!token || typeof token !== "string") {
+    return { valid: false };
+  }
+
+  const parts = token.split(".");
+  if (parts.length !== 3) {
+    return { valid: false };
+  }
+
+  const [header, payload, signature] = parts;
+  const secret = getAmbassadorSecretKey();
+
+  try {
+    const expectedSig = crypto
+      .createHmac("sha256", secret)
+      .update(`${header}.${payload}`)
+      .digest("base64url");
+
+    const sigBuf = Buffer.from(signature);
+    const expectedBuf = Buffer.from(expectedSig);
+
+    if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) {
+      return { valid: false };
+    }
+
+    const decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf-8"));
+    const now = Date.now();
+
+    if (typeof decoded.exp !== "number" || now > decoded.exp) {
+      return { valid: false, expired: true };
+    }
+
+    if (decoded.role !== "ambassador" || decoded.aud !== "terra_ambassador") {
+      return { valid: false };
+    }
+
+    return {
+      valid: true,
+      ambassadorId: decoded.ambId,
+      email: decoded.sub,
+      sessionId: decoded.sid,
+    };
+  } catch {
+    return { valid: false };
+  }
+}
+

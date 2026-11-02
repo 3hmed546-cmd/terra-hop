@@ -37,6 +37,7 @@ const GO: Record<string, string> = {
   d: "/dashboard",
   p: "/products",
   o: "/orders",
+  a: "/ambassadors",
   s: "/settings",
 };
 

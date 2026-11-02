@@ -34,6 +34,13 @@ function CustomerCell({ order }: { order: Order }) {
     <div>
       <div>{order.customer.name}</div>
       {order.customer.phone ? <div className="adm-muted adm-small adm-num">{order.customer.phone}</div> : null}
+      {order.ambassadorCode ? (
+        <div style={{ marginTop: "3px" }}>
+          <span style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "3px", backgroundColor: "#2A1800", color: "#FBBF24", border: "1px solid #78350F" }}>
+            سفير: {order.ambassadorCode}
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -88,6 +88,14 @@ export async function POST(request: NextRequest) {
       maxAge: 24 * 60 * 60,
     });
 
+    response.cookies.set("terra_admin_logged_in", "1", {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 24 * 60 * 60,
+    });
+
     response.headers.set("X-CSRF-Token", csrfToken);
 
     return response;

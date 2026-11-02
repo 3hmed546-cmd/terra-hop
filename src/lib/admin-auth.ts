@@ -10,8 +10,12 @@ export function getAccessToken(): string | null {
 
 export function isAuthenticated(): boolean {
   if (typeof window === "undefined") return false;
-  // If memory state is set, trust it; otherwise check cookie presence as heuristic until /me completes
-  return isSessionActive || document.cookie.includes("terra_admin_session=");
+  // Check memory state, readable cookie, or session cookie indicator
+  return (
+    isSessionActive ||
+    document.cookie.includes("terra_admin_logged_in=1") ||
+    document.cookie.includes("terra_admin_session=")
+  );
 }
 
 export function getAdminUser() {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { checkDoSProtection, getClientIp } from "@/lib/rate-limit";
-import { verifySessionToken } from "@/lib/server/security";
+import { verifySessionToken, verifyAmbassadorSessionToken } from "@/lib/server/security";
 
 // Hidden admin routes. The public URL is /<ADMIN_PATH> for login and /<ADMIN_PATH>/* for dashboard pages.
 // Direct visits to internal folders (/admin and /admin-login) fail closed and return 404.
@@ -16,11 +16,18 @@ export function proxy(request: NextRequest) {
   const sessionCookie = request.cookies.get("terra_admin_session")?.value;
   const isAuthedSession = verifySessionToken(sessionCookie).valid;
 
-  // Exempt authenticated admins, internal Next.js assets, public media, and live SSE stream from aggressive DoS blocking
+  // Check ambassador authentication session
+  const ambSessionCookie = request.cookies.get("terra_amb_session")?.value;
+  const isAmbSession = verifyAmbassadorSessionToken(ambSessionCookie).valid;
+
+  // Exempt authenticated admins, ambassadors, internal Next.js assets, public media, and live SSE stream from aggressive DoS blocking
   const isExemptFromDos =
     isAuthedSession ||
+    isAmbSession ||
     pathname.startsWith("/_next/") ||
     pathname.startsWith("/media/") ||
+    pathname.startsWith("/ambassador") ||
+    pathname.startsWith("/api/ambassador") ||
     pathname === "/api/public/stream" ||
     request.nextUrl.searchParams.has("_rsc");
 
@@ -146,6 +153,29 @@ export function proxy(request: NextRequest) {
     res.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
     res.headers.set("Cache-Control", "no-store");
     res.headers.set("Referrer-Policy", "no-referrer");
+    return res;
+  }
+
+  // 3. Ambassador Portal Protection & Isolation
+  if (pathname === "/ambassador" || pathname.startsWith("/ambassador/")) {
+    if (pathname === "/ambassador/login") {
+      // If already logged in, redirect to dashboard
+      if (isAmbSession) {
+        return NextResponse.redirect(new URL("/ambassador", request.url));
+      }
+      const res = NextResponse.next();
+      res.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+      return res;
+    }
+
+    // Protect all other /ambassador routes
+    if (!isAmbSession) {
+      return NextResponse.redirect(new URL("/ambassador/login", request.url));
+    }
+
+    const res = NextResponse.next();
+    res.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+    res.headers.set("Cache-Control", "no-store");
     return res;
   }
 

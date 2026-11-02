@@ -49,11 +49,34 @@ function EventRow({ event, order }: { event: TimelineEvent; order: Order }) {
 }
 
 export function OrderDetail({ orderId }: { orderId: string }) {
-  const { data, ready, actions } = useAdminStore();
+  const { data, ready, actions, reload } = useAdminStore();
   const toast = useToast();
   const [dialog, setDialog] = useState<"sell" | "cancel" | null>(null);
+  const [delivering, setDelivering] = useState(false);
   const statusRef = useRef<HTMLParagraphElement>(null);
   const refocus = useRef(false);
+
+  const handleMarkDeliveredPaid = async (targetOrderId: string) => {
+    setDelivering(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${targetOrderId}/mark-delivered-paid`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        toast.push(json.data?.message || "تم تأكيد التسليم والتحصيل واحتساب المبيعة للسفير بنجاح!");
+        reload?.();
+      } else {
+        toast.push(json.message || "فشل تأكيد التسليم والتحصيل.");
+      }
+    } catch {
+      toast.push("خطأ في الاتصال بالخادم.");
+    } finally {
+      setDelivering(false);
+    }
+  };
 
   // After a decision the buttons that opened the dialog disappear: move focus to the status line.
   useEffect(() => {
@@ -251,6 +274,56 @@ export function OrderDetail({ orderId }: { orderId: string }) {
                 </Button>
               </div>
             ) : null}
+
+            {/* Street Ambassador & Fulfilment Actions (Revision 2 - R3 / R4) */}
+            <div style={{ marginTop: "1.25rem", paddingTop: "1rem", borderTop: "1px solid #333" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                <span style={{ fontSize: "12px", fontWeight: "bold", color: "#F5F5F5" }}>
+                  حالة التسليم والتحصيل الفعلي (COD):
+                </span>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: "bold",
+                    padding: "2px 8px",
+                    borderRadius: "4px",
+                    backgroundColor: order.fulfilmentStatus === "DELIVERED" ? "rgba(16, 185, 129, 0.15)" : "rgba(56, 189, 248, 0.15)",
+                    color: order.fulfilmentStatus === "DELIVERED" ? "#34D399" : "#38BDF8",
+                    border: `1px solid ${order.fulfilmentStatus === "DELIVERED" ? "rgba(16, 185, 129, 0.3)" : "rgba(56, 189, 248, 0.3)"}`,
+                  }}
+                >
+                  {order.fulfilmentStatus === "DELIVERED" ? "تم التسليم والتحصيل بنجاح" : "قيد الشحن والتوصيل"}
+                </span>
+              </div>
+
+              {order.ambassadorCode && (
+                <div
+                  style={{
+                    padding: "8px 12px",
+                    backgroundColor: "rgba(245, 158, 11, 0.08)",
+                    border: "1px solid rgba(245, 158, 11, 0.25)",
+                    borderRadius: "6px",
+                    fontSize: "12px",
+                    marginBottom: "0.75rem",
+                    color: "#FCD34D",
+                  }}
+                >
+                  منسوب لسفير الشارع: <strong>{order.ambassadorCode}</strong> (يُحتسب له عند تأكيد التسليم)
+                </div>
+              )}
+
+              {order.fulfilmentStatus !== "DELIVERED" && order.status !== "CANCELLED" && (
+                <div style={{ marginTop: "0.5rem" }}>
+                  <Button
+                    variant="primary"
+                    disabled={delivering}
+                    onClick={() => handleMarkDeliveredPaid(order.id)}
+                  >
+                    {delivering ? "جاري التأكيد..." : "تأكيد التسليم والتحصيل (Delivered & Paid)"}
+                  </Button>
+                </div>
+              )}
+            </div>
           </section>
 
           {order.status === "PENDING_EMAIL" ? (

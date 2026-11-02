@@ -18,6 +18,7 @@ const ITEMS = [
   { path: "/media", label: N.media },
   { path: "/products", label: N.products },
   { path: "/orders", label: N.orders },
+  { path: "/ambassadors", label: "سفراء الشارع" },
   { path: "/settings", label: N.settings },
 ] as const;
 

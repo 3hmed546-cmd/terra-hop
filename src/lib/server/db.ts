@@ -297,14 +297,254 @@ function initializeSchema(db: Database.Database): void {
       response TEXT,
       created_at TEXT
     );
+
+    -- =======================================================================
+    -- STREET AMBASSADOR PROGRAM TABLES
+    -- =======================================================================
+
+    CREATE TABLE IF NOT EXISTS ambassadors (
+      id TEXT PRIMARY KEY,
+      display_name TEXT NOT NULL,
+      full_name TEXT NOT NULL,
+      phone TEXT NOT NULL UNIQUE,
+      email TEXT NOT NULL UNIQUE,
+      instagram_handle TEXT,
+      city TEXT,
+      notes TEXT,
+      status TEXT NOT NULL CHECK (status IN ('ACTIVE', 'INACTIVE', 'SUSPENDED')),
+      suspended_reason TEXT,
+      joined_at TEXT NOT NULL,
+      created_by_admin TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS referral_codes (
+      id TEXT PRIMARY KEY,
+      ambassador_id TEXT NOT NULL REFERENCES ambassadors(id) ON DELETE CASCADE,
+      code_hash TEXT NOT NULL UNIQUE,
+      encrypted_code TEXT NOT NULL,
+      discount_percent INTEGER NOT NULL CHECK (discount_percent >= 0 AND discount_percent <= 100),
+      applies_to TEXT NOT NULL CHECK (applies_to IN ('ALL_PRODUCTS', 'SELECTED')),
+      is_active INTEGER NOT NULL DEFAULT 1,
+      valid_from TEXT,
+      valid_until TEXT,
+      max_uses INTEGER,
+      used_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      deactivated_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS ix_ref_code_hash ON referral_codes(code_hash);
+    CREATE INDEX IF NOT EXISTS ix_ref_amb ON referral_codes(ambassador_id);
+
+    CREATE TABLE IF NOT EXISTS discount_code_products (
+      code_id TEXT NOT NULL REFERENCES referral_codes(id) ON DELETE CASCADE,
+      product_id TEXT NOT NULL,
+      PRIMARY KEY (code_id, product_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS ambassador_levels (
+      id TEXT PRIMARY KEY,
+      rank INTEGER NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      threshold_sales INTEGER NOT NULL CHECK (threshold_sales > 0),
+      description_en TEXT NOT NULL DEFAULT '',
+      description_ar TEXT NOT NULL DEFAULT '',
+      is_enabled INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS reward_definitions (
+      id TEXT PRIMARY KEY,
+      level_id TEXT NOT NULL REFERENCES ambassador_levels(id) ON DELETE CASCADE,
+      gift_cost_cents INTEGER,
+      type TEXT NOT NULL CHECK (type IN ('FREE_GIFT', 'PERCENT_DISCOUNT_VOUCHER', 'FIXED_VOUCHER', 'CUSTOM_MANUAL')),
+      title TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      discount_percent INTEGER,
+      max_discount_cents INTEGER,
+      eligible_category TEXT DEFAULT 'Hoodies',
+      max_items_per_voucher INTEGER DEFAULT 1,
+      stackable INTEGER DEFAULT 0,
+      validity_days INTEGER DEFAULT 30,
+      requires_admin_approval INTEGER DEFAULT 0,
+      is_enabled INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS ambassador_rewards (
+      id TEXT PRIMARY KEY,
+      ambassador_id TEXT NOT NULL REFERENCES ambassadors(id) ON DELETE CASCADE,
+      level_id TEXT NOT NULL REFERENCES ambassador_levels(id),
+      reward_definition_id TEXT NOT NULL REFERENCES reward_definitions(id),
+      definition_snapshot TEXT NOT NULL DEFAULT '{}',
+      cycle INTEGER NOT NULL DEFAULT 1,
+      status TEXT NOT NULL CHECK (status IN ('PENDING_APPROVAL', 'EARNED', 'ISSUED', 'REDEEMED', 'EXPIRED', 'REVOKED', 'REJECTED')),
+      earned_at TEXT NOT NULL,
+      approved_by TEXT,
+      approved_at TEXT,
+      rejected_reason TEXT,
+      issued_at TEXT,
+      expires_at TEXT,
+      revoked_reason TEXT,
+      UNIQUE (ambassador_id, reward_definition_id, cycle)
+    );
+    CREATE INDEX IF NOT EXISTS ix_amb_rewards_amb ON ambassador_rewards(ambassador_id);
+
+    CREATE TABLE IF NOT EXISTS reward_vouchers (
+      id TEXT PRIMARY KEY,
+      reward_id TEXT NOT NULL UNIQUE REFERENCES ambassador_rewards(id) ON DELETE CASCADE,
+      ambassador_id TEXT NOT NULL REFERENCES ambassadors(id),
+      code_hash TEXT NOT NULL UNIQUE,
+      encrypted_code TEXT NOT NULL,
+      discount_percent INTEGER NOT NULL DEFAULT 80,
+      max_discount_cents INTEGER,
+      eligible_category TEXT DEFAULT 'Hoodies',
+      eligible_product_ids TEXT DEFAULT '[]',
+      max_items INTEGER DEFAULT 1,
+      status TEXT NOT NULL CHECK (status IN ('ACTIVE', 'REDEEMED', 'EXPIRED', 'REVOKED')),
+      redeemed_order_id TEXT,
+      redeemed_at TEXT,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_voucher_hash ON reward_vouchers(code_hash);
+
+    CREATE TABLE IF NOT EXISTS ambassador_sale_events (
+      id TEXT PRIMARY KEY,
+      ambassador_id TEXT NOT NULL REFERENCES ambassadors(id) ON DELETE CASCADE,
+      order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      event_type TEXT NOT NULL CHECK (event_type IN ('QUALIFIED', 'REVERSED_RETURN', 'REVERSED_REFUND', 'REVERSED_ADMIN', 'REINSTATED')),
+      units INTEGER NOT NULL DEFAULT 1,
+      basis_snapshot TEXT NOT NULL DEFAULT 'orders',
+      amount_cents INTEGER NOT NULL DEFAULT 0,
+      occurred_at TEXT NOT NULL,
+      recorded_by_admin TEXT,
+      source TEXT NOT NULL DEFAULT 'delivered_confirmation',
+      idempotency_key TEXT NOT NULL UNIQUE
+    );
+    CREATE INDEX IF NOT EXISTS ix_sale_events_amb ON ambassador_sale_events(ambassador_id);
+    CREATE INDEX IF NOT EXISTS ix_sale_events_ord ON ambassador_sale_events(order_id);
+
+    CREATE TABLE IF NOT EXISTS ambassador_progress (
+      ambassador_id TEXT PRIMARY KEY REFERENCES ambassadors(id) ON DELETE CASCADE,
+      qualified_count INTEGER NOT NULL DEFAULT 0,
+      reversed_count INTEGER NOT NULL DEFAULT 0,
+      net_count INTEGER NOT NULL DEFAULT 0,
+      pending_count INTEGER NOT NULL DEFAULT 0,
+      cancelled_count INTEGER NOT NULL DEFAULT 0,
+      refunded_count INTEGER NOT NULL DEFAULT 0,
+      current_level_id TEXT REFERENCES ambassador_levels(id),
+      first_qualified_at TEXT,
+      last_qualified_at TEXT,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS ambassador_milestones (
+      id TEXT PRIMARY KEY,
+      ambassador_id TEXT NOT NULL REFERENCES ambassadors(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL CHECK (kind IN ('FIRST_SALE_CONFIRMED', 'LEVEL_REACHED', 'REWARD_ISSUED', 'REWARD_REDEEMED', 'SUSPENDED', 'REACTIVATED')),
+      order_id TEXT,
+      level_id TEXT,
+      description TEXT NOT NULL,
+      occurred_at TEXT NOT NULL,
+      created_by TEXT NOT NULL DEFAULT 'system'
+    );
+    CREATE INDEX IF NOT EXISTS ix_milestones_amb ON ambassador_milestones(ambassador_id);
+
+    CREATE TABLE IF NOT EXISTS ambassador_users (
+      id TEXT PRIMARY KEY,
+      ambassador_id TEXT NOT NULL UNIQUE REFERENCES ambassadors(id) ON DELETE CASCADE,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      failed_attempts INTEGER NOT NULL DEFAULT 0,
+      locked_until TEXT,
+      last_login_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS ambassador_sessions (
+      id TEXT PRIMARY KEY,
+      ambassador_user_id TEXT NOT NULL REFERENCES ambassador_users(id) ON DELETE CASCADE,
+      ambassador_id TEXT NOT NULL REFERENCES ambassadors(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      ip TEXT,
+      ua TEXT,
+      revoked_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS ix_amb_sess ON ambassador_sessions(ambassador_user_id);
+
+    CREATE TABLE IF NOT EXISTS fraud_flags (
+      id TEXT PRIMARY KEY,
+      order_id TEXT,
+      ambassador_id TEXT REFERENCES ambassadors(id) ON DELETE SET NULL,
+      rule TEXT NOT NULL,
+      severity TEXT NOT NULL CHECK (severity IN ('LOW', 'MEDIUM', 'HIGH')),
+      details TEXT NOT NULL DEFAULT '{}',
+      status TEXT NOT NULL CHECK (status IN ('OPEN', 'CLEARED', 'CONFIRMED')),
+      created_at TEXT NOT NULL,
+      resolved_by TEXT,
+      resolved_at TEXT
+    );
   `);
 
-  for (const col of ["cancelled_at TEXT", "cancel_reason TEXT"]) {
+  const orderColumns = [
+    "cancelled_at TEXT",
+    "cancel_reason TEXT",
+    "ambassador_id TEXT",
+    "ambassador_code TEXT",
+    "referral_code_id TEXT",
+    "attribution_locked_at TEXT",
+    "fulfilment_status TEXT DEFAULT 'NOT_SHIPPED'",
+    "payment_status TEXT DEFAULT 'UNPAID'",
+    "delivered_at TEXT",
+    "paid_at TEXT",
+    "delivered_confirmed_by TEXT",
+    "courier_reference TEXT",
+    "code_discount_percent_applied INTEGER",
+    "code_discount_cents INTEGER",
+  ];
+
+  for (const col of orderColumns) {
     try {
       db.exec(`ALTER TABLE orders ADD COLUMN ${col}`);
     } catch {
       /* Column already exists */
     }
+  }
+
+  // Seed default ambassador levels & rewards if missing
+  try {
+    const existingLevels = db.prepare("SELECT COUNT(*) as c FROM ambassador_levels").get() as { c: number };
+    if (!existingLevels || existingLevels.c === 0) {
+      const now = new Date().toISOString();
+      const insertLevel = db.prepare(`
+        INSERT OR IGNORE INTO ambassador_levels (id, rank, name, threshold_sales, description_en, description_ar, is_enabled, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+      `);
+      const insertRewardDef = db.prepare(`
+        INSERT OR IGNORE INTO reward_definitions (id, level_id, gift_cost_cents, type, title, description, discount_percent, max_discount_cents, eligible_category, max_items_per_voucher, stackable, validity_days, requires_admin_approval, is_enabled, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, 30, 0, 1, ?, ?)
+      `);
+
+      // Level 1: Starter (10 sales)
+      insertLevel.run("lvl_starter", 1, "Starter", 10, "Starter Ambassador - Free Brand Gift", "سفير مبتدئ - هدية مجانية خاصة من البراند", now, now);
+      insertRewardDef.run("rwd_starter_gift", "lvl_starter", 25000, "FREE_GIFT", "هدية خاصة من TERRA HOP", "هدية مميزة حصرية مقدمة لسفراء المستوى الأول", null, null, null, now, now);
+
+      // Level 2: Rising (20 sales)
+      insertLevel.run("lvl_rising", 2, "Rising", 20, "Rising Ambassador - 80% Off Hoodie Voucher", "سفير صاعد - كود خصم 80% على هودي إضافي", now, now);
+      insertRewardDef.run("rwd_rising_hoodie", "lvl_rising", null, "PERCENT_DISCOUNT_VOUCHER", "كود خصم 80% على أي هودي", "كود مشفر للاستخدام مرة واحدة صالح لمدة 30 يوماً على هودي من اختيارك", 80, 150000, "Hoodies", now, now);
+
+      // Level 3: Elite (30 sales)
+      insertLevel.run("lvl_elite", 3, "Elite", 30, "Elite Ambassador - VIP Drop Box", "سفير نخبة - صندوق VIP حصري من الدفعة القادمة", now, now);
+      insertRewardDef.run("rwd_elite_box", "lvl_elite", 50000, "FREE_GIFT", "صندوق VIP الحصري", "صندوق هدايا وإصدار حصري قبل طرحه للجمهور", null, null, null, now, now);
+    }
+  } catch (err) {
+    console.error("Ambassador levels seed error:", err);
   }
 }
 
@@ -312,7 +552,7 @@ function initializeSchema(db: Database.Database): void {
  * Log a change into change_log for live SSE & polling updates
  */
 export function recordChange(
-  topic: "media" | "products" | "settings" | "content" | "orders",
+  topic: "media" | "products" | "settings" | "content" | "orders" | "ambassadors",
   entity: string,
   entityId: string | null,
   revision: number
