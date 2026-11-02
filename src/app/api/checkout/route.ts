@@ -8,11 +8,11 @@ import { seedDatabaseIfNeeded } from "@/lib/server/seed-db";
 import { getShippingRules, calcShippingCents } from "@/lib/server/shipping";
 import { evaluatePromo } from "@/lib/server/promo";
 import { normalizePhone, EGYPT_MOBILE } from "@/lib/server/phone";
+import { getPaymentHandler } from "@/lib/server/payment";
 import type Database from "better-sqlite3";
 
 const CHECKOUT_RATE_OPTIONS = { prefix: "store_checkout", max: 5, windowMs: 10 * 60 * 1000 };
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const PAYMENT_METHODS = ["cod"];
 
 // نص خام نظيف: إزالة الحروف الخفية وقص الطول فقط لمنع التشويه
 const cleanText = (v: unknown, max = 500) =>
@@ -87,7 +87,8 @@ export async function POST(request: NextRequest) {
   }
 
   const paymentMethod = cleanText(body?.paymentMethod ?? "cod", 20);
-  if (!PAYMENT_METHODS.includes(paymentMethod)) {
+  const paymentHandler = getPaymentHandler(paymentMethod);
+  if (!paymentHandler || !paymentHandler.isEnabled) {
     return apiError("VALIDATION", "طريقة الدفع غير مدعومة.", 400, "paymentMethod");
   }
 

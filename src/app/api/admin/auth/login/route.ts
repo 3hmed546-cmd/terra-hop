@@ -12,11 +12,11 @@ export async function POST(request: NextRequest) {
     seedDatabaseIfNeeded();
 
     const ip = getClientIp(request);
-    const rateLimitStatus = checkRateLimit(ip, { prefix: "login", max: 5, windowMs: 60 * 1000 });
+    const rateLimitStatus = checkRateLimit(ip, { prefix: "admin_auth_login", max: 5, windowMs: 5 * 60 * 1000 });
     if (!rateLimitStatus.success) {
       return apiError(
         "RATE_LIMITED",
-        "تم تجاوز الحد الأقصى لمحاولات الدخول. يرجى الانتظار دقيقة والمحاولة مجدداً.",
+        "تم تجاوز الحد الأقصى لمحاولات تسجيل الدخول. يرجى الانتظار 5 دقائق لحماية الحساب.",
         429,
         null,
         { "Retry-After": String(rateLimitStatus.retryAfter) }

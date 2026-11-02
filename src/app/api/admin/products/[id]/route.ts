@@ -81,7 +81,7 @@ export async function PATCH(
   const { id } = await context.params;
   const db = getDb();
 
-  const product = db.prepare("SELECT * FROM products WHERE id = ?").get(id) as any;
+  const product = db.prepare("SELECT * FROM products WHERE id = ? OR slug = ?").get(id, id) as any;
   if (!product) {
     return apiError("NOT_FOUND", "المنتج المطلوب تعديله غير موجود.", 404);
   }
@@ -145,12 +145,12 @@ export async function PATCH(
     details,
     nextRevision,
     now,
-    id
+    product.id
   );
 
-  const updated = db.prepare("SELECT * FROM products WHERE id = ?").get(id) as any;
+  const updated = db.prepare("SELECT * FROM products WHERE id = ?").get(product.id) as any;
 
-  recordChange("products", "products", id, nextRevision);
+  recordChange("products", "products", product.id, nextRevision);
   recordAudit({
     actor: auth.user.email,
     action: "UPDATE_PRODUCT",
@@ -177,9 +177,9 @@ export async function DELETE(
   const { id } = await context.params;
   const db = getDb();
 
-  const product = db.prepare("SELECT * FROM products WHERE id = ?").get(id) as any;
+  const product = db.prepare("SELECT * FROM products WHERE id = ? OR slug = ?").get(id, id) as any;
   if (!product) {
-    return apiError("NOT_FOUND", "المنتج غير موجود أو تم حذفه مسبقاً.", 404);
+    return apiSuccess({ deleted: true, id, alreadyDeleted: true });
   }
 
   // Check if active orders exist
@@ -190,7 +190,7 @@ export async function DELETE(
       JOIN orders o ON oi.order_id = o.id
       WHERE oi.product_id = ? AND o.status IN ('AWAITING_APPROVAL', 'PENDING_EMAIL')
     `)
-    .all(id) as any[];
+    .all(product.id) as any[];
 
   if (openOrderItems.length > 0) {
     return apiError(
@@ -202,26 +202,26 @@ export async function DELETE(
 
   db.transaction(() => {
     // Delete product images placement
-    db.prepare("DELETE FROM image_placements WHERE slot_key = 'product' AND owner_id = ?").run(id);
+    db.prepare("DELETE FROM image_placements WHERE slot_key = 'product' AND owner_id = ?").run(product.id);
     // Delete variants & colors (cascade)
-    db.prepare("DELETE FROM variants WHERE product_id = ?").run(id);
-    db.prepare("DELETE FROM product_colors WHERE product_id = ?").run(id);
+    db.prepare("DELETE FROM variants WHERE product_id = ?").run(product.id);
+    db.prepare("DELETE FROM product_colors WHERE product_id = ?").run(product.id);
     // Delete product
-    db.prepare("DELETE FROM products WHERE id = ?").run(id);
+    db.prepare("DELETE FROM products WHERE id = ?").run(product.id);
   })();
 
   const nextRevision = (product.revision || 1) + 1;
-  recordChange("products", "products", id, nextRevision);
+  recordChange("products", "products", product.id, nextRevision);
   recordAudit({
     actor: auth.user.email,
     action: "DELETE_PRODUCT",
     entity: "products",
-    entityId: id,
+    entityId: product.id,
     before: product,
   });
 
   return apiSuccess(
-    { deleted: true, id },
+    { deleted: true, id: product.id },
     { revision: nextRevision, topic: "products", topicRevision: nextRevision }
   );
 }
