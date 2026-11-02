@@ -30,13 +30,16 @@ export async function GET(request: NextRequest) {
   for (const item of orderItems) {
     const list = itemsByOrder.get(item.order_id) || [];
     list.push({
-      id: item.id,
       productId: item.product_id,
-      productSlug: item.product_id,
+      variantId: item.variant_id,
       productName: item.product_name,
       colorName: item.color_name,
       size: item.size,
       qty: item.qty,
+      priceCentsSnapshot: item.price_cents_snapshot,
+      // For backwards compatibility
+      id: item.id,
+      productSlug: item.product_id,
       priceCents: item.price_cents_snapshot,
       price: Math.round(item.price_cents_snapshot / 100),
     });
@@ -53,25 +56,45 @@ export async function GET(request: NextRequest) {
 
     const items = itemsByOrder.get(o.id) || [];
 
+    const timeline: Array<{ at: string; type: string; actor: string; note?: string }> = [
+      { at: o.created_at, type: "placed", actor: "customer" },
+    ];
+    if (o.status === "SOLD" && o.sold_at) {
+      timeline.push({ at: o.sold_at, type: "sold", actor: "owner" });
+    }
+    if (o.status === "CANCELLED") {
+      timeline.push({
+        at: o.cancelled_at ?? o.created_at,
+        type: "cancelled",
+        actor: "owner",
+        ...(o.cancel_reason ? { note: o.cancel_reason } : {}),
+      });
+    }
+
     return {
       id: o.id,
       number: o.number,
       source: o.source,
       status: o.status,
-      customer,
-      notes: o.notes,
+      customer: { email: "", ...customer },
+      notes: o.notes ?? "",
+      items,
       subtotalCents: o.subtotal_cents,
-      subtotal: Math.round(o.subtotal_cents / 100),
       shippingCents: o.shipping_cents,
-      shipping: Math.round(o.shipping_cents / 100),
       discountCents: o.discount_cents,
-      discount: Math.round(o.discount_cents / 100),
       promoCode: o.promo_code,
       totalCents: o.total_cents,
-      total: Math.round(o.total_cents / 100),
       createdAt: o.created_at,
-      soldAt: o.sold_at,
-      items,
+      emailConfirmedAt: null,
+      soldAt: o.sold_at ?? null,
+      cancelledAt: o.cancelled_at ?? null,
+      cancelReason: o.cancel_reason ?? null,
+      timeline,
+      // Compatibility
+      subtotal: Math.round(o.subtotal_cents / 100),
+      shipping: Math.round(o.shipping_cents / 100),
+      discount: Math.round(o.discount_cents / 100),
+      total: Math.round(o.total_cents / 100),
     };
   });
 
@@ -109,14 +132,19 @@ export async function PATCH(request: NextRequest) {
   }
 
   const now = new Date().toISOString();
-  const soldAt = status === "SOLD" ? now : order.sold_at;
+  const soldAt = status === "SOLD" ? now : order.sold_at ?? null;
+  const cancelledAt = status === "CANCELLED" ? now : order.cancelled_at ?? null;
+  const cancelReason =
+    status === "CANCELLED"
+      ? (typeof body.reason === "string" ? body.reason.trim().slice(0, 300) : "") || null
+      : order.cancel_reason ?? null;
 
   db.transaction(() => {
     db.prepare(`
       UPDATE orders
-      SET status = ?, sold_at = ?, revision = revision + 1
+      SET status = ?, sold_at = ?, cancelled_at = ?, cancel_reason = ?, revision = revision + 1
       WHERE id = ?
-    `).run(status, soldAt, orderId);
+    `).run(status, soldAt, cancelledAt, cancelReason, orderId);
 
     // If cancelled, restore variant stock if was previously reserved or sold
     if (status === "CANCELLED" && order.status !== "CANCELLED") {

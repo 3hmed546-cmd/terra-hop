@@ -57,6 +57,9 @@ export async function PATCH(
   }
 
   recordChange("media", "image_placements", id, nextRevision);
+  if (key === "product" && placement.owner_id) {
+    recordChange("products", "products", placement.owner_id, nextRevision);
+  }
   recordAudit({
     actor: auth.user.email,
     action: "UPDATE_PLACEMENT",
@@ -113,6 +116,9 @@ export async function DELETE(
   }
 
   recordChange("media", "image_placements", id, nextRevision);
+  if (key === "product" && placement.owner_id) {
+    recordChange("products", "products", placement.owner_id, nextRevision);
+  }
   recordAudit({
     actor: auth.user.email,
     action: "DELETE_PLACEMENT",

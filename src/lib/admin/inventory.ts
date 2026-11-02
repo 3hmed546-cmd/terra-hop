@@ -218,6 +218,19 @@ export function sellOrder(data: AdminData, orderId: string, now: string): Result
   const order = data.orders.find((o) => o.id === orderId);
   if (!order) return fail("ORDER_NOT_FOUND");
   if (order.status !== "AWAITING_APPROVAL") return fail("ORDER_NOT_AWAITING");
+
+  // Website orders had stock reserved/deducted upon checkout by server; just transition status
+  if (order.source === "website") {
+    return ok(
+      updateOrder(data, orderId, (o) => ({
+        ...o,
+        status: "SOLD",
+        soldAt: now,
+        timeline: [...o.timeline, { at: now, type: "sold", actor: "owner" }],
+      })),
+    );
+  }
+
   if (checkOrderStock(data, order).some((line) => !line.ok)) return fail("INSUFFICIENT_STOCK");
 
   let next = data;

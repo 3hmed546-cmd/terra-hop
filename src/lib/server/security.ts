@@ -16,13 +16,15 @@ function getSecretKey(): string {
  * Generates an HMAC-SHA256 signed session token for authenticated admins.
  * Format: header.payload.signature
  */
-export function signSessionToken(email: string): string {
+export function signSessionToken(email: string, sessionId?: string): string {
   const secret = getSecretKey();
   const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "TERRA-SESSION" })).toString("base64url");
-  
+  const sid = sessionId || crypto.randomUUID();
+
   const payload = Buffer.from(
     JSON.stringify({
       sub: email,
+      sid,
       role: "admin",
       iat: Date.now(),
       exp: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
@@ -41,6 +43,7 @@ export function signSessionToken(email: string): string {
 export interface VerifySessionResult {
   valid: boolean;
   email?: string;
+  sessionId?: string;
   expired?: boolean;
 }
 
@@ -86,7 +89,7 @@ export function verifySessionToken(token: string | undefined | null): VerifySess
       return { valid: false };
     }
 
-    return { valid: true, email: decodedPayload.sub };
+    return { valid: true, email: decodedPayload.sub, sessionId: decodedPayload.sid };
   } catch {
     return { valid: false };
   }

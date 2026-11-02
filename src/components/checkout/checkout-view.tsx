@@ -3,13 +3,13 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { CheckCircle2, ShieldCheck, Truck, Mail, Phone, MapPin, ArrowRight, ArrowLeft } from "lucide-react";
+import { CheckCircle2, ShieldCheck, Truck, Phone, MapPin, ArrowRight, ArrowLeft } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { useLocale } from "@/lib/locale-context";
 import { images } from "@/content/images";
 import { formatPrice } from "@/lib/format";
+import { useCheckoutConfig } from "@/lib/use-checkout-config";
 import type { Product } from "@/content/home";
-import type { Order } from "@/lib/admin/types";
 
 const EGYPT_GOVERNORATES = [
   { ar: "القاهرة", en: "Cairo" },
@@ -35,11 +35,16 @@ const EGYPT_GOVERNORATES = [
   { ar: "قنا", en: "Qena" },
   { ar: "الأقصر", en: "Luxor" },
   { ar: "أسوان", en: "Aswan" },
+  { ar: "شمال سيناء", en: "North Sinai" },
+  { ar: "جنوب سيناء", en: "South Sinai" },
+  { ar: "مطروح", en: "Matrouh" },
+  { ar: "الوادي الجديد", en: "New Valley" },
 ];
 
 export function CheckoutView({ products }: { products: Product[] }) {
-  const { lines, clear } = useCart();
+  const { lines, clear, ready } = useCart();
   const { locale, t, dir } = useLocale();
+  const config = useCheckoutConfig();
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -50,13 +55,37 @@ export function CheckoutView({ products }: { products: Product[] }) {
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
-  const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
+  const [placedOrder, setPlacedOrder] = useState<any | null>(null);
 
-  // Promo / Discount code state (securely validated server-side against .env)
+  // Promo code state
   const [promoCodeInput, setPromoCodeInput] = useState("");
-  const [appliedPromo, setAppliedPromo] = useState<{ code: string; discountPercent: number } | null>(null);
+  const [appliedPromo, setAppliedPromo] = useState<{
+    code: string;
+    discountPercent?: number;
+    discountCents: number;
+  } | null>(null);
   const [promoLoading, setPromoLoading] = useState(false);
   const [promoMessage, setPromoMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Cart products
+  const rows = lines.flatMap((l) => {
+    const product = products.find((p) => p.slug === l.slug);
+    return product ? [{ ...l, product }] : [];
+  });
+
+  const subtotal = rows.reduce((sum, r) => sum + r.product.price * r.qty, 0);
+  const subtotalCents = Math.round(subtotal * 100);
+  const totalItemCount = rows.reduce((sum, r) => sum + r.qty, 0);
+
+  // Authoritative shipping from config
+  const shippingFee = config.shippingCents / 100;
+  const isFreeShipping =
+    (config.freeShippingMinQuantity > 0 && totalItemCount >= config.freeShippingMinQuantity) ||
+    (config.freeShippingMinAmountCents > 0 && subtotalCents >= config.freeShippingMinAmountCents);
+  const finalShipping = isFreeShipping ? 0 : shippingFee;
+
+  const discountAmount = appliedPromo ? Math.round(appliedPromo.discountCents / 100) : 0;
+  const grandTotal = Math.max(0, subtotal - discountAmount) + finalShipping;
 
   async function handleApplyPromo() {
     const clean = promoCodeInput.trim().toUpperCase();
@@ -67,14 +96,31 @@ export function CheckoutView({ products }: { products: Product[] }) {
       const res = await fetch("/api/promo/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: clean }),
+        body: JSON.stringify({ code: clean, subtotalCents }),
       });
       const data = await res.json();
-      if (res.ok && data.ok) {
-        setAppliedPromo({ code: data.code, discountPercent: data.discountPercent });
-        setPromoMessage({ type: "success", text: data.message || `تم تطبيق خصم ${data.discountPercent}%!` });
+      if (res.ok && (data.ok || data.valid)) {
+        const discCents =
+          data.discountCents ??
+          (data.discountPercent ? Math.round((subtotalCents * data.discountPercent) / 100) : 0);
+        setAppliedPromo({
+          code: data.code,
+          discountPercent: data.discountPercent,
+          discountCents: discCents,
+        });
+        setPromoMessage({
+          type: "success",
+          text:
+            data.message ||
+            (data.discountPercent
+              ? `تم تطبيق خصم ${data.discountPercent}%!`
+              : `تم تطبيق خصم ${Math.round(discCents / 100)} ج.م!`),
+        });
       } else {
-        setPromoMessage({ type: "error", text: data.error || "كود الخصم غير صحيح أو منتهي الصلاحية" });
+        setPromoMessage({
+          type: "error",
+          text: data.error || "كود الخصم غير صحيح أو منتهي الصلاحية",
+        });
       }
     } catch {
       setPromoMessage({ type: "error", text: "تعذر التحقق من كود الخصم حالياً" });
@@ -89,22 +135,44 @@ export function CheckoutView({ products }: { products: Product[] }) {
     setPromoMessage(null);
   }
 
-  // Cart products
-  const rows = lines.flatMap((l) => {
-    const product = products.find((p) => p.slug === l.slug);
-    return product ? [{ ...l, product }] : [];
-  });
-
-  const subtotal = rows.reduce((sum, r) => sum + r.product.price * r.qty, 0);
-  const shippingFee = 50; // Standard shipping (flat 50 EGP)
-  // Free shipping offer if 2 items or more
-  const totalItemCount = rows.reduce((sum, r) => sum + r.qty, 0);
-  const isFreeShipping = totalItemCount >= 2;
-  const finalShipping = isFreeShipping ? 0 : shippingFee;
-  const discountAmount = appliedPromo ? Math.round((subtotal * appliedPromo.discountPercent) / 100) : 0;
-  const grandTotal = Math.max(0, subtotal - discountAmount) + finalShipping;
+  if (!ready) {
+    return (
+      <div className="py-24 text-center">
+        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-obsidian border-r-transparent" />
+      </div>
+    );
+  }
 
   if (placedOrder) {
+    const orderItems: any[] = placedOrder.items || [];
+    const orderSubtotal =
+      placedOrder.subtotal != null
+        ? placedOrder.subtotal
+        : placedOrder.subtotalCents != null
+        ? Math.round(placedOrder.subtotalCents / 100)
+        : subtotal;
+
+    const orderShipping =
+      placedOrder.shipping != null
+        ? placedOrder.shipping
+        : placedOrder.shippingCents != null
+        ? Math.round(placedOrder.shippingCents / 100)
+        : finalShipping;
+
+    const orderDiscount =
+      placedOrder.discount != null
+        ? placedOrder.discount
+        : placedOrder.discountCents != null
+        ? Math.round(placedOrder.discountCents / 100)
+        : discountAmount;
+
+    const orderTotal =
+      placedOrder.total != null
+        ? placedOrder.total
+        : placedOrder.totalCents != null
+        ? Math.round(placedOrder.totalCents / 100)
+        : grandTotal;
+
     return (
       <div className="mx-auto max-w-2xl py-12 px-4 text-center">
         <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-800">
@@ -130,22 +198,24 @@ export function CheckoutView({ products }: { products: Product[] }) {
           {t.checkout.success.message}
         </p>
 
-        {/* Invoice & Email Notice Banner */}
+        {/* Confirmation & Shipping Notice Banner */}
         <div className="mt-6 rounded border border-emerald-200 bg-emerald-50/70 p-4 text-left text-xs text-emerald-950 flex items-start gap-3">
-          <Mail className="h-5 w-5 shrink-0 text-emerald-700 mt-0.5" />
+          <Truck className="h-5 w-5 shrink-0 text-emerald-700 mt-0.5" />
           <div>
             <span className="font-bold block text-sm mb-0.5">
-              {locale === "ar" ? "فاتورة إلكترونية عبر الإيميل" : "Electronic Invoice via Email"}
+              {locale === "ar" ? "تأكيد الطلب والشحن السريع" : "Order Confirmation & Shipping"}
             </span>
             <p className="text-emerald-900 leading-normal">
-              {t.checkout.success.emailNotice(placedOrder.customer.email)}
+              {locale === "ar"
+                ? "تم تسجيل طلبك بنجاح. سيتواصل معك فريق خدمة العملاء عبر الواتساب أو الهاتف لتأكيد موعد التسليم."
+                : "Your order is confirmed. Our support team will reach out via WhatsApp/Phone to confirm delivery details."}
             </p>
           </div>
         </div>
 
         {/* Cash on Delivery Notice Banner */}
         <div className="mt-3 rounded border border-line-light bg-line-light/30 p-4 text-left text-xs text-charcoal flex items-start gap-3">
-          <Truck className="h-5 w-5 shrink-0 text-obsidian mt-0.5" />
+          <ShieldCheck className="h-5 w-5 shrink-0 text-obsidian mt-0.5" />
           <div>
             <span className="font-bold block text-sm mb-0.5">
               {locale === "ar" ? "الدفع عند الاستلام والمعاينة" : "Cash on Delivery & Inspection"}
@@ -162,53 +232,72 @@ export function CheckoutView({ products }: { products: Product[] }) {
             {t.checkout.success.orderDetailsTitle}
           </h2>
           <div className="divide-y divide-line-light space-y-2">
-            {placedOrder.items.map((it, idx) => (
-              <div key={idx} className="pt-2 flex justify-between items-center">
-                <span>
-                  <strong>{it.productName}</strong> ({it.size}) × {it.qty}
-                </span>
-                <span className="font-mono font-semibold">
-                  {formatPrice((it.priceCentsSnapshot / 100) * it.qty)}
-                </span>
-              </div>
-            ))}
+            {orderItems.map((it, idx) => {
+              const itemPrice =
+                it.price != null
+                  ? it.price
+                  : it.priceCentsSnapshot != null
+                  ? Math.round(it.priceCentsSnapshot / 100)
+                  : it.priceCents != null
+                  ? Math.round(it.priceCents / 100)
+                  : 0;
+
+              return (
+                <div key={idx} className="pt-2 flex justify-between items-center">
+                  <span>
+                    <strong>{it.productName}</strong> ({it.size}) × {it.qty}
+                  </span>
+                  <span className="font-mono font-semibold">
+                    {formatPrice(itemPrice * it.qty)}
+                  </span>
+                </div>
+              );
+            })}
           </div>
 
           <div className="mt-4 pt-3 border-t border-line-light space-y-1.5 text-graphite">
             <div className="flex justify-between">
               <span>{t.checkout.summary.subtotal}</span>
-              <span className="font-mono">{formatPrice(subtotal)}</span>
+              <span className="font-mono">{formatPrice(orderSubtotal)}</span>
             </div>
+            {orderDiscount > 0 && (
+              <div className="flex justify-between text-emerald-700 font-semibold">
+                <span>{locale === "ar" ? "الخصم" : "Discount"}</span>
+                <span className="font-mono">-{formatPrice(orderDiscount)}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span>{t.checkout.summary.shipping}</span>
               <span className="font-mono">
-                {finalShipping === 0 ? t.checkout.summary.shippingFree : formatPrice(finalShipping)}
+                {orderShipping === 0 ? t.checkout.summary.shippingFree : formatPrice(orderShipping)}
               </span>
             </div>
             <div className="flex justify-between text-sm font-bold text-obsidian pt-2 border-t border-line-light">
               <span>{t.checkout.summary.total}</span>
-              <span className="font-mono">{formatPrice(grandTotal)}</span>
+              <span className="font-mono">{formatPrice(orderTotal)}</span>
             </div>
           </div>
         </div>
 
         {/* Customer & Address Details */}
-        <div className="mt-4 rounded border border-line-light bg-off-white p-4 text-left text-xs text-graphite space-y-2">
-          <h3 className="font-bold text-obsidian">{t.checkout.success.customerInfoTitle}</h3>
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-obsidian">{placedOrder.customer.name}</span>
+        {placedOrder.customer && (
+          <div className="mt-4 rounded border border-line-light bg-off-white p-4 text-left text-xs text-graphite space-y-2">
+            <h3 className="font-bold text-obsidian">{t.checkout.success.customerInfoTitle}</h3>
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-obsidian">{placedOrder.customer.name}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Phone className="h-3.5 w-3.5 text-graphite" />
+              <span>{placedOrder.customer.phone}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <MapPin className="h-3.5 w-3.5 text-graphite" />
+              <span>
+                {placedOrder.customer.address}, {placedOrder.customer.city}
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Phone className="h-3.5 w-3.5 text-graphite" />
-            <span>{placedOrder.customer.phone}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <MapPin className="h-3.5 w-3.5 text-graphite" />
-            <span>
-              {placedOrder.customer.address}, {placedOrder.customer.city}
-            </span>
-          </div>
-        </div>
+        )}
 
         <div className="mt-8">
           <Link
@@ -242,17 +331,15 @@ export function CheckoutView({ products }: { products: Product[] }) {
     if (!name.trim() || name.trim().length < 3) {
       errs.name = t.checkout.errors.nameRequired;
     }
-    const cleanPhone = phone.replace(/\D/g, "");
+    const cleanPhone = phone.replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[^\d+]/g, "");
     if (!cleanPhone) {
       errs.phone = t.checkout.errors.phoneRequired;
-    } else if (cleanPhone.length < 10 || cleanPhone.length > 12) {
+    } else if (cleanPhone.length < 10 || cleanPhone.length > 15) {
       errs.phone = t.checkout.errors.phoneInvalid;
     }
 
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-    if (!email.trim()) {
-      errs.email = t.checkout.errors.emailRequired;
-    } else if (!emailPattern.test(email.trim())) {
+    if (email.trim() && !emailPattern.test(email.trim())) {
       errs.email = t.checkout.errors.emailInvalid;
     }
 
@@ -269,27 +356,22 @@ export function CheckoutView({ products }: { products: Product[] }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!validate()) return;
+    if (!validate() || submitting) return;
 
     setSubmitting(true);
-
-    const combinedNotes = [
-      notes.trim(),
-      appliedPromo ? `[كود الخصم: ${appliedPromo.code} - خصم ${appliedPromo.discountPercent}%]` : null,
-    ]
-      .filter(Boolean)
-      .join(" | ");
+    setFormErrors({});
 
     const checkoutInput = {
       customer: {
         name: name.trim(),
         phone: phone.trim(),
-        email: email.trim().toLowerCase(),
+        email: email.trim().toLowerCase() || undefined,
         city: city.trim(),
         address: address.trim(),
       },
-      notes: combinedNotes,
+      notes: notes.trim() || undefined,
       promoCode: appliedPromo?.code || "",
+      paymentMethod: "cod",
       items: rows.map((r) => ({
         productSlug: r.product.slug,
         productName: r.product.name,
@@ -305,15 +387,20 @@ export function CheckoutView({ products }: { products: Product[] }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(checkoutInput),
       });
-      const resData = await apiRes.json();
+      const resData = await apiRes.json().catch(() => null);
 
-      const order = resData.data || resData.order;
-      if (apiRes.ok && resData.ok && order) {
+      if (apiRes.ok && resData?.ok && resData?.data) {
+        setPlacedOrder(resData.data);
         clear();
-        setPlacedOrder(order);
         window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
-        setFormErrors({ submit: resData.error?.message || resData.error || "حدث خطأ أثناء تسجيل الطلب. يرجى المحاولة مرة أخرى." });
+        const errMsg =
+          resData?.error?.message ||
+          resData?.error ||
+          (apiRes.status === 429
+            ? "تم تجاوز الحد المسموح لتسجيل الطلبات. يرجى الانتظار قليلاً ثم المحاولة."
+            : "حدث خطأ أثناء تسجيل الطلب. يرجى التحقق من البيانات والمحاولة مجدداً.");
+        setFormErrors({ submit: errMsg });
       }
     } catch {
       setFormErrors({ submit: "تعذر الاتصال بالخادم لتسجيل الطلب. يرجى التحقق من اتصالك بالإنترنت." });
@@ -339,7 +426,7 @@ export function CheckoutView({ products }: { products: Product[] }) {
 
       <div className="grid gap-10 lg:grid-cols-12 items-start">
         {/* Left Column: Form Details */}
-        <form onSubmit={handleSubmit} className="lg:col-span-7 space-y-8">
+        <form onSubmit={handleSubmit} className="lg:col-span-7 space-y-8" noValidate>
           {/* Section 1: Customer Details */}
           <div className="rounded border border-line-light bg-off-white p-6 space-y-4">
             <div>
@@ -395,11 +482,10 @@ export function CheckoutView({ products }: { products: Product[] }) {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-charcoal mb-1.5">
-                  {t.checkout.fields.email} <span className="text-red-600">*</span>
+                  {t.checkout.fields.email}
                 </label>
                 <input
                   type="email"
-                  required
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
@@ -489,26 +575,24 @@ export function CheckoutView({ products }: { products: Product[] }) {
             <p className="text-xs text-charcoal leading-relaxed">
               {t.checkout.payment.codDesc}
             </p>
-
-            <div className="rounded bg-line-light/50 p-3 text-xs text-graphite">
-              {t.checkout.payment.emailInvoiceNotice}
-            </div>
           </div>
 
           {formErrors.submit && (
-            <div className="rounded border border-red-300 bg-red-50 p-3 text-xs text-red-700">
+            <div className="rounded border border-red-300 bg-red-50 p-3 text-xs text-red-700 font-medium">
               {formErrors.submit}
             </div>
           )}
 
-          {/* Mobile Submit Button (Visible on small screens) */}
+          {/* Mobile Submit Button */}
           <div className="lg:hidden">
             <button
               type="submit"
               disabled={submitting}
               className="w-full rounded bg-obsidian py-4 text-base font-bold text-off-white hover:bg-charcoal transition-colors duration-200 cursor-pointer disabled:opacity-50"
             >
-              {submitting ? t.checkout.summary.submitting : `${t.checkout.summary.submitBtn} (${formatPrice(grandTotal)})`}
+              {submitting
+                ? t.checkout.summary.submitting
+                : `${t.checkout.summary.submitBtn} (${formatPrice(grandTotal)})`}
             </button>
           </div>
         </form>
@@ -554,7 +638,7 @@ export function CheckoutView({ products }: { products: Product[] }) {
             })}
           </ul>
 
-          {/* Promo Code Input Card (Securely validated server-side) */}
+          {/* Promo Code Input Card */}
           <div className="border-t border-line-light pt-4">
             <label className="block text-xs font-bold uppercase tracking-wider text-charcoal mb-1.5">
               {locale === "ar" ? "هل لديك كود خصم؟" : "Have a promo code?"}
@@ -565,6 +649,12 @@ export function CheckoutView({ products }: { products: Product[] }) {
                 disabled={Boolean(appliedPromo) || promoLoading}
                 value={promoCodeInput}
                 onChange={(e) => setPromoCodeInput(e.target.value.toUpperCase())}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleApplyPromo();
+                  }
+                }}
                 placeholder={locale === "ar" ? "مثال: TERRA10" : "e.g. TERRA10"}
                 className="flex-1 rounded border border-graphite bg-off-white px-3 py-2 text-xs uppercase font-mono tracking-wider text-obsidian focus:border-obsidian focus:outline-none disabled:opacity-50"
               />
@@ -572,7 +662,7 @@ export function CheckoutView({ products }: { products: Product[] }) {
                 <button
                   type="button"
                   onClick={handleRemovePromo}
-                  className="rounded bg-stone-200 px-3 py-2 text-xs font-bold text-stone-800 hover:bg-stone-300 transition cursor-pointer"
+                  className="rounded border border-obsidian px-3 py-2 text-xs font-bold text-obsidian hover:bg-stone-200 transition cursor-pointer"
                 >
                   {locale === "ar" ? "إلغاء" : "Remove"}
                 </button>
@@ -627,7 +717,7 @@ export function CheckoutView({ products }: { products: Product[] }) {
 
             {isFreeShipping && (
               <div className="rounded bg-emerald-50 text-emerald-800 p-2 text-[11px] font-medium text-center">
-                🎉 {locale === "ar" ? "عرض قطعتين أو أكثر: الشحن مجاني لطلبك!" : "Buy 2+ items: You unlocked FREE shipping!"}
+                {locale === "ar" ? "عرض قطعتين أو أكثر: الشحن مجاني لطلبك!" : "Buy 2+ items: You unlocked FREE shipping!"}
               </div>
             )}
 

@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       ip,
     });
 
-    const sessionToken = signSessionToken(email);
+    const sessionToken = signSessionToken(email, sessionId);
     const csrfToken = generateCsrfToken(sessionId);
 
     const response = apiSuccess({

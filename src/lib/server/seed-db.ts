@@ -67,7 +67,7 @@ export function seedDatabaseIfNeeded(targetDb?: any, force = false): boolean {
         "shipping",
         "rules",
         {
-          flatRateCents: 5000, // 50 EGP
+          flatRateCents: 6000, // 60 EGP
           freeShippingMinQuantity: 2, // Buy 2 get free shipping
           freeShippingMinAmountCents: 0,
         },

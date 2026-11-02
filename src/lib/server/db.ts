@@ -298,6 +298,14 @@ function initializeSchema(db: Database.Database): void {
       created_at TEXT
     );
   `);
+
+  for (const col of ["cancelled_at TEXT", "cancel_reason TEXT"]) {
+    try {
+      db.exec(`ALTER TABLE orders ADD COLUMN ${col}`);
+    } catch {
+      /* Column already exists */
+    }
+  }
 }
 
 /**

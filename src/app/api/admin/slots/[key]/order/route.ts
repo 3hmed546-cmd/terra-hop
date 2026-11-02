@@ -58,6 +58,9 @@ export async function PUT(
   })();
 
   recordChange("media", "image_slots", key, nextRevision);
+  if (key === "product" && ownerId) {
+    recordChange("products", "products", ownerId, nextRevision);
+  }
   recordAudit({
     actor: auth.user.email,
     action: "REORDER_SLOT",

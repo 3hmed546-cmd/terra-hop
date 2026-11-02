@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { getDb } from "@/lib/server/db";
 import { seedDatabaseIfNeeded } from "@/lib/server/seed-db";
+import { evaluatePromo } from "@/lib/server/promo";
 
 const PROMO_RATE_OPTIONS = {
   prefix: "promo_validate",
@@ -16,6 +17,8 @@ export async function POST(request: Request) {
   if (!rate.success) {
     return NextResponse.json(
       {
+        ok: false,
+        valid: false,
         error: "محاولات كثيرة جداً لكتابة أكواد الخصم. يرجى الانتظار قليلاً.",
         retryAfter: rate.retryAfter,
       },
@@ -33,45 +36,29 @@ export async function POST(request: Request) {
     const rawCode = String(body.code ?? "").trim().toUpperCase();
 
     if (!rawCode) {
-      return NextResponse.json({ error: "يرجى إدخال كود الخصم" }, { status: 400 });
+      return NextResponse.json({ ok: false, valid: false, error: "يرجى إدخال كود الخصم" }, { status: 400 });
     }
 
     seedDatabaseIfNeeded();
     const db = getDb();
 
-    const promo = db
-      .prepare(`
-        SELECT *
-        FROM promo_codes
-        WHERE code = ? AND active = 1
-      `)
-      .get(rawCode) as any;
+    const subtotalCents = Math.max(0, Math.floor(Number(body.subtotalCents) || 0));
+    const result = evaluatePromo(db, rawCode, subtotalCents);
 
-    if (promo) {
-      const now = new Date().toISOString();
-      if (promo.expires_at && promo.expires_at < now) {
-        return NextResponse.json({ valid: false, error: "كود الخصم منتهي الصلاحية" }, { status: 400 });
-      }
-      if (promo.max_uses && promo.used >= promo.max_uses) {
-        return NextResponse.json({ valid: false, error: "تم استنفاد الحد الأقصى لاستخدام هذا الكود" }, { status: 400 });
-      }
-
-      return NextResponse.json({
-        valid: true,
-        code: promo.code,
-        kind: promo.kind,
-        discount: promo.kind === "percent" ? promo.value : Math.round(promo.value / 100),
-        discountPercent: promo.kind === "percent" ? promo.value : undefined,
-        discountCents: promo.kind === "fixed" ? promo.value : undefined,
-        minSubtotalCents: promo.min_subtotal_cents,
-      });
+    if (!result.ok) {
+      return NextResponse.json({ ok: false, valid: false, error: result.message }, { status: result.status });
     }
 
-    return NextResponse.json(
-      { valid: false, error: "كود الخصم غير صحيح أو غير متاح حالياً" },
-      { status: 404 }
-    );
+    return NextResponse.json({
+      ok: true,
+      valid: true,
+      code: result.code,
+      kind: result.kind,
+      discountCents: result.discountCents,
+      discountPercent: result.discountPercent,
+      message: result.kind === "percent" ? `تم تطبيق خصم ${result.discountPercent}%` : `تم تطبيق خصم ${Math.round(result.discountCents / 100)} ج.م`,
+    });
   } catch {
-    return NextResponse.json({ error: "طلب غير صالح" }, { status: 400 });
+    return NextResponse.json({ ok: false, valid: false, error: "طلب غير صالح" }, { status: 400 });
   }
 }

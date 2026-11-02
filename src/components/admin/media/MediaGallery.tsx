@@ -23,7 +23,7 @@ import {
 } from "@/lib/admin/gallery";
 import { apiFetch } from "@/lib/admin-auth";
 import { resizeImageToDataUrl } from "@/lib/admin/image-resize";
-import { useAdminStore } from "@/lib/admin/store";
+import { useAdminStore, reloadAdminData } from "@/lib/admin/store";
 import { formatPrice } from "@/lib/format";
 import type { Product, ProductImage } from "@/lib/admin/types";
 
@@ -115,12 +115,19 @@ export function MediaGallery() {
     if (confirmTarget.type === "product") {
       const { product, image } = confirmTarget;
       try {
-        await apiFetch(`/api/admin/slots/product/items/${encodeURIComponent(image.id)}`, {
+        const res = await apiFetch(`/api/admin/slots/product/items/${encodeURIComponent(image.id)}`, {
           method: "DELETE",
         });
-        await adminActions.saveProduct(product);
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData?.error?.message || "فشل حذف الصورة من السيرفر.");
+        }
+        const updatedImages = (product.images || []).filter((img) => img.id !== image.id);
+        const updated: Product = { ...product, images: updatedImages, updatedAt: new Date().toISOString() };
+        adminActions.saveProduct(updated);
         setConfirmTarget(null);
         setSuccessDeletedName(`صورة ${image.alt || product.name} من ألبوم (${product.name})`);
+        await reloadAdminData();
       } catch (err: any) {
         setConfirmTarget(null);
         alert(err.message || "فشل حذف صورة المنتج من الخادم.");
@@ -134,7 +141,21 @@ export function MediaGallery() {
     if (!targetImg) return;
     const reordered = [targetImg, ...product.images.filter((img) => img.id !== imageId)];
     const updated: Product = { ...product, images: reordered, updatedAt: new Date().toISOString() };
-    await adminActions.saveProduct(updated);
+    adminActions.saveProduct(updated);
+
+    try {
+      const ids = reordered.map((img) => img.id);
+      const res = await apiFetch(`/api/admin/slots/product/order`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, ownerId: product.id }),
+      });
+      if (res.ok) {
+        await reloadAdminData();
+      }
+    } catch (err) {
+      console.error("Failed to reorder images on server:", err);
+    }
   }
 
   // Handle Add Image Execution

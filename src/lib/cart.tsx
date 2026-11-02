@@ -42,6 +42,7 @@ function reducer(state: State, a: Action): State {
 
 type CartApi = {
   lines: CartLine[];
+  ready: boolean;
   count: number;
   add: (slug: string, size: string) => void;
   setQty: (slug: string, size: string, qty: number) => void;
@@ -89,13 +90,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const api = useMemo<CartApi>(
     () => ({
       lines: state.lines,
+      ready: state.ready,
       count: state.lines.reduce((n, l) => n + l.qty, 0),
       add: (slug, size) => dispatch({ type: "add", slug, size }),
       setQty: (slug, size, qty) => dispatch({ type: "qty", slug, size, qty }),
       remove: (slug, size) => dispatch({ type: "remove", slug, size }),
       clear: () => dispatch({ type: "clear" }),
     }),
-    [state.lines],
+    [state.lines, state.ready],
   );
   return <CartContext.Provider value={api}>{children}</CartContext.Provider>;
 }
