@@ -681,7 +681,7 @@ export function CheckoutView({ products }: { products: Product[] }) {
                     handleApplyPromo();
                   }
                 }}
-                placeholder={locale === "ar" ? "مثال: TERRA10" : "e.g. TERRA10"}
+                placeholder={locale === "ar" ? "أدخل كود الخصم" : "Enter promo code"}
                 className="flex-1 rounded border border-graphite bg-off-white px-3 py-2 text-xs uppercase font-mono tracking-wider text-obsidian focus:border-obsidian focus:outline-none disabled:opacity-50"
               />
               {appliedPromo ? (
