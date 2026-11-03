@@ -81,7 +81,9 @@
 .adm-field-label { font-weight: 600; }
 .adm-field-hint { color: var(--adm-graphite); font-size: 13px; }
 .adm-field-error { font-weight: 600; font-size: 13px; }
-.adm-input { width: 100%; min-height: 44px; padding: 8px 12px; font: inherit; color: var(--adm-obsidian); background: var(--adm-offwhite); border: 1px solid var(--adm-graphite); }
+.adm-input { width: 100%; min-height: 44px; padding: 8px 14px; font: inherit; color: var(--adm-obsidian); background: #ffffff; border: 1px solid var(--adm-graphite); }
+.adm-input:focus { border-color: var(--adm-obsidian); outline: 2px solid var(--adm-obsidian); }
+.adm-input::placeholder { color: #737373; }
 textarea.adm-input { min-height: 96px; resize: vertical; }
 .adm-input:disabled { border-style: dashed; color: var(--adm-graphite); }
 .adm-input[aria-invalid="true"] { border: 2px solid var(--adm-obsidian); }
@@ -107,10 +109,50 @@ textarea.adm-input { min-height: 96px; resize: vertical; }
 .adm-badge-cancelled { border: 1px dotted var(--adm-obsidian); text-decoration: line-through; }
 
 /* ---------- stat card & empty state ---------- */
-.adm-card { border: 1px solid var(--adm-line); padding: 20px; background: var(--adm-offwhite); }
-.adm-stat-value { font-family: var(--adm-font-head); font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1; margin: 12px 0 4px; font-variant-numeric: tabular-nums; }
-.adm-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 32px; border: 1px dashed var(--adm-graphite); }
-.adm-empty p { margin: 0; max-width: 56ch; color: var(--adm-graphite); }
+.adm-card {
+  border: 1px solid var(--adm-line);
+  padding: 20px;
+  background: #ffffff;
+  color: var(--adm-obsidian);
+  box-shadow: 0 1px 3px rgba(8, 8, 8, 0.04);
+}
+.adm-card .adm-label {
+  color: var(--adm-graphite);
+  font-weight: 700;
+}
+.adm-stat-value {
+  font-family: var(--adm-font-head);
+  font-weight: 800;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1;
+  margin: 12px 0 4px;
+  font-variant-numeric: tabular-nums;
+  color: var(--adm-obsidian);
+}
+.adm-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 12px;
+  padding: 48px 24px;
+  border: 1px dashed var(--adm-graphite);
+  background: #ffffff;
+  color: var(--adm-obsidian);
+}
+.adm-empty .adm-h2 {
+  color: var(--adm-obsidian);
+  font-weight: 700;
+  font-size: 1.25rem;
+}
+.adm-empty p {
+  margin: 0;
+  max-width: 56ch;
+  color: var(--adm-graphite);
+  font-size: 14px;
+  font-weight: 500;
+}
 
 /* ---------- table ---------- */
 .adm-table-wrap { position: relative; overflow-x: auto; border: 1px solid var(--adm-line); }
@@ -317,7 +359,8 @@ textarea.adm-input { min-height: 96px; resize: vertical; }
 
 .adm-form-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
 .adm-radios { display: flex; flex-wrap: wrap; gap: 0 24px; }
-.adm-dialog:has(.adm-amb-wide) { width: min(760px, calc(100vw - 32px)); }
+.adm-dialog-wide,
+.adm-dialog:has(.adm-amb-wide) { width: min(780px, calc(100vw - 32px)) !important; }
 .adm-amb-wide { display: flex; flex-direction: column; gap: 24px; max-height: 62vh; overflow-y: auto; padding-inline-end: 4px; }
 .adm-amb-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .adm-amb-list > li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 12px; border: 1px solid var(--adm-line); }

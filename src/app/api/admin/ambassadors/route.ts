@@ -212,6 +212,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // 3b. Also insert into promo_codes as fallback
+    try {
+      db.prepare(`
+        INSERT OR REPLACE INTO promo_codes (code, kind, value, active, starts_at, expires_at, max_uses, used, min_subtotal_cents)
+        VALUES (?, 'percent', ?, 1, ?, NULL, ?, 0, 0)
+      `).run(rawCode, discountPercent, now, maxUses || 10000);
+    } catch {}
+
     // 4. Initialize Progress Cache
     db.prepare(`
       INSERT INTO ambassador_progress (
@@ -241,6 +249,36 @@ export async function POST(request: NextRequest) {
   });
 
   runTx();
+
+  try {
+    const fs = await import("fs");
+    const path = await import("path");
+    const vaultPath = path.join(process.cwd(), "data", "secure-vault", "ambassadors-data.json");
+    let currentList: any[] = [];
+    if (fs.existsSync(vaultPath)) {
+      try {
+        currentList = JSON.parse(fs.readFileSync(vaultPath, "utf-8"));
+      } catch {}
+    }
+    currentList = currentList.filter((a) => a.id !== ambassadorId && a.code !== rawCode);
+    currentList.push({
+      id: ambassadorId,
+      displayName,
+      fullName,
+      phone,
+      email,
+      instagramHandle,
+      city,
+      status: "ACTIVE",
+      code: rawCode,
+      aliases: [],
+      discountPercent,
+      appliesTo,
+      eligibleProductIds,
+      maxUses,
+    });
+    fs.writeFileSync(vaultPath, JSON.stringify(currentList, null, 2), "utf-8");
+  } catch {}
 
   recordChange("ambassadors", "ambassadors", ambassadorId, 1);
   recordAudit({

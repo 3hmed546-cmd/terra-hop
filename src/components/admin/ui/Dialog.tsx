@@ -9,13 +9,14 @@ interface Props {
   children?: ReactNode;
   footer?: ReactNode;
   variant?: "modal" | "fullscreen";
+  className?: string;
 }
 
 /**
  * Built on the native <dialog>: the browser traps focus, makes the page behind inert,
  * closes on Escape and returns focus to the button that opened it.
  */
-export function Dialog({ open, onClose, title, description, children, footer, variant = "modal" }: Props) {
+export function Dialog({ open, onClose, title, description, children, footer, variant = "modal", className = "" }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const descId = useId();
@@ -30,7 +31,7 @@ export function Dialog({ open, onClose, title, description, children, footer, va
   return (
     <dialog
       ref={ref}
-      className={`adm-dialog${variant === "fullscreen" ? " adm-menu" : ""}`}
+      className={`adm-dialog ${variant === "fullscreen" ? "adm-menu" : ""} ${className}`.trim()}
       aria-labelledby={titleId}
       aria-describedby={description ? descId : undefined}
       onClose={onClose}

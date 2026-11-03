@@ -41,6 +41,17 @@ const EGYPT_GOVERNORATES = [
   { ar: "الوادي الجديد", en: "New Valley" },
 ];
 
+function normalizeArabicDigits(input: string): string {
+  if (!input) return "";
+  const easternArabic = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
+  const persian = ["۰", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹"];
+  let res = input;
+  for (let i = 0; i <= 9; i++) {
+    res = res.replaceAll(easternArabic[i], String(i)).replaceAll(persian[i], String(i));
+  }
+  return res;
+}
+
 export function CheckoutView({ products }: { products: Product[] }) {
   const { lines, clear, ready } = useCart();
   const { locale, t, dir } = useLocale();
@@ -88,7 +99,7 @@ export function CheckoutView({ products }: { products: Product[] }) {
   const grandTotal = Math.max(0, subtotal - discountAmount) + finalShipping;
 
   async function handleApplyPromo() {
-    const clean = promoCodeInput.trim().toUpperCase();
+    const clean = normalizeArabicDigits(promoCodeInput).trim().toUpperCase();
     if (!clean) return;
     setPromoLoading(true);
     setPromoMessage(null);

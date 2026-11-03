@@ -528,6 +528,8 @@ export function uniqueSlug(base: string, takenSlugs: string[]): string {
 export function duplicateProduct(data: AdminData, productId: string, newId: string, now: string): Result<AdminData> {
   const source = data.products.find((p) => p.id === productId);
   if (!source) return fail("PRODUCT_NOT_FOUND");
+  const safeColors = Array.isArray(source.colors) ? source.colors.map((c) => ({ ...c })) : [];
+  const safeSizes = Array.isArray(source.sizes) ? [...source.sizes] : [];
   const copy: Product = {
     ...source,
     id: newId,
@@ -535,7 +537,9 @@ export function duplicateProduct(data: AdminData, productId: string, newId: stri
     slug: uniqueSlug(`${source.slug}-copy`, data.products.map((p) => p.slug)),
     status: "draft",
     forceSoldOut: false,
-    variants: generateVariants(newId, source.colors, source.sizes),
+    colors: safeColors,
+    sizes: safeSizes,
+    variants: generateVariants(newId, safeColors, safeSizes),
     createdAt: now,
     updatedAt: now,
   };

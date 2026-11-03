@@ -96,8 +96,8 @@ export function validateSale(data: AdminData, form: SaleForm): Partial<Record<Sa
     errors.product = "product";
     return errors;
   }
-  if (!product.colors.some((c) => c.id === form.colorId)) errors.color = "color";
-  if (!product.sizes.includes(form.size)) errors.size = "size";
+  if (!Array.isArray(product.colors) || !product.colors.some((c) => c.id === form.colorId)) errors.color = "color";
+  if (!Array.isArray(product.sizes) || !product.sizes.includes(form.size)) errors.size = "size";
   const variant = variantOfForm(data, form);
   if (form.qty === null || !Number.isInteger(form.qty) || form.qty < 1) errors.qty = "qty";
   else if (variant && form.qty > variant.stock) errors.qty = "qtyTooMany";

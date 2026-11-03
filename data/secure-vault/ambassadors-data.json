@@ -1,0 +1,17 @@
+[
+  {
+    "id": "amb_ahmed_official",
+    "displayName": "أحمد",
+    "fullName": "أحمد عبد الباسط",
+    "phone": "01000000000",
+    "email": "ahmed@terrahop.com",
+    "city": "القاهرة",
+    "status": "ACTIVE",
+    "code": "AHMED10",
+    "aliases": ["AHMED", "708DDH"],
+    "discountPercent": 10,
+    "appliesTo": "ALL_PRODUCTS",
+    "eligibleProductIds": [],
+    "maxUses": null
+  }
+]

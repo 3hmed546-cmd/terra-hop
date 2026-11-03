@@ -543,6 +543,11 @@ function initializeSchema(db: Database.Database): void {
       insertLevel.run("lvl_elite", 3, "Elite", 30, "Elite Ambassador - VIP Drop Box", "سفير نخبة - صندوق VIP حصري من الدفعة القادمة", now, now);
       insertRewardDef.run("rwd_elite_box", "lvl_elite", 50000, "FREE_GIFT", "صندوق VIP الحصري", "صندوق هدايا وإصدار حصري قبل طرحه للجمهور", null, null, null, now, now);
     }
+
+    try {
+      const { seedAmbassadorsIfNeeded } = require("./seed-db");
+      seedAmbassadorsIfNeeded(db);
+    } catch {}
   } catch (err) {
     console.error("Ambassador levels seed error:", err);
   }

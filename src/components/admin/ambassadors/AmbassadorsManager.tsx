@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Check, Copy, Plus, RefreshCw } from "lucide-react";
 import { PageHeader } from "../PageHeader";
 import { Button, Dialog, EmptyState, StatCard, Table, TextInput, useToast, type Column } from "../ui";
-import { useAdminStore } from "@/lib/admin/store";
+import { useAdminStore, reloadAdminData } from "@/lib/admin/store";
 
 interface AmbassadorItem {
   id: string;
@@ -101,6 +101,7 @@ export function AmbassadorsManager() {
 
   const openCreate = () => {
     setForm(EMPTY_FORM);
+    reloadAdminData().catch(() => {});
     setSelectedProductIds(products.map((p) => p.id));
     setCreateOpen(true);
   };
@@ -372,6 +373,7 @@ export function AmbassadorsManager() {
       <Dialog
         open={createOpen}
         onClose={() => setCreateOpen(false)}
+        className="adm-dialog-wide"
         title="إضافة سفير جديد"
         description="هيتم إنشاء ملف السفير، كود الخصم، وحساب دخول البورتال مرة واحدة."
       >

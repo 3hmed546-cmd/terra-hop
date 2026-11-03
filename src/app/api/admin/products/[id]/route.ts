@@ -175,11 +175,12 @@ export async function DELETE(
   if (!auth.authenticated || !auth.user) return auth.responseError!;
 
   const { id } = await context.params;
+  const rawId = decodeURIComponent(id || "").trim();
   const db = getDb();
 
-  const product = db.prepare("SELECT * FROM products WHERE id = ? OR slug = ?").get(id, id) as any;
+  const product = db.prepare("SELECT * FROM products WHERE id = ? OR slug = ?").get(rawId, rawId) as any;
   if (!product) {
-    return apiSuccess({ deleted: true, id, alreadyDeleted: true });
+    return apiSuccess({ deleted: true, id: rawId, alreadyDeleted: true });
   }
 
   // Check if active orders exist

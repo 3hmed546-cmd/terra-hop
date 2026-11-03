@@ -2,8 +2,149 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { getDb, recordChange } from "./db";
-import { hashPassword } from "./security";
+import { hashPassword, encryptCode, hashLookupCode } from "./security";
 import { loginHoodies } from "@/content/login-hoodies";
+
+export function seedAmbassadorsIfNeeded(db: any, now = new Date().toISOString()) {
+  try {
+    const existingCount = db.prepare("SELECT COUNT(*) as c FROM referral_codes").get() as { c: number };
+    if (existingCount && existingCount.c > 0) {
+      // Ensure AHMED10, AHMED, and 708DDH always exist in promo_codes table as backup
+      const insertPromo = db.prepare(`
+        INSERT OR IGNORE INTO promo_codes (code, kind, value, active, starts_at, expires_at, max_uses, used, min_subtotal_cents)
+        VALUES (?, 'percent', 10, 1, ?, NULL, 10000, 0, 0)
+      `);
+      insertPromo.run("AHMED10", now);
+      insertPromo.run("AHMED", now);
+      insertPromo.run("708DDH", now);
+      return;
+    }
+
+    const ambFile = path.join(process.cwd(), "data", "secure-vault", "ambassadors-data.json");
+    let ambList: any[] = [];
+    if (fs.existsSync(ambFile)) {
+      try {
+        ambList = JSON.parse(fs.readFileSync(ambFile, "utf-8"));
+      } catch {}
+    }
+
+    if (!Array.isArray(ambList) || ambList.length === 0) {
+      ambList = [
+        {
+          id: "amb_ahmed_official",
+          displayName: "أحمد",
+          fullName: "أحمد عبد الباسط",
+          phone: "01000000000",
+          email: "ahmed@terrahop.com",
+          city: "القاهرة",
+          status: "ACTIVE",
+          code: "AHMED10",
+          aliases: ["AHMED", "708DDH"],
+          discountPercent: 10,
+          appliesTo: "ALL_PRODUCTS",
+          eligibleProductIds: [],
+          maxUses: null,
+        },
+      ];
+    }
+
+    const insertAmb = db.prepare(`
+      INSERT OR REPLACE INTO ambassadors (
+        id, display_name, full_name, phone, email, instagram_handle,
+        city, notes, status, suspended_reason, joined_at, created_by_admin,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'seed', ?, ?)
+    `);
+
+    const insertRefCode = db.prepare(`
+      INSERT OR REPLACE INTO referral_codes (
+        id, ambassador_id, code_hash, encrypted_code, discount_percent,
+        applies_to, is_active, valid_from, valid_until, max_uses, used_count, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, NULL, ?, 0, ?)
+    `);
+
+    const insertAmbUser = db.prepare(`
+      INSERT OR REPLACE INTO ambassador_users (
+        id, ambassador_id, email, password_hash, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?)
+    `);
+
+    const insertAmbProgress = db.prepare(`
+      INSERT OR REPLACE INTO ambassador_progress (
+        ambassador_id, qualified_count, reversed_count, net_count, pending_count,
+        cancelled_count, refunded_count, current_level_id, updated_at
+      ) VALUES (?, 0, 0, 0, 0, 0, 0, 'lvl_starter', ?)
+    `);
+
+    const insertPromo = db.prepare(`
+      INSERT OR REPLACE INTO promo_codes (code, kind, value, active, starts_at, expires_at, max_uses, used, min_subtotal_cents)
+      VALUES (?, 'percent', ?, 1, ?, NULL, 10000, 0, 0)
+    `);
+
+    const insertDiscountProduct = db.prepare(`
+      INSERT OR IGNORE INTO discount_code_products (code_id, product_id)
+      VALUES (?, ?)
+    `);
+
+    for (const amb of ambList) {
+      insertAmb.run(
+        amb.id,
+        amb.displayName || amb.fullName,
+        amb.fullName,
+        amb.phone,
+        amb.email,
+        amb.instagramHandle || null,
+        amb.city || "القاهرة",
+        amb.notes || "Official Street Ambassador",
+        amb.status || "ACTIVE",
+        amb.joinedAt || now,
+        amb.createdAt || now,
+        now
+      );
+
+      const codes = [amb.code, ...(Array.isArray(amb.aliases) ? amb.aliases : [])].filter(Boolean);
+      for (const rawC of codes) {
+        const c = String(rawC).trim().toUpperCase();
+        const codeHash = hashLookupCode(c);
+        const encrypted = encryptCode(c);
+        const refId = `ref_${amb.id}_${c.toLowerCase()}`;
+
+        insertRefCode.run(
+          refId,
+          amb.id,
+          codeHash,
+          encrypted,
+          amb.discountPercent || 10,
+          amb.appliesTo || "ALL_PRODUCTS",
+          now,
+          amb.maxUses || null,
+          now
+        );
+
+        if (amb.appliesTo === "SELECTED" && Array.isArray(amb.eligibleProductIds)) {
+          for (const pid of amb.eligibleProductIds) {
+            insertDiscountProduct.run(refId, pid);
+          }
+        }
+
+        insertPromo.run(c, amb.discountPercent || 10, now);
+      }
+
+      insertAmbUser.run(
+        `usr_${amb.id}`,
+        amb.id,
+        amb.email,
+        hashPassword(amb.phone || "ahmed123"),
+        now,
+        now
+      );
+
+      insertAmbProgress.run(amb.id, now);
+    }
+  } catch (err) {
+    console.error("Error seeding ambassadors:", err);
+  }
+}
 
 export function seedDatabaseIfNeeded(targetDb?: any, force = false): boolean {
   const db = targetDb || getDb();
@@ -13,6 +154,7 @@ export function seedDatabaseIfNeeded(targetDb?: any, force = false): boolean {
     | undefined;
 
   if (isSeeded && !force) {
+    seedAmbassadorsIfNeeded(db);
     return false;
   }
 
@@ -344,6 +486,9 @@ export function seedDatabaseIfNeeded(targetDb?: any, force = false): boolean {
         console.error("Failed to parse products-data.json for seed:", err);
       }
     }
+
+    // 8. Seed Street Ambassadors
+    seedAmbassadorsIfNeeded(db, now);
 
     // Mark as seeded
     db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('seeded_at', ?)").run(now);

@@ -10,6 +10,7 @@ type Strings = { sizeLabel?: string; sizeError?: string; add?: string; added?: s
 type Props = { slug: string; sizes: readonly string[]; strings?: Strings; cartHref: string };
 
 export function AddToCart({ slug, sizes, cartHref }: Props) {
+  const safeSizes = Array.isArray(sizes) ? sizes : [];
   const { add } = useCart();
   const { locale } = useLocale();
   const [size, setSize] = useState<string | null>(null);
@@ -35,7 +36,7 @@ export function AddToCart({ slug, sizes, cartHref }: Props) {
         {labels.sizeLabel}
       </p>
       <div role="group" aria-labelledby={`${slug}-size`} className="mt-2.5 flex flex-wrap gap-2">
-        {sizes.map((s) => {
+        {safeSizes.map((s) => {
           const selected = s === size;
           return (
             <button
