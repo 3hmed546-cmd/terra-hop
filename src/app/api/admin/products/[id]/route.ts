@@ -1,7 +1,9 @@
 import { NextRequest } from "next/server";
+import crypto from "crypto";
 import { requireAdmin } from "@/lib/server/auth-middleware";
 import { getDb, recordChange, recordAudit } from "@/lib/server/db";
 import { apiSuccess, apiError } from "@/lib/server/api-envelope";
+import { syncProductsVault } from "@/lib/server/vault-sync";
 
 export async function GET(
   request: NextRequest,
@@ -108,8 +110,24 @@ export async function PATCH(
   const descriptionEn = body.descriptionEn !== undefined ? body.descriptionEn : product.description_en;
   const priceCents = body.priceCents !== undefined ? Number(body.priceCents) : product.price_cents;
   const compareAtCents = body.compareAtCents !== undefined ? (body.compareAtCents ? Number(body.compareAtCents) : null) : product.compare_at_cents;
-  const status = body.status !== undefined ? body.status : product.status;
-  const forceSoldOut = body.forceSoldOut !== undefined ? (body.forceSoldOut ? 1 : 0) : product.force_sold_out;
+  
+  // Status & sold out normalization
+  let status = body.status !== undefined ? body.status : product.status;
+  let forceSoldOut = product.force_sold_out;
+
+  if (body.status === "sold_out" || body.forceSoldOut === true) {
+    status = "active";
+    forceSoldOut = 1;
+  } else if (body.status === "available" || body.forceSoldOut === false) {
+    status = "active";
+    forceSoldOut = 0;
+  } else if (body.status === "draft") {
+    status = "draft";
+    forceSoldOut = 0;
+  } else if (body.forceSoldOut !== undefined) {
+    forceSoldOut = body.forceSoldOut ? 1 : 0;
+  }
+
   const lowStockThreshold = body.lowStockThreshold !== undefined ? (body.lowStockThreshold ? Number(body.lowStockThreshold) : null) : product.low_stock_threshold;
 
   let details = product.details;
@@ -125,28 +143,51 @@ export async function PATCH(
   const nextRevision = (product.revision || 1) + 1;
   const now = new Date().toISOString();
 
-  db.prepare(`
-    UPDATE products
-    SET 
-      name_ar = ?, name_en = ?, description_ar = ?, description_en = ?,
-      price_cents = ?, compare_at_cents = ?, status = ?, force_sold_out = ?,
-      low_stock_threshold = ?, details = ?, revision = ?, updated_at = ?
-    WHERE id = ?
-  `).run(
-    nameAr,
-    nameEn,
-    descriptionAr,
-    descriptionEn,
-    priceCents,
-    compareAtCents,
-    status,
-    forceSoldOut,
-    lowStockThreshold,
-    details,
-    nextRevision,
-    now,
-    product.id
-  );
+  db.transaction(() => {
+    db.prepare(`
+      UPDATE products
+      SET 
+        name_ar = ?, name_en = ?, description_ar = ?, description_en = ?,
+        price_cents = ?, compare_at_cents = ?, status = ?, force_sold_out = ?,
+        low_stock_threshold = ?, details = ?, revision = ?, updated_at = ?
+      WHERE id = ?
+    `).run(
+      nameAr,
+      nameEn,
+      descriptionAr,
+      descriptionEn,
+      priceCents,
+      compareAtCents,
+      status,
+      forceSoldOut,
+      lowStockThreshold,
+      details,
+      nextRevision,
+      now,
+      product.id
+    );
+
+    // Update colors if provided
+    if (Array.isArray(body.colors) && body.colors.length > 0) {
+      db.prepare("DELETE FROM product_colors WHERE product_id = ?").run(product.id);
+      const insColor = db.prepare("INSERT INTO product_colors (id, product_id, name, hex, position) VALUES (?, ?, ?, ?, ?)");
+      body.colors.forEach((c: any, idx: number) => {
+        insColor.run(c.id, product.id, c.name, c.hex, idx + 1);
+      });
+    }
+
+    // Update variants if provided
+    if (Array.isArray(body.variants) && body.variants.length > 0) {
+      db.prepare("DELETE FROM variants WHERE product_id = ?").run(product.id);
+      const insVariant = db.prepare("INSERT INTO variants (id, product_id, color_id, size, stock) VALUES (?, ?, ?, ?, ?)");
+      body.variants.forEach((v: any) => {
+        insVariant.run(v.id || `var_${crypto.randomUUID()}`, product.id, v.colorId, v.size, v.stock ?? 10);
+      });
+    }
+  })();
+
+  // Synchronize to persistent vault immediately
+  syncProductsVault(db);
 
   const updated = db.prepare("SELECT * FROM products WHERE id = ?").get(product.id) as any;
 
@@ -214,6 +255,8 @@ export async function DELETE(
     // Delete product
     db.prepare("DELETE FROM products WHERE id = ?").run(product.id);
   })();
+
+  syncProductsVault(db);
 
   const nextRevision = (product.revision || 1) + 1;
   recordChange("products", "products", product.id, nextRevision);

@@ -82,7 +82,7 @@ export function AmbassadorLoginForm() {
             autoCapitalize="characters"
             spellCheck={false}
             dir="ltr"
-            placeholder="AHMED10"
+            placeholder="كود السفير أو البريد"
             className="mt-2 text-left"
             value={id}
             disabled={loading || ok}

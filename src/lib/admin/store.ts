@@ -241,10 +241,15 @@ export const adminActions = {
   setProductStatus: (productId: string, target: QuickStatus): ActionResult => {
     const res = run((d, now) => pureSetProductStatus(d, productId, target, now));
     if (res.ok) {
+      const isSoldOut = target === "sold_out";
+      const isDraft = target === "draft";
       apiFetch(`/api/admin/products/${productId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: target }),
+        body: JSON.stringify({
+          status: isDraft ? "draft" : "active",
+          forceSoldOut: isSoldOut,
+        }),
       }).then(() => reloadAdminData()).catch(() => {});
     }
     return res;
@@ -265,6 +270,10 @@ export const adminActions = {
           forceSoldOut: product.forceSoldOut,
           descriptionAr: product.description,
           details: product.details,
+          colors: product.colors,
+          sizes: product.sizes,
+          variants: product.variants,
+          images: product.images,
         }),
       }).then(() => reloadAdminData()).catch(() => {});
     }

@@ -1,19 +1,47 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import fs from "fs";
+import path from "path";
 import { notFound } from "next/navigation";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProductDetailView } from "@/components/shop/product-detail-view";
-import { home } from "@/content/home";
+import { home, type Product } from "@/content/home";
 
-const find = (slug: string) => home.drop.products.find((p) => p.slug === slug);
-
-export function generateStaticParams() {
-  return home.drop.products.map((p) => ({ slug: p.slug }));
+function getCatalogProducts(): Product[] {
+  try {
+    const vaultPath = path.join(process.cwd(), "data", "secure-vault", "products-data.json");
+    if (fs.existsSync(vaultPath)) {
+      const raw = JSON.parse(fs.readFileSync(vaultPath, "utf-8"));
+      if (Array.isArray(raw) && raw.length > 0) {
+        return raw.map((p: any) => ({
+          slug: p.slug,
+          name: p.name || p.nameAr,
+          category: (p.category === "tshirt" || p.category === "T-shirts") ? "T-shirts" : "Hoodies",
+          price: (p.priceCents || 0) / 100,
+          originalPrice: p.compareAtCents ? p.compareAtCents / 100 : undefined,
+          status: p.forceSoldOut ? "Sold out" : "Preorder",
+          description: p.description || p.descriptionAr || "",
+          sizes: p.sizes || (p.variants || []).map((v: any) => v.size).filter(Boolean),
+          images: (p.images || []).map((i: any) => (typeof i === "object" ? i.url : i)),
+          colors: p.colors || [],
+          variants: p.variants || [],
+          href: `/shop/${p.slug}`,
+          demo: false,
+        }));
+      }
+    }
+  } catch {}
+  return [...home.drop.products];
 }
 
-export async function generateMetadata({ params }: PageProps<"/shop/[slug]">): Promise<Metadata> {
+const findProduct = (slug: string) => {
+  const all = getCatalogProducts();
+  return all.find((p) => p.slug === slug || (p as any).id === slug);
+};
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const product = find(slug);
+  const product = findProduct(slug);
   return product ? { title: product.name, description: product.description } : {};
 }
 
@@ -29,12 +57,13 @@ function ProductLoadingFallback() {
 
 async function ProductContent({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const product = find(slug);
+  const product = findProduct(slug);
   if (!product) notFound();
-  return <ProductDetailView product={product} allProducts={home.drop.products} />;
+  const allProducts = getCatalogProducts();
+  return <ProductDetailView product={product} allProducts={allProducts} />;
 }
 
-export default function ProductPage({ params }: PageProps<"/shop/[slug]">) {
+export default function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
   return (
     <Suspense fallback={<ProductLoadingFallback />}>
       <ProductContent params={params} />

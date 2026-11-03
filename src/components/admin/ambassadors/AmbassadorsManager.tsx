@@ -402,7 +402,7 @@ export function AmbassadorsManager() {
           <fieldset className="adm-fieldset adm-form-section">
             <legend className="adm-label adm-muted">كود الخصم</legend>
             <div className="adm-form-grid">
-              <TextInput label="الكود" required dir="ltr" placeholder="AHMED10" value={form.code} onChange={(e) => set("code", e.target.value.toUpperCase().replace(/\s+/g, ""))} />
+              <TextInput label="الكود" required dir="ltr" placeholder="اكتب الكود" value={form.code} onChange={(e) => set("code", e.target.value.toUpperCase().replace(/\s+/g, ""))} />
               <TextInput label="خصم العميل (%)" type="number" min={1} max={100} dir="ltr" value={form.discount} onChange={(e) => set("discount", e.target.value)} />
             </div>
 

@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { requireAdmin } from "@/lib/server/auth-middleware";
 import { getDb, recordChange, recordAudit } from "@/lib/server/db";
 import { apiSuccess, apiError } from "@/lib/server/api-envelope";
+import { syncProductsVault } from "@/lib/server/vault-sync";
 
 export async function POST(
   request: NextRequest,
@@ -67,6 +68,8 @@ export async function POST(
     // Update product revision
     db.prepare("UPDATE products SET revision = revision + 1, updated_at = ? WHERE id = ?").run(now, productId);
   })();
+
+  syncProductsVault(db);
 
   const prod = db.prepare("SELECT revision FROM products WHERE id = ?").get(productId) as any;
   recordChange("products", "variants", variantId, prod.revision);

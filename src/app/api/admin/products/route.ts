@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/server/auth-middleware";
 import { getDb, recordChange, recordAudit } from "@/lib/server/db";
 import { apiSuccess, apiError } from "@/lib/server/api-envelope";
 import { seedDatabaseIfNeeded } from "@/lib/server/seed-db";
+import { syncProductsVault } from "@/lib/server/vault-sync";
 
 export async function GET(request: NextRequest) {
   const auth = requireAdmin(request);
@@ -194,6 +195,8 @@ export async function POST(request: NextRequest) {
       });
     });
   })();
+
+  syncProductsVault(db);
 
   recordChange("products", "products", prodId, 1);
   recordAudit({

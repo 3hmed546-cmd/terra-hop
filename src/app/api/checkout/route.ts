@@ -123,19 +123,38 @@ export async function POST(request: NextRequest) {
       )
       .get(slug, slug) as any;
     if (!product || product.force_sold_out === 1) {
-      return apiError("NOT_FOUND", `المنتج (${slug}) غير متاح حالياً.`, 404, "items");
+      return apiError("NOT_FOUND", `المنتج (${product?.name_ar || slug}) نفذ من المخزن حالياً وغير متاح للطلب.`, 404, "items");
     }
 
-    const variant = db
-      .prepare("SELECT id, size, color_id, stock FROM variants WHERE product_id = ? AND size = ? LIMIT 1")
-      .get(product.id, size) as any;
+    const requestedColor = cleanText(item?.color, 60);
+    let variant: any = null;
+    let colorRow: any = null;
+
+    if (requestedColor) {
+      colorRow = db
+        .prepare("SELECT id, name FROM product_colors WHERE product_id = ? AND (name LIKE ? OR id = ?)")
+        .get(product.id, `%${requestedColor}%`, requestedColor) as any;
+      if (colorRow) {
+        variant = db
+          .prepare("SELECT id, size, color_id, stock FROM variants WHERE product_id = ? AND color_id = ? AND size = ?")
+          .get(product.id, colorRow.id, size) as any;
+      }
+    }
+
+    if (!variant) {
+      variant = db
+        .prepare("SELECT id, size, color_id, stock FROM variants WHERE product_id = ? AND size = ? LIMIT 1")
+        .get(product.id, size) as any;
+      if (variant && !colorRow) {
+        colorRow = db
+          .prepare("SELECT name FROM product_colors WHERE id = ? AND product_id = ?")
+          .get(variant.color_id, product.id) as any;
+      }
+    }
+
     if (!variant) {
       return apiError("NOT_FOUND", `المقاس المطلوب (${size}) غير متوفر للمنتج ${product.name_ar}.`, 404, "items");
     }
-
-    const colorRow = db
-      .prepare("SELECT name FROM product_colors WHERE id = ? AND product_id = ?")
-      .get(variant.color_id, product.id) as { name: string } | undefined;
 
     subtotalCents += product.price_cents * qty;
     totalQty += qty;
@@ -144,7 +163,7 @@ export async function POST(request: NextRequest) {
       productSlug: product.slug,
       productName: product.name_ar,
       variantId: variant.id,
-      colorName: colorRow?.name || "اللون الافتراضي",
+      colorName: colorRow?.name || requestedColor || "اللون الافتراضي",
       size: variant.size,
       qty,
       priceCents: product.price_cents,

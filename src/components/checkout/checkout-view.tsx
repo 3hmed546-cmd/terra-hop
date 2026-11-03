@@ -398,6 +398,7 @@ export function CheckoutView({ products }: { products: Product[] }) {
         productSlug: r.product.slug,
         productName: r.product.name,
         size: r.size,
+        color: r.color,
         qty: r.qty,
         priceCents: r.product.price * 100,
       })),
@@ -630,14 +631,15 @@ export function CheckoutView({ products }: { products: Product[] }) {
 
           {/* Items List */}
           <ul className="divide-y divide-line-light max-h-80 overflow-y-auto pr-1">
-            {rows.map(({ product, size, qty }) => {
+            {rows.map(({ product, size, qty, color, colorHex, image }) => {
               const firstImg = product.images[0];
               const isDirectUrl = typeof firstImg === "string" && (firstImg.startsWith("/") || firstImg.startsWith("http"));
               const matchedImg = isDirectUrl ? null : images[firstImg];
-              const imgSrc = isDirectUrl ? firstImg : (matchedImg?.src || "/products/burgundy-hoodie-model.jpg");
+              const defaultSrc = isDirectUrl ? firstImg : (matchedImg?.src || "/products/burgundy-hoodie-model.jpg");
+              const imgSrc = image || defaultSrc;
               const imgAlt = matchedImg?.alt || product.name;
               return (
-                <li key={`${product.slug}-${size}`} className="py-3 flex gap-3 items-center">
+                <li key={`${product.slug}-${size}-${color || "default"}`} className="py-3 flex gap-3 items-center">
                   <div className="relative h-16 w-14 shrink-0 overflow-hidden rounded bg-charcoal">
                     <Image
                       src={imgSrc}
@@ -649,9 +651,28 @@ export function CheckoutView({ products }: { products: Product[] }) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-semibold text-obsidian truncate">{product.name}</h3>
-                    <div className="text-xs text-graphite mt-0.5">
-                      {t.cart.size}: <span className="font-mono font-bold text-obsidian">{size}</span> ·{" "}
-                      {t.cart.quantity}: <span className="font-mono">{qty}</span>
+                    <div className="text-xs text-graphite mt-0.5 flex flex-wrap items-center gap-1.5">
+                      <span>
+                        {t.cart.size}: <span className="font-mono font-bold text-obsidian">{size}</span>
+                      </span>
+                      {color && (
+                        <>
+                          <span>·</span>
+                          <span className="inline-flex items-center gap-1">
+                            {colorHex && (
+                              <span
+                                className="w-2.5 h-2.5 rounded-full border border-stone-300"
+                                style={{ backgroundColor: colorHex }}
+                              />
+                            )}
+                            <strong className="text-obsidian">{color}</strong>
+                          </span>
+                        </>
+                      )}
+                      <span>·</span>
+                      <span>
+                        {t.cart.quantity}: <span className="font-mono">{qty}</span>
+                      </span>
                     </div>
                   </div>
                   <div className="text-right">

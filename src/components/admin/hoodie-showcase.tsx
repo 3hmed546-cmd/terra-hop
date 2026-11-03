@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { loginHoodies, loginHoodieIntervalMs, type LoginHoodie } from "@/content/login-hoodies";
+import { loginHoodieIntervalMs, type LoginHoodie } from "@/content/login-hoodies";
 import { useLive } from "@/lib/use-live";
 import { uiStrings } from "@/lib/ui-strings";
 
@@ -39,7 +39,7 @@ export function HoodieShowcase() {
         },
       }));
     }
-    return loginHoodies;
+    return [];
   }, [liveSite]);
 
   useEffect(() => {
@@ -66,7 +66,7 @@ export function HoodieShowcase() {
     return () => window.clearInterval(id);
   }, [running, index, hoodiesList.length]);
 
-  const current = hoodiesList[index] ?? hoodiesList[0] ?? loginHoodies[0];
+  const current = hoodiesList[index] ?? hoodiesList[0] ?? null;
   const arabicName = current?.name
     ? ARABIC_HOODIE_NAMES[current.name.toUpperCase()] ?? current.name
     : "";
@@ -74,13 +74,15 @@ export function HoodieShowcase() {
   return (
     <div className="relative isolate flex h-full flex-col justify-between overflow-hidden bg-obsidian p-8 text-off-white">
       {/* Dynamic radial glow matching the active hoodie */}
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 transition-colors duration-1000 ease-out"
-        style={{
-          background: `radial-gradient(circle at 50% 45%, ${current.glow} 0%, transparent 65%)`,
-        }}
-        aria-hidden="true"
-      />
+      {current && (
+        <div
+          className="pointer-events-none absolute inset-0 -z-10 transition-colors duration-1000 ease-out"
+          style={{
+            background: `radial-gradient(circle at 50% 45%, ${current.glow} 0%, transparent 65%)`,
+          }}
+          aria-hidden="true"
+        />
+      )}
 
       <div className="flex items-center justify-between">
         <span className="font-mono text-xs uppercase tracking-widest text-concrete">
@@ -116,10 +118,12 @@ export function HoodieShowcase() {
 
       <div className="flex items-center justify-between">
         <div>
-          <span className="font-mono text-xs text-concrete">DROP 01 &bull; HOODIES</span>
-          <p className="text-sm font-medium tracking-wide">
-            {current.name} &bull; {arabicName}
-          </p>
+          <span className="font-mono text-xs text-concrete">TERRA HOP &bull; DROP 01</span>
+          {current && (
+            <p className="text-sm font-medium tracking-wide">
+              {current.name} &bull; {arabicName}
+            </p>
+          )}
         </div>
 
         <ul className="flex gap-1.5" aria-hidden="true">

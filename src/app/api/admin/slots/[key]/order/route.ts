@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/server/auth-middleware";
 import { getDb, recordChange, recordAudit } from "@/lib/server/db";
 import { apiSuccess, apiError } from "@/lib/server/api-envelope";
+import { syncGalleryVault, syncProductsVault } from "@/lib/server/vault-sync";
 
 export async function PUT(
   request: NextRequest,
@@ -56,6 +57,12 @@ export async function PUT(
 
     db.prepare("UPDATE image_slots SET revision = ? WHERE key = ?").run(nextRevision, key);
   })();
+
+  if (key === "hero_carousel" || key === "hero_banner" || key === "login_showcase") {
+    syncGalleryVault(db);
+  } else if (key === "product") {
+    syncProductsVault(db);
+  }
 
   recordChange("media", "image_slots", key, nextRevision);
   if (key === "product" && ownerId) {

@@ -21,6 +21,7 @@ import {
   AlertCircle,
   Sparkles,
   ShieldCheck,
+  Phone,
 } from "lucide-react";
 import { PageShell } from "@/components/layout/page-shell";
 import { images, resolveImage } from "@/content/images";
@@ -35,6 +36,17 @@ type Props = {
   product: Product;
   allProducts?: Product[];
 };
+
+export const HOODIE_COLORS = [
+  { id: "dusty-blue", name: "أزرق سماوي", hex: "#5A82A6", image: "/login-hoodies/hoodie-dusty-blue.webp" },
+  { id: "burgundy", name: "عنابي مارون", hex: "#7B1824", image: "/products/burgundy-hoodie-model.jpg" },
+  { id: "black", name: "أسود أوبسيديان", hex: "#111111", image: "/products/black-hoodie-model.jpg" },
+  { id: "cream", name: "كريمي أوف وايت", hex: "#F4F1EB", image: "/products/cream-hoodie-model.jpg" },
+  { id: "forest", name: "أخضر زمردي", hex: "#1E392A", image: "/products/forest-hoodie-model.jpg" },
+  { id: "mocha", name: "بني موكا", hex: "#4A3728", image: "/products/brown-hoodie-model.jpg" },
+  { id: "navy", name: "كحلي ليلي", hex: "#172439", image: "/products/navy-hoodie-model.jpg" },
+  { id: "charcoal", name: "رمادي فحمي", hex: "#38393D", image: "/login-hoodies/hoodie-charcoal.webp" },
+];
 
 export function ProductDetailView({ product, allProducts = [] }: Props) {
   const router = useRouter();
@@ -65,6 +77,22 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
+  // Sold out determination (Live static from DB & admin settings)
+  const isSoldOut = matchedAdmin
+    ? matchedAdmin.forceSoldOut === true || matchedAdmin.status === "sold_out"
+    : product.status === "Sold out" || product.status === "sold_out";
+
+  // Color selection state & matching image
+  const [selectedColor, setSelectedColor] = useState<any>(() => {
+    const found = HOODIE_COLORS.find(
+      (c) =>
+        product.slug.includes(c.id) ||
+        (product.description && product.description.includes(c.name))
+    );
+    return found || HOODIE_COLORS[0];
+  });
+  const [customActiveImage, setCustomActiveImage] = useState<string | null>(null);
+
   // Keep index within bounds if shots change
   useEffect(() => {
     if (activeImageIndex >= shots.length) {
@@ -72,11 +100,30 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
     }
   }, [shots.length, activeImageIndex]);
 
-  // Size selection and actions
+  // Size selection and availability
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [actionStatus, setActionStatus] = useState<"idle" | "error" | "added">("idle");
   const [showSizeGuide, setShowSizeGuide] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // Determine which sizes are available vs out-of-stock (with X mark)
+  const availableSizes = useMemo(() => {
+    if (matchedAdmin?.variants && Array.isArray(matchedAdmin.variants) && matchedAdmin.variants.length > 0) {
+      const active = matchedAdmin.variants
+        .filter((v: any) => v.stock > 0 && v.available !== false)
+        .map((v: any) => String(v.size).toUpperCase());
+      return new Set(active);
+    }
+    if (matchedAdmin?.sizes && Array.isArray(matchedAdmin.sizes) && matchedAdmin.sizes.length > 0) {
+      return new Set(matchedAdmin.sizes.map((s: string) => String(s).toUpperCase()));
+    }
+    return new Set((product.sizes || ["S", "M", "L", "XL", "XXL"]).map((s) => String(s).toUpperCase()));
+  }, [matchedAdmin, product.sizes]);
+
+  const displaySizes = useMemo(() => {
+    const base = product.sizes && product.sizes.length > 0 ? product.sizes : ["S", "M", "L", "XL", "XXL"];
+    return Array.from(new Set(base.map((s) => String(s).toUpperCase())));
+  }, [product.sizes]);
 
   // Accordion open states
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
@@ -122,8 +169,9 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
       ? t.products[product.slug].description
       : (matchedAdmin?.description || product.description);
 
-  const localizedStatus =
-    locale === "ar" ? t.drop.preorderBadge : (product.status ?? "PREORDER");
+  const localizedStatus = isSoldOut
+    ? (locale === "ar" ? "نفذ من المخزن" : "Sold Out")
+    : (locale === "ar" ? t.drop.preorderBadge : (product.status ?? "PREORDER"));
 
   const currentPrice = matchedAdmin ? (matchedAdmin.priceCents / 100) : product.price;
   const currentOriginalPrice = matchedAdmin?.compareAtCents ? (matchedAdmin.compareAtCents / 100) : product.originalPrice;
@@ -137,9 +185,11 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
 
   // Image Navigation
   const prevImage = () => {
+    setCustomActiveImage(null);
     setActiveImageIndex((prev) => (prev === 0 ? shots.length - 1 : prev - 1));
   };
   const nextImage = () => {
+    setCustomActiveImage(null);
     setActiveImageIndex((prev) => (prev === shots.length - 1 ? 0 : prev + 1));
   };
 
@@ -149,23 +199,35 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
     thumbnailsRef.current.scrollBy({ left: amount, behavior: "smooth" });
   };
 
+  const currentMainSrc = customActiveImage || shots[activeImageIndex]?.src || "";
+
   // Add to Cart handler
   const handleAddToCart = () => {
+    if (isSoldOut) return;
     if (!selectedSize) {
       setActionStatus("error");
       return;
     }
-    add(product.slug, selectedSize);
+    add(product.slug, selectedSize, {
+      name: selectedColor?.name,
+      hex: selectedColor?.hex,
+      image: currentMainSrc,
+    });
     setActionStatus("added");
   };
 
   // Buy Now handler
   const handleBuyNow = () => {
+    if (isSoldOut) return;
     if (!selectedSize) {
       setActionStatus("error");
       return;
     }
-    add(product.slug, selectedSize);
+    add(product.slug, selectedSize, {
+      name: selectedColor?.name,
+      hex: selectedColor?.hex,
+      image: currentMainSrc,
+    });
     router.push("/checkout");
   };
 
@@ -261,8 +323,51 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
             )}
           </div>
 
+          {/* Color Selection Section */}
+          <div className="pt-2 pb-1 border-b border-line-light">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-bold text-obsidian flex items-center gap-1.5">
+                <span>{locale === "ar" ? "اللون:" : "Color:"}</span>
+                <span className="text-stone-600 font-semibold text-xs">
+                  {selectedColor?.name || "اللون المختار"}
+                </span>
+              </span>
+            </div>
+            <div role="group" aria-label="Select Color" className="flex flex-wrap gap-2 mb-3">
+              {HOODIE_COLORS.map((c) => {
+                const isSelected = selectedColor?.id === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedColor(c);
+                      if (c.image) {
+                        setCustomActiveImage(c.image);
+                        const idx = shots.findIndex((s: any) => s.src === c.image);
+                        if (idx !== -1) setActiveImageIndex(idx);
+                      }
+                    }}
+                    title={c.name}
+                    className={`h-9 px-3 rounded-lg border text-xs font-bold transition-all duration-150 cursor-pointer flex items-center gap-2 ${
+                      isSelected
+                        ? "border-stone-900 bg-stone-900 text-white shadow-sm scale-102"
+                        : "border-stone-200 bg-white text-stone-800 hover:border-stone-400 shadow-2xs"
+                    }`}
+                  >
+                    <span
+                      className="w-3.5 h-3.5 rounded-full border border-black/20 shrink-0"
+                      style={{ backgroundColor: c.hex }}
+                    />
+                    <span>{c.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Size Selection Section (Reference Image 4: Testatoro style) */}
-          <div className="pt-1">
+          <div className="pt-2">
             <div className="flex items-center justify-between mb-2.5">
               <div className="text-sm font-bold text-obsidian flex items-center gap-1.5">
                 <span>{locale === "ar" ? "المقاس" : "Size"}</span>
@@ -284,10 +389,29 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
               </button>
             </div>
 
-            {/* Size Chips - Testatoro style: Solid black when selected, clean white when unselected, NO red background */}
+            {/* Size Chips - Testatoro style: Solid black when selected, clean white when unselected, X-mark for out-of-stock */}
             <div role="group" aria-label="Select Size" className="flex flex-wrap gap-2.5">
-              {(product.sizes || []).map((s) => {
+              {displaySizes.map((s: string) => {
+                const isAvailable = !isSoldOut && availableSizes.has(s);
                 const isSelected = s === selectedSize;
+
+                if (!isAvailable) {
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      disabled
+                      title={locale === "ar" ? `مقاس ${s} غير متوفر حالياً` : `Size ${s} Out of Stock`}
+                      className="h-11 min-w-14 rounded-lg border border-dashed border-stone-300 bg-stone-100 text-stone-400 text-sm font-bold opacity-60 line-through cursor-not-allowed relative flex items-center justify-center select-none"
+                    >
+                      <span>{s}</span>
+                      <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-stone-500 text-[9px] text-white font-black leading-none shadow-xs">
+                        ✕
+                      </span>
+                    </button>
+                  );
+                }
+
                 return (
                   <button
                     key={s}
@@ -343,27 +467,59 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
             )}
           </div>
 
-          {/* Action Buttons: Add to Cart (Top) & Buy Now (Bottom) - Reference Image 4 */}
-          <div ref={actionsRef} className="space-y-3 pt-2">
-            {/* 1. Add to Cart (أضف إلى العربة) */}
-            <button
-              type="button"
-              onClick={handleAddToCart}
-              className="w-full rounded-xl border-2 border-stone-900 bg-white hover:bg-stone-50 text-stone-900 py-3.5 px-6 text-base font-extrabold transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 active:scale-[0.99] shadow-xs"
-            >
-              <ShoppingBag className="h-5 w-5 text-stone-900" />
-              <span>{t.productPage.add}</span>
-            </button>
+          {/* Action Buttons: Add to Cart (Top) & Buy Now (Bottom) OR Sold-Out WhatsApp Invite */}
+          <div ref={actionsRef} className="pt-2">
+            {isSoldOut ? (
+              <div className="rounded-xl border border-stone-800 bg-stone-900 text-white p-5 space-y-3.5 shadow-lg" dir="rtl">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-red-600/30 text-red-400 flex items-center justify-center font-bold text-base shrink-0">
+                    ✕
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm sm:text-base text-white">هذا المنتج نفذ من المخزن حالياً</h3>
+                    <p className="text-[11px] sm:text-xs text-stone-300 mt-0.5">الكميات المتاحة انتهت بالكامل وجاري إنتاج الدفعة القادمة.</p>
+                  </div>
+                </div>
 
-            {/* 2. Buy Now (شراء الآن) */}
-            <button
-              type="button"
-              onClick={handleBuyNow}
-              className="w-full rounded-xl border-2 py-3.5 px-6 text-base font-black transition-all duration-200 cursor-pointer shadow-md shadow-red-600/20 flex items-center justify-center active:scale-[0.99]"
-              style={{ backgroundColor: "#c8102e", borderColor: "#c8102e", color: "#ffffff" }}
-            >
-              <span>{t.productPage.buyNow}</span>
-            </button>
+                <p className="text-xs text-stone-300 leading-relaxed bg-black/40 p-3 rounded-lg border border-stone-800">
+                  انضم إلى جروب الواتساب الخاص بمتجر TERRA HOP لتكون أول من يعلم عند فتح الحجز وإعادة توفر المقاسات الجديدة وتطلبها فوراً.
+                </p>
+
+                <a
+                  href={`https://wa.me/201285694670?text=${encodeURIComponent(
+                    `مرحباً TERRA HOP، أود الانضمام لجروب الواتساب ومعرفة موعد توفر هودي "${localizedName}".`
+                  )}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg py-3 px-4 font-bold text-xs sm:text-sm bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow-md cursor-pointer"
+                >
+                  <Phone className="w-4 h-4 fill-current" />
+                  <span>انضم لجروب الواتساب لتصلك تنبيهات التوفر</span>
+                </a>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {/* 1. Add to Cart (أضف إلى العربة) */}
+                <button
+                  type="button"
+                  onClick={handleAddToCart}
+                  className="w-full rounded-xl border-2 border-stone-900 bg-white hover:bg-stone-50 text-stone-900 py-3.5 px-6 text-base font-extrabold transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 active:scale-[0.99] shadow-xs"
+                >
+                  <ShoppingBag className="h-5 w-5 text-stone-900" />
+                  <span>{t.productPage.add}</span>
+                </button>
+
+                {/* 2. Buy Now (شراء الآن) */}
+                <button
+                  type="button"
+                  onClick={handleBuyNow}
+                  className="w-full rounded-xl border-2 py-3.5 px-6 text-base font-black transition-all duration-200 cursor-pointer shadow-md shadow-red-600/20 flex items-center justify-center active:scale-[0.99]"
+                  style={{ backgroundColor: "#c8102e", borderColor: "#c8102e", color: "#ffffff" }}
+                >
+                  <span>{t.productPage.buyNow}</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Trust Highlights Box with Colorful Icon Circles (Reference Image 5) */}
@@ -543,7 +699,7 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
             <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl bg-charcoal/5 border border-line-light shadow-sm">
               <AnimatePresence mode="wait">
                 <motion.div
-                  key={shots[activeImageIndex]?.src || "default-img"}
+                  key={currentMainSrc || "default-img"}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -551,21 +707,21 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
                   className="relative h-full w-full"
                 >
                   <Image
-                    src={shots[activeImageIndex]?.src || ""}
+                    src={currentMainSrc}
                     alt={shots[activeImageIndex]?.alt || localizedName}
                     fill
                     sizes="(min-width: 1024px) 55vw, 100vw"
                     priority
-                    unoptimized={(shots[activeImageIndex]?.src || "").startsWith("data:")}
+                    unoptimized={currentMainSrc.startsWith("data:")}
                     className="object-cover"
                   />
                 </motion.div>
               </AnimatePresence>
 
-              {/* Preorder / Drop Status Badge on Top */}
+              {/* Status Badge on Top */}
               <div className="absolute top-3 left-3 pointer-events-none z-10">
-                <StatusLabel className="bg-obsidian/90 text-amber-300 border border-amber-400/40 text-[11px] font-bold backdrop-blur-md px-3 py-1 rounded-full shadow-sm">
-                  ✦ {localizedStatus}
+                <StatusLabel className={`${isSoldOut ? "bg-stone-900/90 text-red-300 border-red-500/40" : "bg-obsidian/90 text-amber-300 border-amber-400/40"} text-[11px] font-bold backdrop-blur-md px-3 py-1 rounded-full shadow-sm`}>
+                  {isSoldOut ? "✕ نفذ من المخزن" : `✦ ${localizedStatus}`}
                 </StatusLabel>
               </div>
 
@@ -787,21 +943,34 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  if (!selectedSize) {
-                    window.scrollTo({ top: 300, behavior: "smooth" });
-                    setActionStatus("error");
-                  } else {
-                    handleBuyNow();
-                  }
-                }}
-                className="shrink-0 rounded-xl px-5 py-2.5 text-xs font-black shadow-md shadow-red-600/30 cursor-pointer active:scale-95 transition"
-                style={{ backgroundColor: "#c8102e", color: "#ffffff" }}
-              >
-                {t.productPage.stickyBuyNow}
-              </button>
+              {isSoldOut ? (
+                <a
+                  href={`https://wa.me/201285694670?text=${encodeURIComponent(
+                    `مرحباً TERRA HOP، أود الاستفسار عن موعد توفر هودي "${localizedName}".`
+                  )}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="shrink-0 rounded-xl px-4 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md transition"
+                >
+                  نفذ - راسلنا واتساب
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!selectedSize) {
+                      window.scrollTo({ top: 300, behavior: "smooth" });
+                      setActionStatus("error");
+                    } else {
+                      handleBuyNow();
+                    }
+                  }}
+                  className="shrink-0 rounded-xl px-5 py-2.5 text-xs font-black shadow-md shadow-red-600/30 cursor-pointer active:scale-95 transition"
+                  style={{ backgroundColor: "#c8102e", color: "#ffffff" }}
+                >
+                  {t.productPage.stickyBuyNow}
+                </button>
+              )}
             </div>
           </motion.div>
         )}

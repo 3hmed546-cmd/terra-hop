@@ -6,7 +6,7 @@ import { Play, Pause } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { ButtonLink } from "@/components/ui/button";
 import { AnimatedLogo } from "@/components/motion/animated-logo";
-import { loginHoodies, loginHoodieIntervalMs, type LoginHoodie } from "@/content/login-hoodies";
+import { loginHoodieIntervalMs, type LoginHoodie } from "@/content/login-hoodies";
 import { useLive } from "@/lib/use-live";
 import { useLocale } from "@/lib/locale-context";
 import type { home } from "@/content/home";
@@ -27,10 +27,6 @@ export function Hero({ hero }: HeroProps) {
   const hoodiesList = useMemo<LoginHoodie[]>(() => {
     const heroPlacements = liveSite?.slots?.hero_carousel;
     if (Array.isArray(heroPlacements)) {
-      if (heroPlacements.length === 0) {
-        // If user deleted all images, list is truly empty (or fallback banner if desired)
-        return [];
-      }
       return heroPlacements.map((p: any) => {
         const meta = p.meta || {};
         return {
@@ -45,8 +41,7 @@ export function Hero({ hero }: HeroProps) {
       });
     }
 
-    // Initial pre-fetch fallback
-    return loginHoodies;
+    return [];
   }, [liveSite]);
 
   useEffect(() => {

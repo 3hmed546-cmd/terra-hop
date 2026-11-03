@@ -179,8 +179,10 @@ textarea.adm-input { min-height: 96px; resize: vertical; }
 /* ---------- dialog ---------- */
 .adm-dialog {
   position: fixed;
-  inset: 0;
-  margin: auto;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
   width: min(560px, calc(100vw - 32px));
   max-height: calc(100vh - 48px);
   overflow-y: auto;
@@ -195,7 +197,7 @@ textarea.adm-input { min-height: 96px; resize: vertical; }
 .adm-dialog-body { padding: 24px; display: flex; flex-direction: column; gap: 16px; }
 .adm-dialog-body p { margin: 0; color: var(--adm-graphite); }
 .adm-dialog-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-.adm-menu { width: 100vw; max-width: 100vw; height: 100vh; max-height: 100vh; margin: 0; background: var(--adm-obsidian); color: var(--adm-offwhite); border: 0; }
+.adm-menu { width: 100vw; max-width: 100vw; height: 100vh; max-height: 100vh; top: 0; left: 0; transform: none; margin: 0; background: var(--adm-obsidian); color: var(--adm-offwhite); border: 0; }
 .adm-menu .adm-dialog-body { min-height: 100vh; }
 
 /* ---------- toasts ---------- */

@@ -3,7 +3,6 @@ import path from "path";
 import crypto from "crypto";
 import { getDb, recordChange } from "./db";
 import { hashPassword, encryptCode, hashLookupCode } from "./security";
-import { loginHoodies } from "@/content/login-hoodies";
 
 export function seedAmbassadorsIfNeeded(db: any, now = new Date().toISOString()) {
   try {
@@ -352,51 +351,66 @@ export function seedDatabaseIfNeeded(targetDb?: any, force = false): boolean {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
     `);
 
-    // 6. Seed Hero Carousel Placements from loginHoodies
-    loginHoodies.forEach((hoodie, idx) => {
-      const pseudoSha = crypto.createHash("sha256").update(hoodie.src).digest("hex");
-      const existingAsset = db.prepare("SELECT id FROM assets WHERE sha256 = ?").get(pseudoSha) as { id: string } | undefined;
-      let assetId: string;
-      if (existingAsset) {
-        assetId = existingAsset.id;
-      } else {
-        assetId = `asset-hero-${idx + 1}`;
-        insertAsset.run(assetId, pseudoSha, "image/webp", 1080, 1350, 250000, path.basename(hoodie.src), now);
+    // 6. Seed Hero Carousel Placements from gallery-data.json (strictly from settings/vault)
+    const galleryFile = path.join(process.cwd(), "data", "secure-vault", "gallery-data.json");
+    if (fs.existsSync(galleryFile)) {
+      try {
+        const rawGallery = JSON.parse(fs.readFileSync(galleryFile, "utf-8"));
+        if (Array.isArray(rawGallery)) {
+          rawGallery.forEach((item: any, idx: number) => {
+            const itemSrc = item.src || item.url;
+            if (!itemSrc) return;
+            const pseudoSha = crypto.createHash("sha256").update(itemSrc).digest("hex");
+            const existingAsset = db.prepare("SELECT id FROM assets WHERE sha256 = ?").get(pseudoSha) as { id: string } | undefined;
+            let assetId: string;
+            if (existingAsset) {
+              assetId = existingAsset.id;
+            } else {
+              assetId = `asset-hdr-${item.id || idx + 1}`;
+              insertAsset.run(assetId, pseudoSha, "image/webp", 1080, 1350, 250000, path.basename(itemSrc), now);
+            }
+
+            const meta = JSON.stringify({
+              glow: item.meta?.glow || "#34445c",
+              name: item.title,
+              caption: item.meta?.caption || {
+                ar: { prefix: "تميز", accent: "بأسلوبك", sub: item.title },
+                en: { prefix: "STAND OUT", accent: "YOUR WAY", sub: item.title },
+              },
+              sourceUrl: itemSrc,
+              tag: item.tag || "هيدر كاروسيل",
+            });
+
+            const plcId = item.id ? `plc-${item.id}` : `plc-hero-${idx + 1}`;
+            insertPlacement.run(
+              plcId,
+              "hero_carousel",
+              null,
+              assetId,
+              idx + 1,
+              item.title,
+              item.title,
+              meta,
+              now
+            );
+
+            insertPlacement.run(
+              `plc-login-${item.id || idx + 1}`,
+              "login_showcase",
+              null,
+              assetId,
+              idx + 1,
+              item.title,
+              item.title,
+              meta,
+              now
+            );
+          });
+        }
+      } catch (err) {
+        console.error("Failed to parse gallery-data.json for seed:", err);
       }
-
-      const meta = JSON.stringify({
-        glow: hoodie.glow,
-        name: hoodie.name,
-        caption: hoodie.caption,
-        sourceUrl: hoodie.src,
-      });
-
-      // Insert placement into hero_carousel
-      insertPlacement.run(
-        `plc-hero-${idx + 1}`,
-        "hero_carousel",
-        null,
-        assetId,
-        idx + 1,
-        hoodie.name,
-        hoodie.name,
-        meta,
-        now
-      );
-
-      // Also insert into login_showcase
-      insertPlacement.run(
-        `plc-login-${idx + 1}`,
-        "login_showcase",
-        null,
-        assetId,
-        idx + 1,
-        hoodie.name,
-        hoodie.name,
-        meta,
-        now
-      );
-    });
+    }
 
     // 7. Seed Products from products-data.json
     const productsFile = path.join(process.cwd(), "data", "secure-vault", "products-data.json");

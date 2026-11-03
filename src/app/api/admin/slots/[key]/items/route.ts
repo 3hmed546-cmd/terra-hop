@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/server/auth-middleware";
 import { getDb, recordChange, recordAudit } from "@/lib/server/db";
 import { processAndSaveAsset } from "@/lib/server/services/assets";
 import { apiSuccess, apiError } from "@/lib/server/api-envelope";
+import { syncGalleryVault, syncProductsVault } from "@/lib/server/vault-sync";
 
 export async function POST(
   request: NextRequest,
@@ -117,6 +118,13 @@ export async function POST(
 
   if (!readBack) {
     return apiError("WRITE_NOT_VERIFIED", "فشل تأكيد حفظ الصورة في قاعدة البيانات.", 500);
+  }
+
+  // Persist additions to file vault
+  if (key === "hero_carousel" || key === "hero_banner" || key === "login_showcase") {
+    syncGalleryVault(db);
+  } else if (key === "product") {
+    syncProductsVault(db);
   }
 
   recordChange("media", "image_placements", placementId, nextRevision);

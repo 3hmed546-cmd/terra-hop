@@ -52,8 +52,13 @@ export function ProductCard({ product }: { product: Product }) {
       ? t.products[product.slug].name
       : (matchedAdmin?.name || product.name);
 
-  const localizedStatus =
-    locale === "ar" ? t.drop.preorderBadge : (product.status ?? "PREORDER");
+  const isSoldOut = matchedAdmin
+    ? matchedAdmin.forceSoldOut === true || matchedAdmin.status === "sold_out"
+    : product.status === "Sold out" || product.status === "sold_out";
+
+  const localizedStatus = isSoldOut
+    ? (locale === "ar" ? "نفذ من المخزن" : "Sold Out")
+    : (locale === "ar" ? t.drop.preorderBadge : (product.status ?? "PREORDER"));
 
   const currentPrice = matchedAdmin ? matchedAdmin.priceCents / 100 : product.price;
   const currentOriginalPrice = matchedAdmin?.compareAtCents
@@ -86,7 +91,12 @@ export function ProductCard({ product }: { product: Product }) {
           sizes={sizes}
           className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-200 group-hover:opacity-100"
         />
-        {hasDiscount && (
+        {isSoldOut && (
+          <span className="absolute top-2.5 right-2.5 z-10 rounded-md bg-stone-900/90 px-2.5 py-1 text-xs font-bold text-white shadow-md">
+            {locale === "ar" ? "نفذ من المخزن" : "Sold Out"}
+          </span>
+        )}
+        {hasDiscount && !isSoldOut && (
           <span
             className="absolute bottom-2.5 right-2.5 rounded-lg px-2.5 py-1 text-xs font-black uppercase shadow-md z-10 tracking-wider"
             style={{ backgroundColor: "#c8102e", color: "#ffffff" }}

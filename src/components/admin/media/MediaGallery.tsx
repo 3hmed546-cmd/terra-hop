@@ -115,12 +115,14 @@ export function MediaGallery() {
     if (confirmTarget.type === "header") {
       const target = confirmTarget.image;
       try {
+        setImages((prev) => prev.filter((img) => img.id !== target.id));
         await deleteHeroImage(target.id);
         const next = await fetchHeroImages();
         setImages(next);
         setConfirmTarget(null);
         setSuccessDeletedName(`صورة الهيدر "${target.title}"`);
       } catch (err: any) {
+        await refreshGallery();
         setConfirmTarget(null);
         alert(err.message || "فشل حذف صورة الهيدر من الخادم.");
       }
@@ -332,10 +334,10 @@ export function MediaGallery() {
             type="button"
             onClick={handleResetDefaults}
             className="flex items-center gap-1.5 text-xs text-concrete hover:text-off-white transition-colors px-2 py-1 cursor-pointer"
-            title="استعادة الصور الأصلية في حال حذفت شيئاً بالخطأ"
+            title="تحديث قائمة الصور من الخادم"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span>استعادة الهيدرز</span>
+            <span>تحديث الصور</span>
           </button>
         </div>
       </div>

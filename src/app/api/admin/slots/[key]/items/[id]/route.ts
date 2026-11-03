@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/server/auth-middleware";
 import { getDb, recordChange, recordAudit } from "@/lib/server/db";
 import { apiSuccess, apiError } from "@/lib/server/api-envelope";
+import { syncGalleryVault, syncProductsVault } from "@/lib/server/vault-sync";
 
 export async function PATCH(
   request: NextRequest,
@@ -93,11 +94,16 @@ export async function DELETE(
   const { key, id } = await context.params;
   const db = getDb();
 
+  const strippedId = id.replace(/^plc-/, "");
   const placement = db
-    .prepare("SELECT * FROM image_placements WHERE (id = ? OR asset_id = ?) AND slot_key = ?")
-    .get(id, id, key) as any;
+    .prepare("SELECT * FROM image_placements WHERE (id = ? OR asset_id = ? OR id = ? OR id = ? OR id = ?) AND slot_key = ?")
+    .get(id, id, `plc-${id}`, `plc-hero-${id}`, `plc-${strippedId}`, key) as any;
 
   if (!placement) {
+    // If not found in DB, also check if it needs to be cleaned from vault directly
+    if (key === "hero_carousel" || key === "hero_banner" || key === "login_showcase") {
+      syncGalleryVault(db);
+    }
     return apiSuccess({ deleted: true, id, alreadyDeleted: true });
   }
 
@@ -113,6 +119,13 @@ export async function DELETE(
   const checkDeleted = db.prepare("SELECT id FROM image_placements WHERE id = ?").get(placement.id);
   if (checkDeleted) {
     return apiError("WRITE_NOT_VERIFIED", "فشل التحقق من إزالة الصورة من قاعدة البيانات.", 500);
+  }
+
+  // Persist deletion to file vault so it never reappears on reload
+  if (key === "hero_carousel" || key === "hero_banner" || key === "login_showcase") {
+    syncGalleryVault(db);
+  } else if (key === "product") {
+    syncProductsVault(db);
   }
 
   recordChange("media", "image_placements", id, nextRevision);
