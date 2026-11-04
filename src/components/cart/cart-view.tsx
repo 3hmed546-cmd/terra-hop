@@ -115,6 +115,19 @@ export function CartView({ products }: Props) {
                         </>
                       )}
                     </div>
+                    {product.status === "Sold out" && (
+                      <div className="mt-2.5 rounded-lg border border-red-200 bg-red-50 p-2 text-xs font-bold text-red-700 flex flex-wrap items-center justify-between gap-2">
+                        <span>{locale === "ar" ? "عفواً، هذا المنتج نفذ من المخزن حالياً." : "This product is currently out of stock."}</span>
+                        <a
+                          href={`https://wa.me/201285694670?text=${encodeURIComponent(`مرحباً TERRA HOP، أود معرفة موعد إعادة توفر هودي "${translatedName}".`)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-stone-900 underline hover:text-black font-extrabold"
+                        >
+                          {locale === "ar" ? "انضم لجروب الواتساب للتنبيهات" : "Join WhatsApp Group"}
+                        </a>
+                      </div>
+                    )}
                   </div>
                   <p className="tabular-nums font-mono font-bold text-obsidian">
                     {formatPrice(product.price * qty)}
@@ -178,9 +191,24 @@ export function CartView({ products }: Props) {
           {locale === "ar" ? "الشحن يتم حسابه في خطوة إتمام الطلب." : "Shipping calculated at checkout."}
         </div>
         <div className="mt-6 flex flex-col gap-3">
-          <ButtonLink href="/checkout" className="w-full text-center">
-            {locale === "ar" ? "متابعة لإتمام الطلب" : "Proceed to Checkout"}
-          </ButtonLink>
+          {rows.some((r) => r.product.status === "Sold out") ? (
+            <div className="space-y-2">
+              <button
+                type="button"
+                disabled
+                className="w-full text-center py-3.5 px-6 rounded-xl bg-stone-300 text-stone-500 font-bold text-sm cursor-not-allowed opacity-70"
+              >
+                {locale === "ar" ? "متابعة لإتمام الطلب" : "Proceed to Checkout"}
+              </button>
+              <p className="text-xs text-red-600 font-bold text-center">
+                {locale === "ar" ? "يرجى حذف المنتجات غير المتوفرة (التي نفذت من المخزن) لمتابعة الطلب." : "Please remove out-of-stock items to proceed."}
+              </p>
+            </div>
+          ) : (
+            <ButtonLink href="/checkout" className="w-full text-center">
+              {locale === "ar" ? "متابعة لإتمام الطلب" : "Proceed to Checkout"}
+            </ButtonLink>
+          )}
           <button
             type="button"
             onClick={clear}

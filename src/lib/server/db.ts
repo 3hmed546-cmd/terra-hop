@@ -57,7 +57,16 @@ export function getBaseStorageDir(): string {
 
 export function getDatabasePath(): string {
   if (process.env.DATABASE_PATH) {
-    return process.env.DATABASE_PATH;
+    try {
+      const dir = path.dirname(process.env.DATABASE_PATH);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      return process.env.DATABASE_PATH;
+    } catch {
+      // If writing to process.env.DATABASE_PATH fails (e.g. during build when volume is not yet mounted)
+      // fallback to safe storage dir below
+    }
   }
   const storageDir = getBaseStorageDir();
   return path.join(storageDir, "terra.db");
@@ -68,8 +77,23 @@ export function getDb(): Database.Database {
     return dbInstance;
   }
 
-  const dbPath = getDatabasePath();
-  const db = new Database(dbPath);
+  let dbPath = getDatabasePath();
+  let db: Database.Database;
+  try {
+    const parentDir = path.dirname(dbPath);
+    if (!fs.existsSync(parentDir)) {
+      fs.mkdirSync(parentDir, { recursive: true });
+    }
+    db = new Database(dbPath);
+  } catch (err) {
+    console.warn(`[getDb] Could not open database at ${dbPath}, falling back to tmpdir:`, err);
+    const fallbackDir = path.join(os.tmpdir(), "terra-storage");
+    if (!fs.existsSync(fallbackDir)) {
+      fs.mkdirSync(fallbackDir, { recursive: true });
+    }
+    dbPath = path.join(fallbackDir, "terra.db");
+    db = new Database(dbPath);
+  }
 
   // Performance & Integrity PRAGMAs
   try {

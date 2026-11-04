@@ -244,6 +244,22 @@ export const adminActions = {
     if (!product) return { ok: false, error: "PRODUCT_NOT_FOUND" };
     if (target === "available" && !canMakeAvailable(product)) return { ok: false, error: "NO_STOCK" };
 
+    // Optimistic in-memory update so UI never reverts or lags
+    const patch: Partial<Product> =
+      target === "available"
+        ? { status: "active", forceSoldOut: false }
+        : target === "sold_out"
+          ? { status: "active", forceSoldOut: true }
+          : { status: "draft" };
+
+    if (state) {
+      state = {
+        ...state,
+        products: state.products.map((p) => (p.id === productId ? { ...p, ...patch } : p)),
+      };
+      emit();
+    }
+
     try {
       const response = await apiFetch(`/api/admin/products/${encodeURIComponent(productId)}`, {
         method: "PATCH",
@@ -255,10 +271,27 @@ export const adminActions = {
         }),
       });
       const payload = await response.json().catch(() => null);
-      if (!response.ok || !payload?.ok) return { ok: false, error: "NO_CHANGE" };
+      if (!response.ok || !payload?.ok) {
+        // Rollback on server failure
+        if (state) {
+          state = {
+            ...state,
+            products: state.products.map((p) => (p.id === productId ? product : p)),
+          };
+          emit();
+        }
+        return { ok: false, error: "NO_CHANGE" };
+      }
       await reloadAdminData();
       return { ok: true };
     } catch {
+      if (state) {
+        state = {
+          ...state,
+          products: state.products.map((p) => (p.id === productId ? product : p)),
+        };
+        emit();
+      }
       return { ok: false, error: "NO_CHANGE" };
     }
   },

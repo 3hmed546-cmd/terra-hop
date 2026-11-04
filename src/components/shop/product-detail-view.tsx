@@ -133,25 +133,25 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
 
   // Determine which sizes are available vs out-of-stock (with X mark) for selected color
   const availableSizes = useMemo(() => {
-    if (isSoldOut) return new Set<string>();
-
-    if (matchedAdmin?.variants && Array.isArray(matchedAdmin.variants) && matchedAdmin.variants.length > 0) {
-      const scopedVariants = selectedColor
-        ? matchedAdmin.variants.filter((v: any) => String(v.colorId) === String(selectedColor.id))
-        : matchedAdmin.variants;
-
-      const active = (scopedVariants.length > 0 ? scopedVariants : matchedAdmin.variants)
-        .filter((v: any) => {
-          const stock = typeof v.stock === "number" ? v.stock : 0;
-          return stock > 0 && v.available !== false;
-        })
-        .map((v: any) => String(v.size).toUpperCase());
-
-      return new Set(active);
+    if (!matchedAdmin?.variants || !Array.isArray(matchedAdmin.variants) || matchedAdmin.variants.length === 0) {
+      return new Set(displaySizes);
     }
 
-    return new Set(displaySizes);
-  }, [matchedAdmin?.variants, selectedColor, displaySizes, isSoldOut]);
+    const scopedVariants = selectedColor
+      ? matchedAdmin.variants.filter((v: any) => String(v.colorId).toLowerCase() === String(selectedColor.id).toLowerCase())
+      : matchedAdmin.variants;
+
+    const targetVariants = scopedVariants.length > 0 ? scopedVariants : matchedAdmin.variants;
+
+    const active = targetVariants
+      .filter((v: any) => {
+        const stock = typeof v.stock === "number" ? v.stock : 0;
+        return stock > 0 && v.available !== false;
+      })
+      .map((v: any) => String(v.size).toUpperCase());
+
+    return new Set(active);
+  }, [matchedAdmin?.variants, selectedColor, displaySizes]);
 
   // Auto-select first available size when availableSizes changes
   useEffect(() => {
@@ -362,15 +362,12 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
             )}
           </div>
 
-          {/* Color Selection Section (Swatches Only - No text names inside buttons) */}
+          {/* Color Selection Section (Swatches Only - No text names) */}
           {productColors.length > 0 && (
             <div className="pt-2 pb-1 border-b border-line-light">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-bold text-obsidian flex items-center gap-1.5">
-                  <span>{locale === "ar" ? "اللون:" : "Color:"}</span>
-                  <span className="text-stone-600 font-semibold text-xs">
-                    {selectedColor?.name || ""}
-                  </span>
+                  <span>{locale === "ar" ? "اللون" : "Color"}</span>
                 </span>
               </div>
               <div role="group" aria-label="Select Color" className="flex flex-wrap items-center gap-2.5 mb-3">
