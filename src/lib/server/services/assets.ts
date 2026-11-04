@@ -141,3 +141,26 @@ export async function processAndSaveAsset(
     created_by: createdBy,
   };
 }
+
+/**
+ * Removes an uploaded asset only after its final placement has been removed.
+ * Seeded or externally hosted assets simply have no local files, which is safe.
+ */
+export function removeAssetIfUnused(assetId: string): void {
+  const db = getDb();
+  const remaining = db.prepare("SELECT COUNT(*) AS count FROM image_placements WHERE asset_id = ?").get(assetId) as { count: number };
+  if (remaining.count > 0) return;
+
+  const asset = db.prepare("SELECT sha256 FROM assets WHERE id = ?").get(assetId) as { sha256: string } | undefined;
+  if (!asset) return;
+
+  db.prepare("DELETE FROM assets WHERE id = ?").run(assetId);
+  const uploadsDir = getUploadsDir();
+  for (const suffix of [".webp", "-md.webp", "-thumb.webp"]) {
+    try {
+      fs.unlinkSync(path.join(/* turbopackIgnore: true */ uploadsDir, `${asset.sha256}${suffix}`));
+    } catch (error: any) {
+      if (error?.code !== "ENOENT") console.error("Failed to delete unused asset file:", error);
+    }
+  }
+}

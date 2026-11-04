@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/server/auth-middleware";
 import { getDb, recordChange, recordAudit } from "@/lib/server/db";
 import { apiSuccess, apiError } from "@/lib/server/api-envelope";
 import { syncGalleryVault, syncProductsVault } from "@/lib/server/vault-sync";
+import { removeAssetIfUnused } from "@/lib/server/services/assets";
 
 export async function PATCH(
   request: NextRequest,
@@ -70,6 +71,12 @@ export async function PATCH(
     after: readBack,
   });
 
+  if (key === "hero_carousel" || key === "hero_banner" || key === "login_showcase") {
+    syncGalleryVault(db);
+  } else if (key === "product") {
+    syncProductsVault(db);
+  }
+
   return apiSuccess(
     {
       ...readBack,
@@ -94,23 +101,8 @@ export async function DELETE(
   const { key, id } = await context.params;
   const db = getDb();
 
-  const strippedId = id.replace(/^plc-/, "").replace(/^login-/, "").replace(/^hero-/, "");
-  const placements = db
-    .prepare(`
-      SELECT * FROM image_placements 
-      WHERE (id = ? OR asset_id = ? OR id = ? OR id = ? OR id = ? OR id = ? OR id LIKE ?) 
-        AND (slot_key = ? OR slot_key = 'login_showcase' OR slot_key = 'hero_carousel')
-    `)
-    .all(
-      id,
-      id,
-      `plc-${id}`,
-      `plc-hero-${id}`,
-      `plc-${strippedId}`,
-      `plc-login-${strippedId}`,
-      `%${strippedId}%`,
-      key
-    ) as any[];
+  const placement = db.prepare("SELECT * FROM image_placements WHERE id = ? AND slot_key = ?").get(id, key) as any;
+  const placements = placement ? [placement] : [];
 
   if (placements.length === 0) {
     if (key === "hero_carousel" || key === "hero_banner" || key === "login_showcase") {
@@ -128,6 +120,8 @@ export async function DELETE(
     }
     db.prepare("UPDATE image_slots SET revision = ? WHERE key = ?").run(nextRevision, key);
   })();
+
+  for (const p of placements) removeAssetIfUnused(p.asset_id);
 
   // Protocol B3: Read-back verification - must be gone!
   for (const p of placements) {

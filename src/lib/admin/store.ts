@@ -6,6 +6,7 @@ import type { AdminData, ErrorCode, Product, Result, Settings, Order, StockMovem
 import { DEFAULT_SETTINGS, createSeedData } from "./seed";
 import {
   adjustStock as pureAdjustStock,
+  canMakeAvailable,
   cancelOrder as pureCancelOrder,
   deleteProduct as pureDeleteProduct,
   duplicateProduct as pureDuplicateProduct,
@@ -13,7 +14,6 @@ import {
   restockProduct as pureRestockProduct,
   saveProduct as pureSaveProduct,
   sellOrder as pureSellOrder,
-  setProductStatus as pureSetProductStatus,
   type ManualSaleInput,
   type RestockLine,
   type QuickStatus,
@@ -238,21 +238,29 @@ export const adminActions = {
     return res;
   },
 
-  setProductStatus: (productId: string, target: QuickStatus): ActionResult => {
-    const res = run((d, now) => pureSetProductStatus(d, productId, target, now));
-    if (res.ok) {
-      const isSoldOut = target === "sold_out";
-      const isDraft = target === "draft";
-      apiFetch(`/api/admin/products/${productId}`, {
+  setProductStatusAsync: async (productId: string, target: QuickStatus): Promise<ActionResult> => {
+    const current = getSnapshot();
+    const product = current?.products.find((item) => item.id === productId);
+    if (!product) return { ok: false, error: "PRODUCT_NOT_FOUND" };
+    if (target === "available" && !canMakeAvailable(product)) return { ok: false, error: "NO_STOCK" };
+
+    try {
+      const response = await apiFetch(`/api/admin/products/${encodeURIComponent(productId)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          status: isDraft ? "draft" : "active",
-          forceSoldOut: isSoldOut,
+          status: target === "draft" ? "draft" : "active",
+          forceSoldOut: target === "sold_out",
+          ifRevision: product.revision,
         }),
-      }).then(() => reloadAdminData()).catch(() => {});
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) return { ok: false, error: "NO_CHANGE" };
+      await reloadAdminData();
+      return { ok: true };
+    } catch {
+      return { ok: false, error: "NO_CHANGE" };
     }
-    return res;
   },
 
   saveProduct: async (product: Product): Promise<ActionResult> => {
@@ -269,6 +277,7 @@ export const adminActions = {
       status: product.status,
       forceSoldOut: product.forceSoldOut,
       lowStockThreshold: product.lowStockThreshold,
+      ifRevision: product.revision,
       descriptionAr: product.description,
       details: product.details,
       colors: product.colors,

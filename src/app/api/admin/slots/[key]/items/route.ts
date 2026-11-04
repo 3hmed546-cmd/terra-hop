@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import crypto from "crypto";
 import { requireAdmin } from "@/lib/server/auth-middleware";
 import { getDb, recordChange, recordAudit } from "@/lib/server/db";
-import { processAndSaveAsset } from "@/lib/server/services/assets";
+import { processAndSaveAsset, removeAssetIfUnused } from "@/lib/server/services/assets";
 import { apiSuccess, apiError } from "@/lib/server/api-envelope";
 import { syncGalleryVault, syncProductsVault } from "@/lib/server/vault-sync";
 
@@ -194,6 +194,9 @@ export async function DELETE(
 
   const nextRevision = (slot.revision || 1) + 1;
   let deletedCount = 0;
+  const assetsToCheck = db
+    .prepare(`SELECT asset_id FROM image_placements WHERE slot_key = ?${ownerId ? " AND owner_id = ?" : ""}`)
+    .all(...(ownerId ? [key, ownerId] : [key])) as Array<{ asset_id: string }>;
 
   db.transaction(() => {
     let delQuery = "DELETE FROM image_placements WHERE slot_key = ?";
@@ -207,6 +210,16 @@ export async function DELETE(
 
     db.prepare("UPDATE image_slots SET revision = ? WHERE key = ?").run(nextRevision, key);
   })();
+
+  // The placement is gone now, so only remove the file when no other page or
+  // product still references it.
+  for (const asset of assetsToCheck) removeAssetIfUnused(asset.asset_id);
+
+  if (key === "hero_carousel" || key === "hero_banner" || key === "login_showcase") {
+    syncGalleryVault(db);
+  } else if (key === "product") {
+    syncProductsVault(db);
+  }
 
   recordChange("media", "image_slots", key, nextRevision);
   recordAudit({

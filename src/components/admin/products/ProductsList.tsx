@@ -100,19 +100,19 @@ function RowActions({
   const SC = S.statusChange;
   const labels: Record<QuickStatus, string> = { available: SC.available, sold_out: SC.soldOut, draft: SC.draft };
 
-  const change = (target: QuickStatus) => {
+  const change = async (target: QuickStatus) => {
     if (typeof window !== "undefined") {
       if (document.activeElement instanceof HTMLElement) {
         document.activeElement.blur();
       }
       const scrollPos = window.scrollY;
-      const result = actions.setProductStatus(product.id, target);
+      const result = await actions.setProductStatusAsync(product.id, target);
       toast.push(result.ok ? SC.changed(product.name, labels[target]) : ADMIN_STRINGS.errors[result.error]);
       requestAnimationFrame(() => {
         window.scrollTo({ top: scrollPos, behavior: "instant" });
       });
     } else {
-      const result = actions.setProductStatus(product.id, target);
+      const result = await actions.setProductStatusAsync(product.id, target);
       toast.push(result.ok ? SC.changed(product.name, labels[target]) : ADMIN_STRINGS.errors[result.error]);
     }
   };

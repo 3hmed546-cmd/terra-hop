@@ -50,6 +50,8 @@ export interface Product {
   sizes: string[];
   variants: Variant[];
   images: ProductImage[];
+  /** Server-side revision used to reject stale writes instead of overwriting newer data. */
+  revision?: number;
   createdAt: string;
   updatedAt: string;
 }

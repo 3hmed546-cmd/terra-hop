@@ -202,6 +202,9 @@ export function formToProduct(form: ProductForm, existing: Product | null, now: 
     sizes: Array.isArray(form?.sizes) ? [...form.sizes] : [],
     variants: (Array.isArray(form?.variants) ? form.variants : []).map((v) => ({ ...v })),
     images: (Array.isArray(form?.images) ? form.images : []).map((i) => ({ ...i, alt: (i.alt || "").trim() })),
+    // The server uses this value to reject an old editor tab instead of letting it
+    // overwrite a newer stock/status/price update.
+    revision: existing?.revision,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
