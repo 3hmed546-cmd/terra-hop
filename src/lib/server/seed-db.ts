@@ -3,6 +3,7 @@ import path from "path";
 import crypto from "crypto";
 import { getDb, recordChange } from "./db";
 import { hashPassword, encryptCode, hashLookupCode } from "./security";
+import { readVaultFile } from "./vault-sync";
 
 export function seedAmbassadorsIfNeeded(db: any, now = new Date().toISOString()) {
   try {
@@ -352,71 +353,68 @@ export function seedDatabaseIfNeeded(targetDb?: any, force = false): boolean {
     `);
 
     // 6. Seed Hero Carousel Placements from gallery-data.json (strictly from settings/vault)
-    const galleryFile = path.join(process.cwd(), "data", "secure-vault", "gallery-data.json");
-    if (fs.existsSync(galleryFile)) {
+    const rawGallery = readVaultFile<any[]>("gallery-data.json");
+    if (Array.isArray(rawGallery)) {
       try {
-        const rawGallery = JSON.parse(fs.readFileSync(galleryFile, "utf-8"));
-        if (Array.isArray(rawGallery)) {
-          rawGallery.forEach((item: any, idx: number) => {
-            const itemSrc = item.src || item.url;
-            if (!itemSrc) return;
-            const pseudoSha = crypto.createHash("sha256").update(itemSrc).digest("hex");
-            const existingAsset = db.prepare("SELECT id FROM assets WHERE sha256 = ?").get(pseudoSha) as { id: string } | undefined;
-            let assetId: string;
-            if (existingAsset) {
-              assetId = existingAsset.id;
-            } else {
-              assetId = `asset-hdr-${item.id || idx + 1}`;
-              insertAsset.run(assetId, pseudoSha, "image/webp", 1080, 1350, 250000, path.basename(itemSrc), now);
-            }
+        rawGallery.forEach((item: any, idx: number) => {
+          const itemSrc = item.src || item.url;
+          if (!itemSrc) return;
+          const pseudoSha = crypto.createHash("sha256").update(itemSrc).digest("hex");
+          const existingAsset = db.prepare("SELECT id FROM assets WHERE sha256 = ?").get(pseudoSha) as { id: string } | undefined;
+          let assetId: string;
+          if (existingAsset) {
+            assetId = existingAsset.id;
+          } else {
+            assetId = `asset-hdr-${item.id || idx + 1}`;
+            insertAsset.run(assetId, pseudoSha, "image/webp", 1080, 1350, 250000, path.basename(itemSrc), now);
+          }
 
-            const meta = JSON.stringify({
-              glow: item.meta?.glow || "#34445c",
-              name: item.title,
-              caption: item.meta?.caption || {
-                ar: { prefix: "تميز", accent: "بأسلوبك", sub: item.title },
-                en: { prefix: "STAND OUT", accent: "YOUR WAY", sub: item.title },
-              },
-              sourceUrl: itemSrc,
-              tag: item.tag || "هيدر كاروسيل",
-            });
-
-            const plcId = item.id ? `plc-${item.id}` : `plc-hero-${idx + 1}`;
-            insertPlacement.run(
-              plcId,
-              "hero_carousel",
-              null,
-              assetId,
-              idx + 1,
-              item.title,
-              item.title,
-              meta,
-              now
-            );
-
-            insertPlacement.run(
-              `plc-login-${item.id || idx + 1}`,
-              "login_showcase",
-              null,
-              assetId,
-              idx + 1,
-              item.title,
-              item.title,
-              meta,
-              now
-            );
+          const meta = JSON.stringify({
+            glow: item.meta?.glow || "#34445c",
+            name: item.title,
+            caption: item.meta?.caption || {
+              ar: { prefix: "تميز", accent: "بأسلوبك", sub: item.title },
+              en: { prefix: "STAND OUT", accent: "YOUR WAY", sub: item.title },
+            },
+            sourceUrl: itemSrc,
+            tag: item.tag || "هيدر كاروسيل",
           });
-        }
+
+          const rawId = item.id ? String(item.id).replace(/^plc-/, "") : `hero-${idx + 1}`;
+          const plcId = `plc-${rawId}`;
+          insertPlacement.run(
+            plcId,
+            "hero_carousel",
+            null,
+            assetId,
+            idx + 1,
+            item.title,
+            item.title,
+            meta,
+            now
+          );
+
+          insertPlacement.run(
+            `plc-login-${rawId}`,
+            "login_showcase",
+            null,
+            assetId,
+            idx + 1,
+            item.title,
+            item.title,
+            meta,
+            now
+          );
+        });
       } catch (err) {
         console.error("Failed to parse gallery-data.json for seed:", err);
       }
     }
 
     // 7. Seed Products from products-data.json
-    const productsFile = path.join(process.cwd(), "data", "secure-vault", "products-data.json");
-    if (fs.existsSync(productsFile)) {
+    const rawProducts = readVaultFile<any[]>("products-data.json");
+    if (Array.isArray(rawProducts)) {
       try {
-        const rawProducts = JSON.parse(fs.readFileSync(productsFile, "utf-8"));
         const insertProduct = db.prepare(`
           INSERT OR REPLACE INTO products (
             id, slug, name_ar, name_en, description_ar, description_en,
@@ -426,8 +424,8 @@ export function seedDatabaseIfNeeded(targetDb?: any, force = false): boolean {
         `);
 
         const insertColor = db.prepare(`
-          INSERT OR REPLACE INTO product_colors (id, product_id, name, hex, position)
-          VALUES (?, ?, ?, ?, ?)
+          INSERT OR REPLACE INTO product_colors (id, product_id, name, hex, position, image_url)
+          VALUES (?, ?, ?, ?, ?, ?)
         `);
 
         const insertVariant = db.prepare(`
@@ -458,7 +456,7 @@ export function seedDatabaseIfNeeded(targetDb?: any, force = false): boolean {
           // Colors
           if (Array.isArray(p.colors)) {
             p.colors.forEach((c: any, cIdx: number) => {
-              insertColor.run(c.id, p.id, c.name, c.hex, cIdx + 1);
+              insertColor.run(c.id, p.id, c.name, c.hex, cIdx + 1, c.image || null);
             });
           }
 

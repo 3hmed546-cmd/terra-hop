@@ -94,13 +94,25 @@ export async function DELETE(
   const { key, id } = await context.params;
   const db = getDb();
 
-  const strippedId = id.replace(/^plc-/, "");
-  const placement = db
-    .prepare("SELECT * FROM image_placements WHERE (id = ? OR asset_id = ? OR id = ? OR id = ? OR id = ?) AND slot_key = ?")
-    .get(id, id, `plc-${id}`, `plc-hero-${id}`, `plc-${strippedId}`, key) as any;
+  const strippedId = id.replace(/^plc-/, "").replace(/^login-/, "").replace(/^hero-/, "");
+  const placements = db
+    .prepare(`
+      SELECT * FROM image_placements 
+      WHERE (id = ? OR asset_id = ? OR id = ? OR id = ? OR id = ? OR id = ? OR id LIKE ?) 
+        AND (slot_key = ? OR slot_key = 'login_showcase' OR slot_key = 'hero_carousel')
+    `)
+    .all(
+      id,
+      id,
+      `plc-${id}`,
+      `plc-hero-${id}`,
+      `plc-${strippedId}`,
+      `plc-login-${strippedId}`,
+      `%${strippedId}%`,
+      key
+    ) as any[];
 
-  if (!placement) {
-    // If not found in DB, also check if it needs to be cleaned from vault directly
+  if (placements.length === 0) {
     if (key === "hero_carousel" || key === "hero_banner" || key === "login_showcase") {
       syncGalleryVault(db);
     }
@@ -111,14 +123,18 @@ export async function DELETE(
   const nextRevision = (slot?.revision || 1) + 1;
 
   db.transaction(() => {
-    db.prepare("DELETE FROM image_placements WHERE id = ?").run(placement.id);
+    for (const p of placements) {
+      db.prepare("DELETE FROM image_placements WHERE id = ?").run(p.id);
+    }
     db.prepare("UPDATE image_slots SET revision = ? WHERE key = ?").run(nextRevision, key);
   })();
 
   // Protocol B3: Read-back verification - must be gone!
-  const checkDeleted = db.prepare("SELECT id FROM image_placements WHERE id = ?").get(placement.id);
-  if (checkDeleted) {
-    return apiError("WRITE_NOT_VERIFIED", "فشل التحقق من إزالة الصورة من قاعدة البيانات.", 500);
+  for (const p of placements) {
+    const checkDeleted = db.prepare("SELECT id FROM image_placements WHERE id = ?").get(p.id);
+    if (checkDeleted) {
+      return apiError("WRITE_NOT_VERIFIED", "فشل التحقق من إزالة الصورة من قاعدة البيانات.", 500);
+    }
   }
 
   // Persist deletion to file vault so it never reappears on reload
@@ -129,15 +145,18 @@ export async function DELETE(
   }
 
   recordChange("media", "image_placements", id, nextRevision);
-  if (key === "product" && placement.owner_id) {
-    recordChange("products", "products", placement.owner_id, nextRevision);
+  for (const p of placements) {
+    if (key === "product" && p.owner_id) {
+      recordChange("products", "products", p.owner_id, nextRevision);
+    }
   }
   recordAudit({
     actor: auth.user.email,
     action: "DELETE_PLACEMENT",
     entity: "image_placements",
     entityId: id,
-    before: placement,
+    before: placements[0],
+    after: null,
   });
 
   return apiSuccess(

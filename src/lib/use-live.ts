@@ -37,7 +37,7 @@ let pollTimer: NodeJS.Timeout | null = null;
 
 async function fetchSiteData() {
   try {
-    const res = await fetch("/api/public/site", { cache: "no-store" });
+    const res = await fetch(`/api/public/site?_t=${Date.now()}`, { cache: "no-store" });
     if (res.ok) {
       const payload = await res.json();
       if (payload.ok && payload.data) {
@@ -50,7 +50,7 @@ async function fetchSiteData() {
 
 async function fetchProductsData() {
   try {
-    const res = await fetch("/api/public/products", { cache: "no-store" });
+    const res = await fetch(`/api/public/products?_t=${Date.now()}`, { cache: "no-store" });
     if (res.ok) {
       const payload = await res.json();
       if (payload.ok && payload.data) {
@@ -61,9 +61,10 @@ async function fetchProductsData() {
   } catch {}
 }
 
-function handleTopicChange(topic: Topic, newRev: number) {
-  if (state.revisions[topic] === newRev) return;
-  state.revisions[topic] = newRev;
+function handleTopicChange(topic: Topic, newRev?: number) {
+  if (typeof newRev === "number") {
+    state.revisions[topic] = newRev;
+  }
 
   if (topic === "media" || topic === "settings" || topic === "content") {
     fetchSiteData();

@@ -14,7 +14,12 @@ export async function GET(request: NextRequest) {
   const db = getDb();
 
   const products = db.prepare("SELECT * FROM products ORDER BY position ASC, created_at DESC").all() as any[];
-  const colors = db.prepare("SELECT * FROM product_colors ORDER BY position ASC").all() as any[];
+  let colors: any[] = [];
+  try {
+    colors = db.prepare("SELECT id, product_id, name, hex, position, image_url as image FROM product_colors ORDER BY position ASC").all() as any[];
+  } catch {
+    colors = db.prepare("SELECT id, product_id, name, hex, position FROM product_colors ORDER BY position ASC").all() as any[];
+  }
   const variants = db.prepare("SELECT * FROM variants").all() as any[];
   const placements = db
     .prepare(`
@@ -29,7 +34,7 @@ export async function GET(request: NextRequest) {
   const colorsByProd = new Map<string, any[]>();
   for (const c of colors) {
     const list = colorsByProd.get(c.product_id) || [];
-    list.push({ id: c.id, name: c.name, hex: c.hex });
+    list.push({ id: c.id, name: c.name, hex: c.hex, image: c.image || undefined });
     colorsByProd.set(c.product_id, list);
   }
 

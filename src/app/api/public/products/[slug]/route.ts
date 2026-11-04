@@ -18,9 +18,16 @@ export async function GET(
     return apiError("NOT_FOUND", "المنتج غير موجود أو لم يعد متاحاً.", 404);
   }
 
-  const colors = db
-    .prepare("SELECT * FROM product_colors WHERE product_id = ? ORDER BY position ASC")
-    .all(product.id) as any[];
+  let colors: any[] = [];
+  try {
+    colors = db
+      .prepare("SELECT id, product_id, name, hex, position, image_url as image FROM product_colors WHERE product_id = ? ORDER BY position ASC")
+      .all(product.id) as any[];
+  } catch {
+    colors = db
+      .prepare("SELECT id, product_id, name, hex, position FROM product_colors WHERE product_id = ? ORDER BY position ASC")
+      .all(product.id) as any[];
+  }
 
   const variants = db
     .prepare("SELECT * FROM variants WHERE product_id = ?")
@@ -55,14 +62,17 @@ export async function GET(
     id: v.id,
     colorId: v.color_id,
     size: v.size,
-    available: v.stock > 0,
-    stockStatus: v.stock <= 0 ? "sold_out" : v.stock <= 3 ? "low" : "available",
+    stock: v.stock ?? 0,
+    available: (v.stock ?? 0) > 0,
+    stockStatus: (v.stock ?? 0) <= 0 ? "sold_out" : v.stock <= 3 ? "low" : "available",
   }));
 
   let details = {};
   try {
     details = JSON.parse(product.details || "{}");
   } catch {}
+
+  const isSoldOut = product.force_sold_out === 1 || (formattedVariants.length > 0 && formattedVariants.every((v) => !v.available));
 
   const result = {
     id: product.id,
@@ -78,9 +88,10 @@ export async function GET(
     priceCents: product.price_cents,
     compareAtPrice: product.compare_at_cents ? Math.round(product.compare_at_cents / 100) : null,
     compareAtCents: product.compare_at_cents,
-    status: product.force_sold_out === 1 || formattedVariants.every((v) => !v.available) ? "sold_out" : "active",
+    status: isSoldOut ? "sold_out" : "active",
+    forceSoldOut: product.force_sold_out === 1,
     details,
-    colors: colors.map((c) => ({ id: c.id, name: c.name, hex: c.hex })),
+    colors: colors.map((c) => ({ id: c.id, name: c.name, hex: c.hex, image: c.image || undefined })),
     variants: formattedVariants,
     images,
   };
@@ -97,7 +108,7 @@ export async function GET(
     revision: product.revision,
     headers: {
       ETag: etag,
-      "Cache-Control": "public, max-age=5, stale-while-revalidate=30",
+      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
     },
   });
 }

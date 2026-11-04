@@ -20,9 +20,16 @@ export async function GET(
     return apiError("NOT_FOUND", "المنتج غير موجود.", 404);
   }
 
-  const colors = db
-    .prepare("SELECT * FROM product_colors WHERE product_id = ? ORDER BY position ASC")
-    .all(product.id) as any[];
+  let colors: any[] = [];
+  try {
+    colors = db
+      .prepare("SELECT id, product_id, name, hex, position, image_url as image FROM product_colors WHERE product_id = ? ORDER BY position ASC")
+      .all(product.id) as any[];
+  } catch {
+    colors = db
+      .prepare("SELECT id, product_id, name, hex, position FROM product_colors WHERE product_id = ? ORDER BY position ASC")
+      .all(product.id) as any[];
+  }
 
   const variants = db
     .prepare("SELECT * FROM variants WHERE product_id = ?")
@@ -168,20 +175,58 @@ export async function PATCH(
     );
 
     // Update colors if provided
-    if (Array.isArray(body.colors) && body.colors.length > 0) {
+    if (Array.isArray(body.colors)) {
       db.prepare("DELETE FROM product_colors WHERE product_id = ?").run(product.id);
-      const insColor = db.prepare("INSERT INTO product_colors (id, product_id, name, hex, position) VALUES (?, ?, ?, ?, ?)");
+      const insColor = db.prepare("INSERT INTO product_colors (id, product_id, name, hex, position, image_url) VALUES (?, ?, ?, ?, ?, ?)");
       body.colors.forEach((c: any, idx: number) => {
-        insColor.run(c.id, product.id, c.name, c.hex, idx + 1);
+        insColor.run(c.id, product.id, c.name, c.hex, idx + 1, c.image || null);
       });
     }
 
     // Update variants if provided
-    if (Array.isArray(body.variants) && body.variants.length > 0) {
+    if (Array.isArray(body.variants)) {
       db.prepare("DELETE FROM variants WHERE product_id = ?").run(product.id);
       const insVariant = db.prepare("INSERT INTO variants (id, product_id, color_id, size, stock) VALUES (?, ?, ?, ?, ?)");
       body.variants.forEach((v: any) => {
         insVariant.run(v.id || `var_${crypto.randomUUID()}`, product.id, v.colorId, v.size, v.stock ?? 10);
+      });
+    }
+
+    // Update images if provided
+    if (Array.isArray(body.images)) {
+      db.prepare("DELETE FROM image_placements WHERE slot_key = 'product' AND owner_id = ?").run(product.id);
+      const insertAsset = db.prepare(`
+        INSERT OR IGNORE INTO assets (id, sha256, mime, width, height, bytes, original_name, created_at, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'admin')
+      `);
+      const insertPlacement = db.prepare(`
+        INSERT INTO image_placements (id, slot_key, owner_id, asset_id, position, alt_ar, alt_en, meta, active, created_at)
+        VALUES (?, 'product', ?, ?, ?, ?, ?, ?, 1, ?)
+      `);
+
+      body.images.forEach((img: any, imgIdx: number) => {
+        const imgUrl = typeof img === "string" ? img : img.url;
+        if (!imgUrl) return;
+        const pSha = crypto.createHash("sha256").update(imgUrl).digest("hex");
+        const existingAsset = db.prepare("SELECT id FROM assets WHERE sha256 = ?").get(pSha) as { id: string } | undefined;
+        let assetId: string;
+        if (existingAsset) {
+          assetId = existingAsset.id;
+        } else {
+          assetId = `asset-prod-${product.id}-${imgIdx + 1}`;
+          insertAsset.run(assetId, pSha, "image/webp", 1000, 1000, 150000, `product-${product.id}-${imgIdx + 1}`, now);
+        }
+        const plcId = img.id && !img.id.startsWith("img-") ? img.id : `plc-prod-${product.id}-${imgIdx + 1}`;
+        insertPlacement.run(
+          plcId,
+          product.id,
+          assetId,
+          imgIdx + 1,
+          img.alt || product.name_ar,
+          img.alt || product.name_en || product.name_ar,
+          JSON.stringify({ sourceUrl: imgUrl }),
+          now
+        );
       });
     }
   })();
@@ -192,6 +237,7 @@ export async function PATCH(
   const updated = db.prepare("SELECT * FROM products WHERE id = ?").get(product.id) as any;
 
   recordChange("products", "products", product.id, nextRevision);
+  recordChange("media", "image_placements", product.id, nextRevision);
   recordAudit({
     actor: auth.user.email,
     action: "UPDATE_PRODUCT",

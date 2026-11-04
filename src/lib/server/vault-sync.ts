@@ -1,32 +1,84 @@
 import fs from "fs";
 import path from "path";
 import type Database from "better-sqlite3";
+import { getBaseStorageDir } from "./db";
 
-const VAULT_DIR = path.join(process.cwd(), "data", "secure-vault");
+const REPO_VAULT_DIR = path.join(process.cwd(), "data", "secure-vault");
 
-function ensureVaultDir() {
-  if (!fs.existsSync(VAULT_DIR)) {
-    fs.mkdirSync(VAULT_DIR, { recursive: true });
+function getStorageVaultDir(): string {
+  return path.join(getBaseStorageDir(), "vault");
+}
+
+function writeToAllVaultDirs(fileName: string, content: string) {
+  // 1. Storage directory (always writable, e.g. /tmp/terra-storage/vault on Vercel)
+  try {
+    const storageVault = getStorageVaultDir();
+    if (!fs.existsSync(storageVault)) {
+      fs.mkdirSync(storageVault, { recursive: true });
+    }
+    fs.writeFileSync(path.join(storageVault, fileName), content, "utf-8");
+  } catch (err) {
+    console.error(`Failed to write ${fileName} to storage vault:`, err);
+  }
+
+  // 2. Repo directory (writable in local dev / persistent server)
+  try {
+    if (!fs.existsSync(REPO_VAULT_DIR)) {
+      fs.mkdirSync(REPO_VAULT_DIR, { recursive: true });
+    }
+    fs.writeFileSync(path.join(REPO_VAULT_DIR, fileName), content, "utf-8");
+  } catch {
+    // Expected on read-only serverless filesystems (e.g. AWS Lambda / Vercel production container)
   }
 }
 
 /**
- * Authoritative synchronization of products from SQLite to data/secure-vault/products-data.json
+ * Reads vault file checking writable storage first, then falling back to repo bundled copy
+ */
+export function readVaultFile<T = any>(fileName: string): T | null {
+  // Check storage vault first
+  try {
+    const storagePath = path.join(getStorageVaultDir(), fileName);
+    if (fs.existsSync(storagePath)) {
+      const data = JSON.parse(fs.readFileSync(storagePath, "utf-8"));
+      if (data !== undefined && data !== null) return data;
+    }
+  } catch {}
+
+  // Fallback to repo bundled vault
+  try {
+    const repoPath = path.join(REPO_VAULT_DIR, fileName);
+    if (fs.existsSync(repoPath)) {
+      const data = JSON.parse(fs.readFileSync(repoPath, "utf-8"));
+      if (data !== undefined && data !== null) return data;
+    }
+  } catch {}
+
+  return null;
+}
+
+/**
+ * Authoritative synchronization of products from SQLite to products-data.json
  * Guarantees that any product mutation (prices, status, sold out, images, sizes, colors)
  * persists across serverless container restarts and deployments.
  */
 export function syncProductsVault(db: Database.Database): void {
   try {
-    ensureVaultDir();
-    const vaultPath = path.join(VAULT_DIR, "products-data.json");
-
     const products = db
       .prepare("SELECT * FROM products ORDER BY position ASC, created_at DESC")
       .all() as any[];
 
-    const colors = db
-      .prepare("SELECT * FROM product_colors ORDER BY position ASC")
-      .all() as any[];
+    // Check if image_url column exists in product_colors
+    let colors: any[] = [];
+    try {
+      colors = db
+        .prepare("SELECT id, product_id, name, hex, position, image_url FROM product_colors ORDER BY position ASC")
+        .all() as any[];
+    } catch {
+      colors = db
+        .prepare("SELECT id, product_id, name, hex, position FROM product_colors ORDER BY position ASC")
+        .all() as any[];
+    }
 
     const variants = db
       .prepare("SELECT * FROM variants")
@@ -45,7 +97,7 @@ export function syncProductsVault(db: Database.Database): void {
     const colorsByProd = new Map<string, any[]>();
     for (const c of colors) {
       const list = colorsByProd.get(c.product_id) || [];
-      list.push({ id: c.id, name: c.name, hex: c.hex });
+      list.push({ id: c.id, name: c.name, hex: c.hex, image: c.image_url || undefined });
       colorsByProd.set(c.product_id, list);
     }
 
@@ -108,21 +160,18 @@ export function syncProductsVault(db: Database.Database): void {
       };
     });
 
-    fs.writeFileSync(vaultPath, JSON.stringify(vaultProducts, null, 2), "utf-8");
+    writeToAllVaultDirs("products-data.json", JSON.stringify(vaultProducts, null, 2));
   } catch (err) {
     console.error("Failed to sync products to secure vault:", err);
   }
 }
 
 /**
- * Authoritative synchronization of hero & header images from SQLite to data/secure-vault/gallery-data.json
+ * Authoritative synchronization of hero & header images from SQLite to gallery-data.json
  * Guarantees that deleted images never reappear on refresh or server restart.
  */
 export function syncGalleryVault(db: Database.Database): void {
   try {
-    ensureVaultDir();
-    const vaultPath = path.join(VAULT_DIR, "gallery-data.json");
-
     const placements = db
       .prepare(`
         SELECT p.*, a.sha256
@@ -153,7 +202,7 @@ export function syncGalleryVault(db: Database.Database): void {
       };
     });
 
-    fs.writeFileSync(vaultPath, JSON.stringify(galleryItems, null, 2), "utf-8");
+    writeToAllVaultDirs("gallery-data.json", JSON.stringify(galleryItems, null, 2));
   } catch (err) {
     console.error("Failed to sync gallery to secure vault:", err);
   }

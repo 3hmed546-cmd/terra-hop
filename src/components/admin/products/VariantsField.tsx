@@ -19,10 +19,11 @@ export function VariantsField({ form, onChange, errors }: Props) {
   const safeSizes = Array.isArray(form?.sizes) ? form.sizes : [];
   const safeColors = Array.isArray(form?.colors) ? form.colors : [];
   const safeVariants = Array.isArray(form?.variants) ? form.variants : [];
+  const safeImages = Array.isArray(form?.images) ? form.images : [];
 
   const rowTotal = (colorId: string) => safeVariants.filter((v) => v.colorId === colorId).reduce((s, v) => s + v.stock, 0);
 
-  const setColor = (id: string, patch: Partial<{ name: string; hex: string }>) =>
+  const setColor = (id: string, patch: Partial<{ name: string; hex: string; image?: string }>) =>
     onChange(withGrid(form, { colors: safeColors.map((c) => (c.id === id ? { ...c, ...patch } : c)) }));
 
   return (
@@ -31,7 +32,7 @@ export function VariantsField({ form, onChange, errors }: Props) {
         <legend className="adm-field-label">{V.colorsLegend}</legend>
         <div className="adm-stack">
           {form.colors.map((c, i) => (
-            <div key={c.id} className="adm-color-row">
+            <div key={c.id} className="adm-color-row" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.5rem" }}>
               <input
                 type="color"
                 className="adm-color-input"
@@ -47,6 +48,26 @@ export function VariantsField({ form, onChange, errors }: Props) {
                 maxLength={40}
                 onChange={(e) => setColor(c.id, { name: e.target.value })}
               />
+              {safeImages.length > 0 && (
+                <select
+                  aria-label="صورة اللون"
+                  className="adm-select"
+                  style={{ fontSize: "0.75rem", padding: "0.4rem 0.6rem", borderRadius: "0.375rem", maxWidth: "200px" }}
+                  value={c.image || ""}
+                  onChange={(e) => setColor(c.id, { image: e.target.value || undefined })}
+                  title="صورة هذا اللون عند اختيار العميل له"
+                >
+                  <option value="">صورة اللون: افتراضية (الغلاف)</option>
+                  {safeImages.map((img, imgIdx) => {
+                    const imgUrl = typeof img === "string" ? img : img.url;
+                    return (
+                      <option key={img.id || imgIdx} value={imgUrl}>
+                        صورة {imgIdx + 1}: {img.alt || `صورة ${imgIdx + 1}`}
+                      </option>
+                    );
+                  })}
+                </select>
+              )}
               <Button
                 variant="ghost"
                 aria-label={V.removeColor(c.name)}

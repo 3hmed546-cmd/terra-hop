@@ -13,7 +13,12 @@ export async function GET(request: NextRequest) {
     .prepare("SELECT * FROM products WHERE status = 'active' ORDER BY position ASC, created_at DESC")
     .all() as any[];
 
-  const colors = db.prepare("SELECT * FROM product_colors ORDER BY position ASC").all() as any[];
+  let colors: any[] = [];
+  try {
+    colors = db.prepare("SELECT id, product_id, name, hex, position, image_url as image FROM product_colors ORDER BY position ASC").all() as any[];
+  } catch {
+    colors = db.prepare("SELECT id, product_id, name, hex, position FROM product_colors ORDER BY position ASC").all() as any[];
+  }
   const variants = db.prepare("SELECT * FROM variants").all() as any[];
   const placements = db
     .prepare(`
@@ -28,7 +33,7 @@ export async function GET(request: NextRequest) {
   const colorsByProd = new Map<string, any[]>();
   for (const c of colors) {
     const list = colorsByProd.get(c.product_id) || [];
-    list.push({ id: c.id, name: c.name, hex: c.hex });
+    list.push({ id: c.id, name: c.name, hex: c.hex, image: c.image || undefined });
     colorsByProd.set(c.product_id, list);
   }
 
@@ -39,8 +44,9 @@ export async function GET(request: NextRequest) {
       id: v.id,
       colorId: v.color_id,
       size: v.size,
-      available: v.stock > 0,
-      stockStatus: v.stock <= 0 ? "sold_out" : v.stock <= 3 ? "low" : "available",
+      stock: v.stock ?? 0,
+      available: (v.stock ?? 0) > 0,
+      stockStatus: (v.stock ?? 0) <= 0 ? "sold_out" : v.stock <= 3 ? "low" : "available",
     });
     variantsByProd.set(v.product_id, list);
   }
@@ -72,7 +78,7 @@ export async function GET(request: NextRequest) {
 
     const prodVariants = variantsByProd.get(p.id) || [];
     const isSoldOut =
-      p.force_sold_out === 1 || prodVariants.every((v) => !v.available);
+      p.force_sold_out === 1 || (prodVariants.length > 0 && prodVariants.every((v) => !v.available));
 
     return {
       id: p.id,
@@ -89,6 +95,8 @@ export async function GET(request: NextRequest) {
       compareAtPrice: p.compare_at_cents ? Math.round(p.compare_at_cents / 100) : null,
       compareAtCents: p.compare_at_cents,
       status: isSoldOut ? "sold_out" : "active",
+      forceSoldOut: p.force_sold_out === 1,
+      isSoldOut,
       details,
       position: p.position,
       colors: colorsByProd.get(p.id) || [],
@@ -110,7 +118,7 @@ export async function GET(request: NextRequest) {
     revision: latestRev,
     headers: {
       ETag: etag,
-      "Cache-Control": "public, max-age=5, stale-while-revalidate=30",
+      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
     },
   });
   } catch (error: any) {

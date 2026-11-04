@@ -172,6 +172,7 @@ function initializeSchema(db: Database.Database): void {
       name TEXT,
       hex TEXT,
       position INTEGER,
+      image_url TEXT,
       PRIMARY KEY (product_id, id)
     );
 
@@ -515,6 +516,12 @@ function initializeSchema(db: Database.Database): void {
     } catch {
       /* Column already exists */
     }
+  }
+
+  try {
+    db.exec("ALTER TABLE product_colors ADD COLUMN image_url TEXT;");
+  } catch {
+    /* Column already exists */
   }
 
   // Seed default ambassador levels & rewards if missing

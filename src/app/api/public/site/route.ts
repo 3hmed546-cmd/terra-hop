@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
       revision: latestRev,
       headers: {
         ETag: etag,
-        "Cache-Control": "public, max-age=5, stale-while-revalidate=30",
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
       },
     });
   } catch (error: any) {

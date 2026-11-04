@@ -9,6 +9,8 @@ export interface ColorOption {
   id: string;
   name: string;
   hex: string;
+  image?: string;
+  imageUrl?: string;
 }
 
 export interface Variant {

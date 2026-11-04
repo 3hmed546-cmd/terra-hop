@@ -37,17 +37,6 @@ type Props = {
   allProducts?: Product[];
 };
 
-export const HOODIE_COLORS = [
-  { id: "dusty-blue", name: "أزرق سماوي", hex: "#5A82A6", image: "/login-hoodies/hoodie-dusty-blue.webp" },
-  { id: "burgundy", name: "عنابي مارون", hex: "#7B1824", image: "/products/burgundy-hoodie-model.jpg" },
-  { id: "black", name: "أسود أوبسيديان", hex: "#111111", image: "/products/black-hoodie-model.jpg" },
-  { id: "cream", name: "كريمي أوف وايت", hex: "#F4F1EB", image: "/products/cream-hoodie-model.jpg" },
-  { id: "forest", name: "أخضر زمردي", hex: "#1E392A", image: "/products/forest-hoodie-model.jpg" },
-  { id: "mocha", name: "بني موكا", hex: "#4A3728", image: "/products/brown-hoodie-model.jpg" },
-  { id: "navy", name: "كحلي ليلي", hex: "#172439", image: "/products/navy-hoodie-model.jpg" },
-  { id: "charcoal", name: "رمادي فحمي", hex: "#38393D", image: "/login-hoodies/hoodie-charcoal.webp" },
-];
-
 export function ProductDetailView({ product, allProducts = [] }: Props) {
   const router = useRouter();
   const { add } = useCart();
@@ -82,16 +71,39 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
     ? matchedAdmin.forceSoldOut === true || matchedAdmin.status === "sold_out"
     : product.status === "Sold out" || product.status === "sold_out";
 
-  // Color selection state & matching image
+  // Product colors strictly from admin data or product configuration
+  const productColors = useMemo(() => {
+    if (matchedAdmin?.colors && Array.isArray(matchedAdmin.colors) && matchedAdmin.colors.length > 0) {
+      return matchedAdmin.colors;
+    }
+    if ((product as any).colors && Array.isArray((product as any).colors) && (product as any).colors.length > 0) {
+      return (product as any).colors;
+    }
+    return [];
+  }, [matchedAdmin?.colors, (product as any).colors]);
+
   const [selectedColor, setSelectedColor] = useState<any>(() => {
-    const found = HOODIE_COLORS.find(
-      (c) =>
-        product.slug.includes(c.id) ||
-        (product.description && product.description.includes(c.name))
-    );
-    return found || HOODIE_COLORS[0];
+    return productColors.length > 0 ? productColors[0] : null;
   });
   const [customActiveImage, setCustomActiveImage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (productColors.length > 0) {
+      if (!selectedColor || !productColors.some((c: any) => c.id === selectedColor.id)) {
+        setSelectedColor(productColors[0]);
+      }
+    }
+  }, [productColors, selectedColor]);
+
+  const isColorOutOfStock = (colorId: string) => {
+    if (isSoldOut) return true;
+    if (!matchedAdmin?.variants || !Array.isArray(matchedAdmin.variants) || matchedAdmin.variants.length === 0) {
+      return false;
+    }
+    const colorVariants = matchedAdmin.variants.filter((v: any) => String(v.colorId) === String(colorId));
+    if (colorVariants.length === 0) return false;
+    return colorVariants.every((v: any) => (v.stock ?? 0) <= 0 || v.available === false);
+  };
 
   // Keep index within bounds if shots change
   useEffect(() => {
@@ -106,24 +118,51 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
   const [showSizeGuide, setShowSizeGuide] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // Determine which sizes are available vs out-of-stock (with X mark)
-  const availableSizes = useMemo(() => {
+  // Sizes to display: from admin product configuration or defaults
+  const displaySizes = useMemo<string[]>(() => {
+    if (matchedAdmin?.sizes && Array.isArray(matchedAdmin.sizes) && matchedAdmin.sizes.length > 0) {
+      return Array.from(new Set<string>(matchedAdmin.sizes.map((s: string) => String(s).toUpperCase())));
+    }
     if (matchedAdmin?.variants && Array.isArray(matchedAdmin.variants) && matchedAdmin.variants.length > 0) {
-      const active = matchedAdmin.variants
-        .filter((v: any) => v.stock > 0 && v.available !== false)
+      const list = Array.from(new Set<string>(matchedAdmin.variants.map((v: any) => String(v.size || "").toUpperCase()))).filter(Boolean);
+      if (list.length > 0) return list;
+    }
+    const base: readonly string[] = product.sizes && product.sizes.length > 0 ? product.sizes : ["S", "M", "L", "XL", "XXL"];
+    return Array.from(new Set<string>(base.map((s) => String(s).toUpperCase())));
+  }, [matchedAdmin?.sizes, matchedAdmin?.variants, product.sizes]);
+
+  // Determine which sizes are available vs out-of-stock (with X mark) for selected color
+  const availableSizes = useMemo(() => {
+    if (isSoldOut) return new Set<string>();
+
+    if (matchedAdmin?.variants && Array.isArray(matchedAdmin.variants) && matchedAdmin.variants.length > 0) {
+      const scopedVariants = selectedColor
+        ? matchedAdmin.variants.filter((v: any) => String(v.colorId) === String(selectedColor.id))
+        : matchedAdmin.variants;
+
+      const active = (scopedVariants.length > 0 ? scopedVariants : matchedAdmin.variants)
+        .filter((v: any) => {
+          const stock = typeof v.stock === "number" ? v.stock : 0;
+          return stock > 0 && v.available !== false;
+        })
         .map((v: any) => String(v.size).toUpperCase());
+
       return new Set(active);
     }
-    if (matchedAdmin?.sizes && Array.isArray(matchedAdmin.sizes) && matchedAdmin.sizes.length > 0) {
-      return new Set(matchedAdmin.sizes.map((s: string) => String(s).toUpperCase()));
-    }
-    return new Set((product.sizes || ["S", "M", "L", "XL", "XXL"]).map((s) => String(s).toUpperCase()));
-  }, [matchedAdmin, product.sizes]);
 
-  const displaySizes = useMemo(() => {
-    const base = product.sizes && product.sizes.length > 0 ? product.sizes : ["S", "M", "L", "XL", "XXL"];
-    return Array.from(new Set(base.map((s) => String(s).toUpperCase())));
-  }, [product.sizes]);
+    return new Set(displaySizes);
+  }, [matchedAdmin?.variants, selectedColor, displaySizes, isSoldOut]);
+
+  // Auto-select first available size when availableSizes changes
+  useEffect(() => {
+    if (selectedSize && !availableSizes.has(selectedSize)) {
+      const firstAvail = displaySizes.find((s) => availableSizes.has(s));
+      setSelectedSize(firstAvail || null);
+    } else if (!selectedSize && availableSizes.size > 0) {
+      const firstAvail = displaySizes.find((s) => availableSizes.has(s));
+      if (firstAvail) setSelectedSize(firstAvail);
+    }
+  }, [availableSizes, displaySizes, selectedSize]);
 
   // Accordion open states
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
@@ -323,48 +362,58 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
             )}
           </div>
 
-          {/* Color Selection Section */}
-          <div className="pt-2 pb-1 border-b border-line-light">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-bold text-obsidian flex items-center gap-1.5">
-                <span>{locale === "ar" ? "اللون:" : "Color:"}</span>
-                <span className="text-stone-600 font-semibold text-xs">
-                  {selectedColor?.name || "اللون المختار"}
+          {/* Color Selection Section (Swatches Only - No text names inside buttons) */}
+          {productColors.length > 0 && (
+            <div className="pt-2 pb-1 border-b border-line-light">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-bold text-obsidian flex items-center gap-1.5">
+                  <span>{locale === "ar" ? "اللون:" : "Color:"}</span>
+                  <span className="text-stone-600 font-semibold text-xs">
+                    {selectedColor?.name || ""}
+                  </span>
                 </span>
-              </span>
+              </div>
+              <div role="group" aria-label="Select Color" className="flex flex-wrap items-center gap-2.5 mb-3">
+                {productColors.map((c: any) => {
+                  const isSelected = selectedColor?.id === c.id;
+                  const outOfStock = isColorOutOfStock(c.id);
+                  const colorHex = /^#[0-9a-fA-F]{6}$/.test(c.hex) ? c.hex : "#080808";
+
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      disabled={outOfStock}
+                      onClick={() => {
+                        if (outOfStock) return;
+                        setSelectedColor(c);
+                        if (c.image) {
+                          setCustomActiveImage(c.image);
+                          const idx = shots.findIndex((s: any) => s.src === c.image);
+                          if (idx !== -1) setActiveImageIndex(idx);
+                        } else {
+                          setCustomActiveImage(null);
+                        }
+                      }}
+                      title={`${c.name || "لون"}${outOfStock ? (locale === "ar" ? " (غير متوفر)" : " (Out of Stock)") : ""}`}
+                      className={`relative w-8 h-8 rounded-full transition-all duration-150 flex items-center justify-center cursor-pointer ${
+                        isSelected
+                          ? "ring-2 ring-offset-2 ring-stone-900 scale-110 shadow-sm"
+                          : "hover:scale-105 shadow-2xs border border-black/20"
+                      } ${outOfStock ? "opacity-40 cursor-not-allowed hover:scale-100" : ""}`}
+                      style={{ backgroundColor: colorHex }}
+                    >
+                      {outOfStock && (
+                        <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <span className="w-[125%] h-[2px] bg-red-600 -rotate-45 transform origin-center shadow-xs" />
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <div role="group" aria-label="Select Color" className="flex flex-wrap gap-2 mb-3">
-              {HOODIE_COLORS.map((c) => {
-                const isSelected = selectedColor?.id === c.id;
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedColor(c);
-                      if (c.image) {
-                        setCustomActiveImage(c.image);
-                        const idx = shots.findIndex((s: any) => s.src === c.image);
-                        if (idx !== -1) setActiveImageIndex(idx);
-                      }
-                    }}
-                    title={c.name}
-                    className={`h-9 px-3 rounded-lg border text-xs font-bold transition-all duration-150 cursor-pointer flex items-center gap-2 ${
-                      isSelected
-                        ? "border-stone-900 bg-stone-900 text-white shadow-sm scale-102"
-                        : "border-stone-200 bg-white text-stone-800 hover:border-stone-400 shadow-2xs"
-                    }`}
-                  >
-                    <span
-                      className="w-3.5 h-3.5 rounded-full border border-black/20 shrink-0"
-                      style={{ backgroundColor: c.hex }}
-                    />
-                    <span>{c.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          )}
 
           {/* Size Selection Section (Reference Image 4: Testatoro style) */}
           <div className="pt-2">
@@ -470,20 +519,20 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
           {/* Action Buttons: Add to Cart (Top) & Buy Now (Bottom) OR Sold-Out WhatsApp Invite */}
           <div ref={actionsRef} className="pt-2">
             {isSoldOut ? (
-              <div className="rounded-xl border border-stone-800 bg-stone-900 text-white p-5 space-y-3.5 shadow-lg" dir="rtl">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-red-600/30 text-red-400 flex items-center justify-center font-bold text-base shrink-0">
+              <div className="rounded-2xl border-2 border-stone-900 bg-[#F4F1EB] p-5 sm:p-6 space-y-4 shadow-sm" dir="rtl">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-full bg-stone-900 text-white flex items-center justify-center font-black text-lg shrink-0">
                     ✕
                   </div>
                   <div>
-                    <h3 className="font-extrabold text-sm sm:text-base text-white">هذا المنتج نفذ من المخزن حالياً</h3>
-                    <p className="text-[11px] sm:text-xs text-stone-300 mt-0.5">الكميات المتاحة انتهت بالكامل وجاري إنتاج الدفعة القادمة.</p>
+                    <h3 className="font-extrabold text-base sm:text-lg text-stone-900">هذا المنتج نفذ من المخزن حالياً</h3>
+                    <p className="text-xs text-stone-600 font-medium mt-0.5">الكميات المتاحة انتهت بالكامل وجاري إنتاج الدفعة القادمة.</p>
                   </div>
                 </div>
 
-                <p className="text-xs text-stone-300 leading-relaxed bg-black/40 p-3 rounded-lg border border-stone-800">
-                  انضم إلى جروب الواتساب الخاص بمتجر TERRA HOP لتكون أول من يعلم عند فتح الحجز وإعادة توفر المقاسات الجديدة وتطلبها فوراً.
-                </p>
+                <div className="text-xs text-stone-700 leading-relaxed bg-white p-3.5 rounded-xl border border-stone-200 font-medium">
+                  انضم إلى مجتمع TERRA HOP على الواتساب لتكون أول من يعلم عند فتح باب الحجز وإعادة توفر هذا الهودي وطلب مقاسك فوراً.
+                </div>
 
                 <a
                   href={`https://wa.me/201285694670?text=${encodeURIComponent(
@@ -491,9 +540,9 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
                   )}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg py-3 px-4 font-bold text-xs sm:text-sm bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow-md cursor-pointer"
+                  className="w-full inline-flex items-center justify-center gap-2.5 rounded-xl py-3.5 px-4 font-bold text-xs sm:text-sm bg-stone-900 hover:bg-black text-white transition-all shadow-md cursor-pointer hover:scale-[1.01]"
                 >
-                  <Phone className="w-4 h-4 fill-current" />
+                  <Phone className="w-4 h-4 fill-current text-emerald-400" />
                   <span>انضم لجروب الواتساب لتصلك تنبيهات التوفر</span>
                 </a>
               </div>
@@ -950,7 +999,7 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
                   )}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="shrink-0 rounded-xl px-4 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md transition"
+                  className="shrink-0 rounded-xl px-4 py-2 text-xs font-bold bg-stone-900 hover:bg-black text-white shadow-md transition"
                 >
                   نفذ - راسلنا واتساب
                 </a>
