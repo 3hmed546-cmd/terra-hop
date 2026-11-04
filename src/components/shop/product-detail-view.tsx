@@ -30,6 +30,8 @@ import { useCart } from "@/lib/cart";
 import { useLocale } from "@/lib/locale-context";
 import { StatusLabel } from "@/components/ui/status-label";
 import { useLive } from "@/lib/use-live";
+import { WhatsAppIcon } from "@/components/ui/social-icons";
+import { home } from "@/content/home";
 import type { Product } from "@/content/home";
 
 type Props = {
@@ -114,7 +116,7 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
 
   // Size selection and availability
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
-  const [actionStatus, setActionStatus] = useState<"idle" | "error" | "added">("idle");
+  const [actionStatus, setActionStatus] = useState<"idle" | "error" | "added" | "copied">("idle");
   const [showSizeGuide, setShowSizeGuide] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
@@ -511,6 +513,19 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
                 </span>
               </div>
             )}
+
+            {/* Copied Alert if enquiry message copied */}
+            {actionStatus === "copied" && (
+              <div
+                className="mt-3 flex items-center gap-2.5 rounded-xl border px-4 py-3 text-xs sm:text-sm font-bold shadow-xs"
+                style={{ backgroundColor: "#ecfdf5", borderColor: "#a7f3d0", color: "#047857" }}
+              >
+                <Check className="h-4 w-4 shrink-0" style={{ color: "#059669" }} />
+                <span style={{ color: "#047857" }}>
+                  تم نسخ رسالة الاستفسار تلقائياً! يمكنك لصقها وإرسالها بالجروب بعد الانضمام.
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Action Buttons: Add to Cart (Top) & Buy Now (Bottom) OR Sold-Out WhatsApp Invite */}
@@ -528,19 +543,24 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
                 </div>
 
                 <div className="text-xs text-stone-700 leading-relaxed bg-white p-3.5 rounded-xl border border-stone-200 font-medium">
-                  انضم إلى مجتمع TERRA HOP على الواتساب لتكون أول من يعلم عند فتح باب الحجز وإعادة توفر هذا الهودي وطلب مقاسك فوراً.
+                  انضم إلى مجتمع TERRA HOP على الواتساب لتكون أول من يعلم عند فتح باب الحجز وإعادة توفر هذا الهودي ومتابعة كل جديد. يتم نسخ رسالة الاستفسار تلقائياً لإرسالها بالجروب.
                 </div>
 
                 <a
-                  href={`https://wa.me/201285694670?text=${encodeURIComponent(
-                    `مرحباً TERRA HOP، أود الانضمام لجروب الواتساب ومعرفة موعد توفر هودي "${localizedName}".`
-                  )}`}
+                  href={home.signup.whatsappGroupUrl}
                   target="_blank"
                   rel="noreferrer"
+                  onClick={() => {
+                    try {
+                      navigator.clipboard.writeText(`مرحباً TERRA HOP، أود معرفة موعد إعادة توفر هودي "${localizedName}".`);
+                      setActionStatus("copied");
+                      setTimeout(() => setActionStatus("idle"), 4500);
+                    } catch (_) {}
+                  }}
                   className="w-full inline-flex items-center justify-center gap-2.5 rounded-xl py-3.5 px-4 font-bold text-xs sm:text-sm bg-stone-900 hover:bg-black text-white transition-all shadow-md cursor-pointer hover:scale-[1.01]"
                 >
-                  <Phone className="w-4 h-4 fill-current text-emerald-400" />
-                  <span>انضم لجروب الواتساب لتصلك تنبيهات التوفر</span>
+                  <WhatsAppIcon className="w-5 h-5 fill-current text-emerald-400" />
+                  <span>انضم لجروب الواتساب لمتابعة التوفر</span>
                 </a>
               </div>
             ) : (
@@ -991,14 +1011,20 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
 
               {isSoldOut ? (
                 <a
-                  href={`https://wa.me/201285694670?text=${encodeURIComponent(
-                    `مرحباً TERRA HOP، أود الاستفسار عن موعد توفر هودي "${localizedName}".`
-                  )}`}
+                  href={home.signup.whatsappGroupUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="shrink-0 rounded-xl px-4 py-2 text-xs font-bold bg-stone-900 hover:bg-black text-white shadow-md transition"
+                  onClick={() => {
+                    try {
+                      navigator.clipboard.writeText(`مرحباً TERRA HOP، أود معرفة موعد إعادة توفر هودي "${localizedName}".`);
+                      setActionStatus("copied");
+                      setTimeout(() => setActionStatus("idle"), 4500);
+                    } catch (_) {}
+                  }}
+                  className="shrink-0 inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold bg-stone-900 hover:bg-black text-white shadow-md transition"
                 >
-                  نفذ - راسلنا واتساب
+                  <WhatsAppIcon className="w-4 h-4 fill-current text-emerald-400" />
+                  <span>انضم للجروب</span>
                 </a>
               ) : (
                 <button

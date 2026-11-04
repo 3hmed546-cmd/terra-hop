@@ -6,15 +6,59 @@ import { Play, Pause } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { ButtonLink } from "@/components/ui/button";
 import { AnimatedLogo } from "@/components/motion/animated-logo";
-import { loginHoodieIntervalMs, type LoginHoodie } from "@/content/login-hoodies";
+import { loginHoodieIntervalMs } from "@/content/login-hoodies";
 import { useLive } from "@/lib/use-live";
 import { useLocale } from "@/lib/locale-context";
 import type { home } from "@/content/home";
+
+export const HERO_CAPTIONS = [
+  {
+    ar: { prefix: "تميز", accent: "بأسلوبك", sub: "أصالة ستريت وير مصرية بهوية عصرية" },
+    en: { prefix: "STAND", accent: "OUT", sub: "Egyptian streetwear culture redefined" },
+  },
+  {
+    ar: { prefix: "صُنِع", accent: "ليعبر عنك", sub: "تفاصيل استثنائية وخامة قطن مصري فاخر 100%" },
+    en: { prefix: "CRAFTED", accent: "FOR YOU", sub: "100% premium Egyptian combed cotton" },
+  },
+  {
+    ar: { prefix: "طاقة", accent: "الشارع", sub: "قصات أوفرسايز مريحة مستوحاة من ثقافة المدن" },
+    en: { prefix: "STREET", accent: "ENERGY", sub: "Effortless oversized urban silhouettes" },
+  },
+  {
+    ar: { prefix: "إطلالة", accent: "جريئة", sub: "طباعة ثلاثية الأبعاد باف برينت مجسمة ومتقنة" },
+    en: { prefix: "BOLD", accent: "IDENTITY", sub: "Bespoke 3D puff print & drop-shoulder cuts" },
+  },
+  {
+    ar: { prefix: "راحة", accent: "بلا حدود", sub: "نسيج ثقيل ودافئ صُمم خصيصاً لأيام الشتاء" },
+    en: { prefix: "PURE", accent: "COMFORT", sub: "Ultra-heavyweight fleece crafted for warmth" },
+  },
+  {
+    ar: { prefix: "حضور", accent: "استثنائي", sub: "إصدارات حصرية وقطع فريدة لكل يوم" },
+    en: { prefix: "ICONIC", accent: "PRESENCE", sub: "Curated seasonal drops in limited batches" },
+  },
+  {
+    ar: { prefix: "أسلوب", accent: "الجيل الجديد", sub: "ملابس شوارع تصنع الفارق في كل تفصيلة" },
+    en: { prefix: "NEXT", accent: "GEN", sub: "Streetwear that reflects who you truly are" },
+  },
+  {
+    ar: { prefix: "جودة", accent: "تدوم", sub: "حياكة معززة وألوان ثابتة تدوم طويلاً" },
+    en: { prefix: "BUILT", accent: "TO LAST", sub: "Reinforced tailoring and long-lasting dyes" },
+  },
+  {
+    ar: { prefix: "أناقة", accent: "عصرية", sub: "توازن مثالي بين الراحة المطلقة والأناقة المعاصرة" },
+    en: { prefix: "EFFORTLESS", accent: "STYLE", sub: "Modern street poise with effortless attitude" },
+  },
+  {
+    ar: { prefix: "انضم", accent: "لمجتمعنا", sub: "عائلة TERRA HOP تكبر في كل مكان" },
+    en: { prefix: "JOIN", accent: "THE MOVEMENT", sub: "The TERRA HOP lifestyle across Egypt" },
+  },
+];
 
 type HeroProps = { hero: typeof home.hero };
 
 export function Hero({ hero }: HeroProps) {
   const [index, setIndex] = useState(0);
+  const [step, setStep] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [reduced, setReduced] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -24,7 +68,7 @@ export function Hero({ hero }: HeroProps) {
   const { data: liveSite } = useLive("media");
 
   // Derive active hero hoodies from server database live slots
-  const hoodiesList = useMemo<LoginHoodie[]>(() => {
+  const hoodiesList = useMemo<{ src: string; name: string; glow: string }[]>(() => {
     const heroPlacements = liveSite?.slots?.hero_carousel;
     if (Array.isArray(heroPlacements)) {
       return heroPlacements.map((p: any) => {
@@ -33,10 +77,6 @@ export function Hero({ hero }: HeroProps) {
           src: p.url,
           name: p.alt?.ar || p.alt?.en || meta.name || "TERRA HOP",
           glow: meta.glow || "#34445c",
-          caption: meta.caption || {
-            ar: { prefix: "تميز", accent: "بأسلوبك", sub: p.alt?.ar || "مجموعة الهوديز الجديدة" },
-            en: { prefix: "STAND OUT", accent: "YOUR WAY", sub: p.alt?.en || "New Hoodies Collection" },
-          },
         };
       });
     }
@@ -68,22 +108,27 @@ export function Hero({ hero }: HeroProps) {
   useEffect(() => {
     if (!running || hoodiesList.length === 0) return;
     const id = window.setInterval(() => {
-      if (!document.hidden) setIndex((i) => (i + 1) % hoodiesList.length);
+      if (!document.hidden) {
+        setIndex((i) => (i + 1) % hoodiesList.length);
+        setStep((s) => s + 1);
+      }
     }, loginHoodieIntervalMs);
     return () => window.clearInterval(id);
   }, [running, index, hoodiesList.length]);
 
-  const current = hoodiesList[index] ?? hoodiesList[0];
-  const currentCaption = current
+  // Captions cycle across the 10 available captions for up to 10 images.
+  // For images beyond 10 (11th, etc.), no caption is displayed.
+  const activeCaptionObj = index < 10 ? HERO_CAPTIONS[step % HERO_CAPTIONS.length] : null;
+  const currentCaption = activeCaptionObj
     ? locale === "ar"
-      ? current.caption.ar
-      : current.caption.en
-    : { prefix: "TERRA", accent: "HOP", sub: "Streetwear Culture" };
+      ? activeCaptionObj.ar
+      : activeCaptionObj.en
+    : null;
 
   return (
     <section
       dir="ltr"
-      className="on-dark relative isolate flex min-h-[620px] h-svh flex-col justify-between overflow-hidden bg-obsidian text-off-white text-left select-none"
+      className="on-dark relative isolate flex min-h-[620px] h-svh flex-col justify-between overflow-hidden w-full max-w-full bg-obsidian text-off-white text-left select-none"
     >
       {/* Background Spotlight Glows */}
       <div className="absolute inset-0 pointer-events-none -z-20 overflow-hidden" aria-hidden="true">
@@ -101,7 +146,7 @@ export function Hero({ hero }: HeroProps) {
       </div>
 
       {/* Rotating Hoodie Images Showcase - Desktop (aligned to right bottom) */}
-      <div className="hidden md:flex absolute inset-0 -z-10 pointer-events-none items-end justify-end md:pr-[5%] lg:pr-[10%]">
+      <div className="hidden md:flex absolute inset-0 -z-10 pointer-events-none items-end justify-end md:pr-[5%] lg:pr-[10%] overflow-hidden">
         <div className="relative h-full w-full max-w-[850px]">
           {hoodiesList.map((h, i) => (
             // eslint-disable-next-line @next/next/no-img-element
@@ -126,9 +171,9 @@ export function Hero({ hero }: HeroProps) {
         </div>
       </div>
 
-      {/* Rotating Hoodie Images Showcase - Mobile (Large & Fills space with NO bottom gap) */}
-      <div className="flex md:hidden absolute inset-x-0 bottom-0 top-[260px] sm:top-[275px] -z-10 pointer-events-none items-end justify-center overflow-hidden">
-        <div className="relative h-[78vh] w-full max-w-[480px]">
+      {/* Rotating Hoodie Images Showcase - Mobile (Positioned below caption with no face overlap) */}
+      <div className="flex md:hidden absolute inset-x-0 bottom-0 top-[220px] sm:top-[240px] -z-10 pointer-events-none items-end justify-center overflow-hidden">
+        <div className="relative h-[72vh] w-full max-w-[440px]">
           {hoodiesList.map((h, i) => (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -140,8 +185,8 @@ export function Hero({ hero }: HeroProps) {
               height={965}
               decoding="async"
               fetchPriority={i === 0 ? "high" : "auto"}
-              className={`absolute inset-0 h-full w-full object-contain object-bottom scale-110 origin-bottom transition-[opacity,transform] duration-1000 ease-out ${
-                i === index ? "translate-y-0 opacity-100" : "translate-y-3 scale-105 opacity-0"
+              className={`absolute inset-0 h-full w-full object-contain object-bottom transition-[opacity,transform] duration-1000 ease-out ${
+                i === index ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
               }`}
             />
           ))}
@@ -158,79 +203,83 @@ export function Hero({ hero }: HeroProps) {
         </h1>
       </div>
 
-      {/* Desktop Bottom-Right Caption (تحت على اليمين - Rotating smoothly with each hoodie slide) */}
-      <div
-        dir={locale === "ar" ? "rtl" : "ltr"}
-        className="hidden md:flex flex-col items-start text-right z-10 md:absolute md:bottom-28 lg:bottom-32 md:right-8 lg:right-14 max-w-md xl:max-w-xl select-none"
-      >
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={`d-caption-${index}`}
-            initial={mounted ? { opacity: 0, y: 12 } : false}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            transition={{ duration: 0.38, ease: "easeOut" }}
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-3xl lg:text-4xl xl:text-5xl font-extrabold text-white tracking-tight">
-                {currentCaption.prefix}
-              </span>
-              <span className="bg-[#b31428] text-white text-2xl lg:text-3xl xl:text-4xl font-extrabold px-3 py-1 rounded-md shadow-md">
-                {currentCaption.accent}
-              </span>
-            </div>
-            <p className="mt-2 text-sm lg:text-base font-semibold text-stone-200/90 tracking-wide drop-shadow-sm max-w-sm">
-              {currentCaption.sub}
-            </p>
-          </motion.div>
-        </AnimatePresence>
-      </div>
-
-      {/* MOBILE LAYOUT (< md) - Moved caption up 20px, 15px below logo, 20px above model head, font +30% */}
-      <div className="flex md:hidden flex-col items-center justify-start flex-1 px-4 pt-[44px] z-10">
-        {/* Big White TERRA HOP Logo in Mobile */}
-        <h1 className="w-full max-w-[280px] sm:max-w-[320px] text-center mb-0">
-          <AnimatedLogo>
-            <Logo className="w-full drop-shadow-md" />
-          </AnimatedLogo>
-        </h1>
-
-        {/* Mobile Upper Caption (Centered, exactly 15px below Logo, ~20px above model head, 30% larger font) */}
+      {/* Desktop Bottom-Right Caption (Rotating smoothly with each slide) */}
+      {currentCaption && (
         <div
           dir={locale === "ar" ? "rtl" : "ltr"}
-          className="flex flex-col items-center text-center mt-[15px] z-10 select-none"
+          className="hidden md:flex flex-col items-start text-right z-10 md:absolute md:bottom-28 lg:bottom-32 md:right-8 lg:right-14 max-w-md xl:max-w-xl select-none"
         >
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
-              key={`m-caption-${index}`}
-              initial={mounted ? { opacity: 0, y: 10 } : false}
+              key={`d-caption-${index}`}
+              initial={mounted ? { opacity: 0, y: 12 } : false}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
+              exit={{ opacity: 0, y: -12 }}
               transition={{ duration: 0.38, ease: "easeOut" }}
-              className="flex flex-col items-center"
             >
-              <div className="flex items-center justify-center gap-2.5">
-                <span className="text-[34px] sm:text-[40px] font-extrabold text-white tracking-tight drop-shadow-sm leading-tight">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl lg:text-4xl xl:text-5xl font-extrabold text-white tracking-tight">
                   {currentCaption.prefix}
                 </span>
-                <span className="bg-[#b31428] text-white text-[30px] sm:text-[34px] font-extrabold px-3.5 py-1 rounded-md shadow-md leading-tight">
+                <span className="bg-[#b31428] text-white text-2xl lg:text-3xl xl:text-4xl font-extrabold px-3 py-1 rounded-md shadow-md">
                   {currentCaption.accent}
                 </span>
               </div>
-              <p
-                style={{
-                  fontFamily:
-                    locale === "ar"
-                      ? "'Cairo', var(--font-inter), system-ui, sans-serif"
-                      : "inherit",
-                }}
-                className="mt-2.5 text-[20px] sm:text-[23px] font-semibold text-stone-200/95 tracking-wide drop-shadow-md text-center max-w-[340px] sm:max-w-md"
-              >
+              <p className="mt-2 text-sm lg:text-base font-semibold text-stone-200/90 tracking-wide drop-shadow-sm max-w-sm">
                 {currentCaption.sub}
               </p>
             </motion.div>
           </AnimatePresence>
         </div>
+      )}
+
+      {/* MOBILE LAYOUT (< md) - Clean logo and responsive compact caption above model */}
+      <div className="flex md:hidden flex-col items-center justify-start flex-1 px-4 pt-[32px] sm:pt-[40px] z-10">
+        {/* Big White TERRA HOP Logo in Mobile */}
+        <h1 className="w-full max-w-[260px] sm:max-w-[300px] text-center mb-0">
+          <AnimatedLogo>
+            <Logo className="w-full drop-shadow-md" />
+          </AnimatedLogo>
+        </h1>
+
+        {/* Mobile Upper Caption (Centered, cleanly spaced between Logo and model head) */}
+        {currentCaption && (
+          <div
+            dir={locale === "ar" ? "rtl" : "ltr"}
+            className="flex flex-col items-center text-center mt-3 z-10 select-none"
+          >
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={`m-caption-${index}`}
+                initial={mounted ? { opacity: 0, y: 8 } : false}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.38, ease: "easeOut" }}
+                className="flex flex-col items-center"
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight drop-shadow-sm leading-tight">
+                    {currentCaption.prefix}
+                  </span>
+                  <span className="bg-[#b31428] text-white text-xl sm:text-2xl font-extrabold px-3 py-0.5 rounded-md shadow-md leading-tight">
+                    {currentCaption.accent}
+                  </span>
+                </div>
+                <p
+                  style={{
+                    fontFamily:
+                      locale === "ar"
+                        ? "'Cairo', var(--font-inter), system-ui, sans-serif"
+                        : "inherit",
+                  }}
+                  className="mt-1.5 text-xs sm:text-sm font-semibold text-stone-200/90 tracking-wide drop-shadow-md text-center max-w-[320px]"
+                >
+                  {currentCaption.sub}
+                </p>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        )}
       </div>
 
       {/* Bottom Bar: CTA on left, Carousel Indicator on right */}

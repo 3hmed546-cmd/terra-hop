@@ -27,7 +27,7 @@ export function Footer({ footer }: { footer: typeof home.footer }) {
   ];
 
   return (
-    <footer dir="ltr" className="on-dark bg-obsidian text-off-white text-left">
+    <footer dir="ltr" className="on-dark bg-obsidian text-off-white text-left w-full max-w-full overflow-hidden">
       <div className="mx-auto w-full max-w-[1280px] px-4 py-12 md:px-6 lg:px-10 lg:py-16">
         <div className="grid gap-12 md:grid-cols-12 text-left">
           {/* Brand & Tagline - Always on Left */}

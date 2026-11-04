@@ -42,7 +42,7 @@ export function Header({ header, overlay = false }: Props) {
   return (
     <>
       {/* 1. Primary Top Header (Before Scroll) */}
-      <header dir="ltr" className={`${wrapper} h-14 md:h-16 text-left`}>
+      <header dir="ltr" className={`${wrapper} h-14 md:h-16 text-left w-full max-w-full overflow-hidden`}>
         <div className="relative mx-auto flex h-full w-full max-w-[1280px] items-center justify-between px-4 md:px-6 lg:px-10">
           {/* Left: Mobile Menu button or Desktop nav links */}
           <div className="flex items-center gap-2 md:gap-6">

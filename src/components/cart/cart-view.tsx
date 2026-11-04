@@ -9,6 +9,8 @@ import { formatPrice } from "@/lib/format";
 import { useCart } from "@/lib/cart";
 import { useLocale } from "@/lib/locale-context";
 import { useLive } from "@/lib/use-live";
+import { WhatsAppIcon } from "@/components/ui/social-icons";
+import { home } from "@/content/home";
 import type { Product } from "@/content/home";
 
 type Props = { products: Product[] };
@@ -116,15 +118,21 @@ export function CartView({ products }: Props) {
                       )}
                     </div>
                     {product.status === "Sold out" && (
-                      <div className="mt-2.5 rounded-lg border border-red-200 bg-red-50 p-2 text-xs font-bold text-red-700 flex flex-wrap items-center justify-between gap-2">
+                      <div className="mt-2.5 rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs font-bold text-red-700 flex flex-wrap items-center justify-between gap-2">
                         <span>{locale === "ar" ? "عفواً، هذا المنتج نفذ من المخزن حالياً." : "This product is currently out of stock."}</span>
                         <a
-                          href={`https://wa.me/201285694670?text=${encodeURIComponent(`مرحباً TERRA HOP، أود معرفة موعد إعادة توفر هودي "${translatedName}".`)}`}
+                          href={home.signup.whatsappGroupUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-stone-900 underline hover:text-black font-extrabold"
+                          onClick={() => {
+                            try {
+                              navigator.clipboard.writeText(`مرحباً TERRA HOP، أود معرفة موعد إعادة توفر هودي "${translatedName}".`);
+                            } catch (_) {}
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-md bg-stone-900 px-3 py-1.5 text-white hover:bg-black font-bold transition text-xs shadow-xs"
                         >
-                          {locale === "ar" ? "انضم لجروب الواتساب للتنبيهات" : "Join WhatsApp Group"}
+                          <WhatsAppIcon className="w-3.5 h-3.5 fill-current text-emerald-400" />
+                          <span>{locale === "ar" ? "انضم لجروب الواتساب للتوفر" : "Join WhatsApp Group"}</span>
                         </a>
                       </div>
                     )}
@@ -192,7 +200,7 @@ export function CartView({ products }: Props) {
         </div>
         <div className="mt-6 flex flex-col gap-3">
           {rows.some((r) => r.product.status === "Sold out") ? (
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               <button
                 type="button"
                 disabled
@@ -203,6 +211,15 @@ export function CartView({ products }: Props) {
               <p className="text-xs text-red-600 font-bold text-center">
                 {locale === "ar" ? "يرجى حذف المنتجات غير المتوفرة (التي نفذت من المخزن) لمتابعة الطلب." : "Please remove out-of-stock items to proceed."}
               </p>
+              <a
+                href={home.signup.whatsappGroupUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl py-3 px-4 font-bold text-xs bg-stone-900 hover:bg-black text-white transition shadow-sm"
+              >
+                <WhatsAppIcon className="w-4 h-4 fill-current text-emerald-400" />
+                <span>{locale === "ar" ? "انضم لجروب الواتساب لمتابعة المنتجات والتوفر" : "Join WhatsApp Group for Restocks"}</span>
+              </a>
             </div>
           ) : (
             <ButtonLink href="/checkout" className="w-full text-center">

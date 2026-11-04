@@ -10,6 +10,8 @@ import { images } from "@/content/images";
 import { formatPrice } from "@/lib/format";
 import { useCheckoutConfig } from "@/lib/use-checkout-config";
 import { useLive } from "@/lib/use-live";
+import { WhatsAppIcon } from "@/components/ui/social-icons";
+import { home } from "@/content/home";
 import type { Product } from "@/content/home";
 
 const EGYPT_GOVERNORATES = [
@@ -104,6 +106,8 @@ export function CheckoutView({ products }: { products: Product[] }) {
     const product = effectiveProducts.find((p) => p.slug === l.slug);
     return product ? [{ ...l, product }] : [];
   });
+
+  const hasSoldOut = rows.some((r) => r.product.status === "Sold out");
 
   const subtotal = rows.reduce((sum, r) => sum + r.product.price * r.qty, 0);
   const subtotalCents = Math.round(subtotal * 100);
@@ -393,6 +397,10 @@ export function CheckoutView({ products }: { products: Product[] }) {
       errs.address = t.checkout.errors.addressRequired;
     }
 
+    if (rows.some((r) => r.product.status === "Sold out")) {
+      errs.general = locale === "ar" ? "يوجد منتج نفذ من المخزن في طلبك، يرجى حذفه للمتابعة" : "Some items in your cart are sold out";
+    }
+
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
   }
@@ -454,9 +462,9 @@ export function CheckoutView({ products }: { products: Product[] }) {
   }
 
   return (
-    <div className="min-w-0 py-5 sm:py-6">
+    <div className="min-w-0 w-full max-w-full py-5 sm:py-6 overflow-hidden">
       {/* Header */}
-      <div className="mb-8 border-b border-line-light pb-6">
+      <div className="mb-8 border-b border-line-light pb-6 w-full max-w-full">
         <Link
           href="/cart"
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-graphite hover:text-obsidian mb-3"
@@ -629,15 +637,39 @@ export function CheckoutView({ products }: { products: Product[] }) {
 
           {/* Mobile Submit Button */}
           <div className="lg:hidden">
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full rounded bg-obsidian py-4 text-base font-bold text-off-white hover:bg-charcoal transition-colors duration-200 cursor-pointer disabled:opacity-50"
-            >
-              {submitting
-                ? t.checkout.summary.submitting
-                : `${t.checkout.summary.submitBtn} (${formatPrice(grandTotal)})`}
-            </button>
+            {hasSoldOut ? (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  disabled
+                  className="w-full rounded bg-stone-300 py-4 text-base font-bold text-stone-500 cursor-not-allowed opacity-70"
+                >
+                  {t.checkout.summary.submitBtn}
+                </button>
+                <p className="text-xs text-red-600 font-bold text-center">
+                  {locale === "ar" ? "يوجد منتج نفذ من المخزن في طلبك. يرجى حذفه لمتابعة الشراء." : "Some items in your cart are sold out."}
+                </p>
+                <a
+                  href={home.signup.whatsappGroupUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl py-3 px-4 font-bold text-xs bg-stone-900 hover:bg-black text-white transition shadow-sm"
+                >
+                  <WhatsAppIcon className="w-4 h-4 fill-current text-emerald-400" />
+                  <span>{locale === "ar" ? "انضم لجروب الواتساب لمتابعة التوفر" : "Join WhatsApp Group"}</span>
+                </a>
+              </div>
+            ) : (
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full rounded bg-obsidian py-4 text-base font-bold text-off-white hover:bg-charcoal transition-colors duration-200 cursor-pointer disabled:opacity-50"
+              >
+                {submitting
+                  ? t.checkout.summary.submitting
+                  : `${t.checkout.summary.submitBtn} (${formatPrice(grandTotal)})`}
+              </button>
+            )}
           </div>
         </form>
 
@@ -797,17 +829,43 @@ export function CheckoutView({ products }: { products: Product[] }) {
 
           {/* Desktop Submit Button */}
           <div className="hidden lg:block pt-2">
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={submitting}
-              className="w-full rounded bg-obsidian py-4 text-base font-bold text-off-white hover:bg-charcoal transition-colors duration-200 cursor-pointer disabled:opacity-50"
-            >
-              {submitting ? t.checkout.summary.submitting : t.checkout.summary.submitBtn}
-            </button>
-            <p className="mt-3 text-[11px] text-graphite text-center">
-              {t.checkout.summary.guarantee}
-            </p>
+            {hasSoldOut ? (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  disabled
+                  className="w-full rounded bg-stone-300 py-4 text-base font-bold text-stone-500 cursor-not-allowed opacity-70"
+                >
+                  {t.checkout.summary.submitBtn}
+                </button>
+                <p className="text-xs text-red-600 font-bold text-center">
+                  {locale === "ar" ? "يوجد منتج نفذ من المخزن في طلبك. يرجى حذفه لمتابعة الشراء." : "Some items in your cart are sold out."}
+                </p>
+                <a
+                  href={home.signup.whatsappGroupUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl py-3 px-4 font-bold text-xs bg-stone-900 hover:bg-black text-white transition shadow-sm"
+                >
+                  <WhatsAppIcon className="w-4 h-4 fill-current text-emerald-400" />
+                  <span>{locale === "ar" ? "انضم لجروب الواتساب لمتابعة التوفر" : "Join WhatsApp Group"}</span>
+                </a>
+              </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className="w-full rounded bg-obsidian py-4 text-base font-bold text-off-white hover:bg-charcoal transition-colors duration-200 cursor-pointer disabled:opacity-50"
+                >
+                  {submitting ? t.checkout.summary.submitting : t.checkout.summary.submitBtn}
+                </button>
+                <p className="mt-3 text-[11px] text-graphite text-center">
+                  {t.checkout.summary.guarantee}
+                </p>
+              </>
+            )}
           </div>
         </aside>
       </div>
