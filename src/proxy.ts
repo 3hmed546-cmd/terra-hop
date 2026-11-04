@@ -113,7 +113,7 @@ export function proxy(request: NextRequest) {
   }
 
   // 2. Secret Admin Routing & IDOR / Access Control Protection
-  const secret = (process.env.ADMIN_PATH ?? process.env.ADMIN_LOGIN_PATH ?? "").replace(/^\/+|\/+$/g, "");
+  const secret = (process.env.ADMIN_PATH ?? process.env.ADMIN_LOGIN_PATH ?? process.env.ADMIN_KEY ?? "").replace(/^\/+|\/+$/g, "");
 
   // Clean redirection for admin entry: /admin, /admin/, or /admin/login -> redirect to secret login URL
   if (pathname === "/admin" || pathname === "/admin/" || pathname === "/admin/login") {
