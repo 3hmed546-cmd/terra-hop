@@ -139,9 +139,6 @@ export function MediaGallery() {
           const errData = await res.json().catch(() => ({}));
           throw new Error(errData?.error?.message || "فشل حذف الصورة من السيرفر.");
         }
-        const updatedImages = (product.images || []).filter((img) => img.id !== image.id);
-        const updated: Product = { ...product, images: updatedImages, updatedAt: new Date().toISOString() };
-        adminActions.saveProduct(updated);
         setConfirmTarget(null);
         setSuccessDeletedName(`صورة ${image.alt || product.name} من ألبوم (${product.name})`);
         await reloadAdminData();
@@ -157,8 +154,6 @@ export function MediaGallery() {
     const targetImg = product.images.find((img) => img.id === imageId);
     if (!targetImg) return;
     const reordered = [targetImg, ...product.images.filter((img) => img.id !== imageId)];
-    const updated: Product = { ...product, images: reordered, updatedAt: new Date().toISOString() };
-    adminActions.saveProduct(updated);
 
     try {
       const ids = reordered.map((img) => img.id);
@@ -226,7 +221,7 @@ export function MediaGallery() {
           throw new Error(errData.error?.message || "فشل إضافة الصورة لهذا المنتج.");
         }
 
-        await adminActions.saveProduct(product);
+        await reloadAdminData();
         const pName = product.name;
         resetAddForm();
         setSuccessAddedName(`صورة جديدة لألبوم (${pName})`);

@@ -2,11 +2,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useMemo } from "react";
 import { ButtonLink } from "@/components/ui/button";
 import { images } from "@/content/images";
 import { formatPrice } from "@/lib/format";
 import { useCart } from "@/lib/cart";
 import { useLocale } from "@/lib/locale-context";
+import { useLive } from "@/lib/use-live";
 import type { Product } from "@/content/home";
 
 type Props = { products: Product[] };
@@ -17,9 +19,28 @@ const qtyBtn =
 export function CartView({ products }: Props) {
   const { lines, setQty, remove, clear } = useCart();
   const { t, locale } = useLocale();
+  const { data: liveProducts } = useLive("products");
+  const effectiveProducts = useMemo<Product[]>(() => {
+    if (!Array.isArray(liveProducts) || liveProducts.length === 0) return products;
+    return liveProducts.map((product: any) => ({
+      slug: product.slug || product.id,
+      name: product.name || product.nameAr,
+      category: product.category === "tshirt" || product.category === "T-shirts" ? "T-shirts" : "Hoodies",
+      price: (product.priceCents || 0) / 100,
+      originalPrice: product.compareAtCents ? product.compareAtCents / 100 : undefined,
+      status: product.forceSoldOut || product.status === "sold_out" ? "Sold out" : "Preorder",
+      description: product.description || product.descriptionAr || "",
+      sizes: product.sizes || (product.variants || []).map((variant: any) => variant.size).filter(Boolean),
+      images: (product.images || []).map((image: any) => typeof image === "object" ? image.url : image),
+      colors: product.colors || [],
+      variants: product.variants || [],
+      href: `/shop/${product.slug || product.id}`,
+      demo: false,
+    }));
+  }, [liveProducts, products]);
 
   const rows = lines.flatMap((l) => {
-    const product = products.find((p) => p.slug === l.slug);
+    const product = effectiveProducts.find((p) => p.slug === l.slug);
     return product ? [{ ...l, product }] : [];
   });
 

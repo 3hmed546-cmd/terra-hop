@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useLive } from "@/lib/use-live";
 
 export type CheckoutConfig = {
   currency: string;
@@ -20,6 +21,7 @@ const DEFAULT_CONFIG: CheckoutConfig = {
 
 export function useCheckoutConfig(): CheckoutConfig {
   const [config, setConfig] = useState<CheckoutConfig>(DEFAULT_CONFIG);
+  const { revision } = useLive("settings");
 
   useEffect(() => {
     let active = true;
@@ -35,7 +37,7 @@ export function useCheckoutConfig(): CheckoutConfig {
     return () => {
       active = false;
     };
-  }, []);
+  }, [revision]);
 
   return config;
 }

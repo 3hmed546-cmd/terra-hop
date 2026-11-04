@@ -255,29 +255,60 @@ export const adminActions = {
     return res;
   },
 
-  saveProduct: (product: Product): ActionResult => {
-    const res = run((d, now) => pureSaveProduct(d, product, now));
-    if (res.ok) {
-      apiFetch(`/api/admin/products/${product.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nameAr: product.name,
-          nameEn: product.name,
-          priceCents: product.priceCents,
-          compareAtCents: product.compareAtCents,
-          status: product.status,
-          forceSoldOut: product.forceSoldOut,
-          descriptionAr: product.description,
-          details: product.details,
-          colors: product.colors,
-          sizes: product.sizes,
-          variants: product.variants,
-          images: product.images,
-        }),
-      }).then(() => reloadAdminData()).catch(() => {});
+  saveProduct: async (product: Product): Promise<ActionResult> => {
+    const current = getSnapshot();
+    if (!current) return { ok: false, error: "NO_CHANGE" };
+
+    const payload = {
+      slug: product.slug,
+      nameAr: product.name,
+      nameEn: product.name,
+      category: product.category,
+      priceCents: product.priceCents,
+      compareAtCents: product.compareAtCents,
+      status: product.status,
+      forceSoldOut: product.forceSoldOut,
+      lowStockThreshold: product.lowStockThreshold,
+      descriptionAr: product.description,
+      details: product.details,
+      colors: product.colors,
+      variants: product.variants,
+      images: product.images,
+    };
+
+    try {
+      const exists = current.products.some((item) => item.id === product.id);
+      let response: Response;
+      if (exists) {
+        response = await apiFetch(`/api/admin/products/${encodeURIComponent(product.id)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        const created = await apiFetch("/api/admin/products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const createdPayload = await created.json().catch(() => null);
+        if (!created.ok || !createdPayload?.ok || !createdPayload.data?.id) {
+          return { ok: false, error: "NO_CHANGE" };
+        }
+        response = await apiFetch(`/api/admin/products/${encodeURIComponent(createdPayload.data.id)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
+
+      const responsePayload = await response.json().catch(() => null);
+      if (!response.ok || !responsePayload?.ok) return { ok: false, error: "NO_CHANGE" };
+      await reloadAdminData();
+      return { ok: true };
+    } catch {
+      return { ok: false, error: "NO_CHANGE" };
     }
-    return res;
   },
 
   duplicateProduct: (productId: string, newId: string): ActionResult => {
@@ -310,18 +341,25 @@ export const adminActions = {
     return res;
   },
 
-  updateSettings: (patch: Partial<Settings>): ActionResult => {
-    const res = run((d) => ({ ok: true, data: { ...d, settings: { ...d.settings, ...patch } } }));
-    if (res.ok) {
-      for (const [key, value] of Object.entries(patch)) {
-        apiFetch("/api/admin/settings", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ groupKey: "store", key, value }),
-        }).catch(() => {});
-      }
+  updateSettings: async (patch: Partial<Settings>): Promise<ActionResult> => {
+    try {
+      const responses = await Promise.all(
+        Object.entries(patch).map(async ([key, value]) => {
+          const response = await apiFetch("/api/admin/settings", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ groupKey: "store", key, value }),
+          });
+          const payload = await response.json().catch(() => null);
+          return response.ok && payload?.ok;
+        }),
+      );
+      if (responses.some((ok) => !ok)) return { ok: false, error: "NO_CHANGE" };
+      await reloadAdminData();
+      return { ok: true };
+    } catch {
+      return { ok: false, error: "NO_CHANGE" };
     }
-    return res;
   },
 
   simulateOrder: (kind: string): { ok: true; number: string } | { ok: false; error: ErrorCode } => {

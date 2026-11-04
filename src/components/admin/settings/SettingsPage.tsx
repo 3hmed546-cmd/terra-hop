@@ -70,7 +70,7 @@ function SettingsEditor({ settings }: { settings: Settings }) {
 
   const patch = (p: Partial<SettingsFormState>) => setForm((f) => ({ ...f, ...p }));
 
-  const save = () => {
+  const save = async () => {
     setSubmitted(true);
     if (isSettingsFormEqual(form, base)) {
       toast.push(S.noChanges);
@@ -81,7 +81,7 @@ function SettingsEditor({ settings }: { settings: Settings }) {
       return;
     }
     const next = formToSettings(form, settings);
-    const result = actions.updateSettings(next);
+    const result = await actions.updateSettings(next);
     if (!result.ok) {
       toast.push(ADMIN_STRINGS.errors[result.error]);
       return;
@@ -115,7 +115,7 @@ function SettingsEditor({ settings }: { settings: Settings }) {
 
   return (
     <>
-      <form className="adm-form" noValidate onSubmit={(e) => { e.preventDefault(); save(); }}>
+      <form className="adm-form" noValidate onSubmit={(e) => { e.preventDefault(); void save(); }}>
         {errorCodes.length > 0 ? (
           <div ref={summaryRef} tabIndex={-1} role="alert" className="adm-summary">
             <strong>{S.summaryTitle(errorCodes.length)}</strong>

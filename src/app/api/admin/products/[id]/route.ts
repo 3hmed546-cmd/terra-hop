@@ -115,6 +115,8 @@ export async function PATCH(
   const nameEn = body.nameEn !== undefined ? body.nameEn : product.name_en;
   const descriptionAr = body.descriptionAr !== undefined ? body.descriptionAr : (body.description !== undefined ? body.description : product.description_ar);
   const descriptionEn = body.descriptionEn !== undefined ? body.descriptionEn : product.description_en;
+  const category = body.category !== undefined ? String(body.category).trim() : product.category;
+  const slug = body.slug !== undefined ? String(body.slug).trim() : product.slug;
   const priceCents = body.priceCents !== undefined ? Number(body.priceCents) : product.price_cents;
   const compareAtCents = body.compareAtCents !== undefined ? (body.compareAtCents ? Number(body.compareAtCents) : null) : product.compare_at_cents;
   
@@ -150,19 +152,29 @@ export async function PATCH(
   const nextRevision = (product.revision || 1) + 1;
   const now = new Date().toISOString();
 
+  if (!slug || !category) {
+    return apiError("VALIDATION", "اسم الرابط وتصنيف المنتج مطلوبان.", 400);
+  }
+  const duplicate = db.prepare("SELECT id FROM products WHERE slug = ? AND id != ?").get(slug, product.id);
+  if (duplicate) {
+    return apiError("VALIDATION", "اسم الرابط مستخدم بالفعل لمنتج آخر.", 409, "slug");
+  }
+
   db.transaction(() => {
     db.prepare(`
       UPDATE products
       SET 
-        name_ar = ?, name_en = ?, description_ar = ?, description_en = ?,
+        slug = ?, name_ar = ?, name_en = ?, description_ar = ?, description_en = ?, category = ?,
         price_cents = ?, compare_at_cents = ?, status = ?, force_sold_out = ?,
         low_stock_threshold = ?, details = ?, revision = ?, updated_at = ?
       WHERE id = ?
     `).run(
+      slug,
       nameAr,
       nameEn,
       descriptionAr,
       descriptionEn,
+      category,
       priceCents,
       compareAtCents,
       status,

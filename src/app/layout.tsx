@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { archivo, inter } from "./fonts";
 import { MotionProvider } from "@/components/motion/motion-provider";
 import { CartProvider } from "@/lib/cart";
@@ -17,6 +17,14 @@ export const metadata: Metadata = {
     shortcut: "/favicon.ico",
     apple: "/icon-192.png",
   },
+};
+
+// Keep the layout viewport tied to the actual device width, including small phones.
+// Declaring this explicitly protects the store from platform or proxy defaults that
+// can otherwise render a desktop-width layout viewport on mobile browsers.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

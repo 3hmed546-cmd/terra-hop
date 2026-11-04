@@ -4,10 +4,29 @@ import AxeBuilder from "@axe-core/playwright";
 const widths = [320, 375, 768, 1024, 1440];
 const shotWidths = [375, 768, 1024, 1440];
 
+async function openCheckoutWithItem(page: import("@playwright/test").Page) {
+  await page.addInitScript(() => {
+    localStorage.setItem("terra-hop-cart", JSON.stringify([
+      { slug: "oversized-burgundy-hoodie", size: "M", qty: 1 },
+    ]));
+  });
+  await page.goto("/checkout");
+  await expect(page.getByRole("heading", { name: /إتمام الطلب|Checkout/ })).toBeVisible();
+}
+
 for (const w of widths) {
   test(`no horizontal scroll at ${w}px`, async ({ page }) => {
     await page.setViewportSize({ width: w, height: 900 });
     await page.goto("/");
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+}
+
+for (const w of widths) {
+  test(`checkout has no horizontal scroll at ${w}px`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: 900 });
+    await openCheckoutWithItem(page);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(0);
   });

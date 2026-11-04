@@ -104,11 +104,11 @@ function Editor({ initial, existing, isNew, tab, onTab, focusLogRef }: EditorPro
         return;
       }
     }
-    commitSave(product, status);
+    void commitSave(product, status);
   };
 
-  const commitSave = (product: Product, status: FormStatus) => {
-    const result = actions.saveProduct(product);
+  const commitSave = async (product: Product, status: FormStatus) => {
+    const result = await actions.saveProduct(product);
     if (!result.ok) {
       toast.push(ADMIN_STRINGS.errors[result.error]);
       return;
@@ -269,7 +269,7 @@ function Editor({ initial, existing, isNew, tab, onTab, focusLogRef }: EditorPro
             <Button variant="secondary" onClick={() => setPendingRemoval(null)}>{F.removeVariants.keep}</Button>
             <Button
               onClick={() => {
-                if (pendingRemoval) commitSave(pendingRemoval.product, pendingRemoval.status);
+                if (pendingRemoval) void commitSave(pendingRemoval.product, pendingRemoval.status);
                 setPendingRemoval(null);
               }}
             >
