@@ -454,7 +454,7 @@ export function CheckoutView({ products }: { products: Product[] }) {
   }
 
   return (
-    <div className="py-6">
+    <div className="min-w-0 py-5 sm:py-6">
       {/* Header */}
       <div className="mb-8 border-b border-line-light pb-6">
         <Link
@@ -468,11 +468,11 @@ export function CheckoutView({ products }: { products: Product[] }) {
         <p className="mt-1 text-sm text-graphite">{t.checkout.subtitle}</p>
       </div>
 
-      <div className="grid gap-10 lg:grid-cols-12 items-start">
+      <div className="grid min-w-0 gap-6 sm:gap-8 lg:grid-cols-12 lg:gap-10 items-start">
         {/* Left Column: Form Details */}
-        <form onSubmit={handleSubmit} className="lg:col-span-7 space-y-8" noValidate>
+        <form onSubmit={handleSubmit} className="min-w-0 space-y-6 sm:space-y-8 lg:col-span-7" noValidate>
           {/* Section 1: Customer Details */}
-          <div className="rounded border border-line-light bg-off-white p-6 space-y-4">
+          <div className="min-w-0 rounded border border-line-light bg-off-white p-4 space-y-4 sm:p-6">
             <div>
               <h2 className="text-base font-bold text-obsidian">{t.checkout.step1Title}</h2>
               <p className="text-xs text-graphite mt-0.5">{t.checkout.step1Desc}</p>
@@ -605,13 +605,13 @@ export function CheckoutView({ products }: { products: Product[] }) {
           </div>
 
           {/* Section 2: Cash On Delivery & Guarantee Banner */}
-          <div className="rounded border-2 border-obsidian bg-off-white p-6 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
+          <div className="min-w-0 rounded border-2 border-obsidian bg-off-white p-4 space-y-3 sm:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2.5">
                 <ShieldCheck className="h-5 w-5 text-obsidian" />
-                <h2 className="text-base font-bold text-obsidian">{t.checkout.payment.codTitle}</h2>
+                <h2 className="text-base font-bold text-obsidian break-words">{t.checkout.payment.codTitle}</h2>
               </div>
-              <span className="rounded bg-obsidian px-2.5 py-1 text-[11px] font-bold text-off-white uppercase">
+              <span className="shrink-0 rounded bg-obsidian px-2.5 py-1 text-[11px] font-bold text-off-white uppercase">
                 {t.checkout.payment.codBadge}
               </span>
             </div>
@@ -642,7 +642,7 @@ export function CheckoutView({ products }: { products: Product[] }) {
         </form>
 
         {/* Right Column: Order Summary Card */}
-        <aside className="lg:col-span-5 sticky top-24 rounded border border-line-light bg-off-white p-6 space-y-6">
+        <aside className="min-w-0 rounded border border-line-light bg-off-white p-4 space-y-5 sm:p-6 sm:space-y-6 lg:sticky lg:top-24 lg:col-span-5">
           <div className="flex items-center justify-between border-b border-line-light pb-4">
             <h2 className="text-lg font-bold text-obsidian">{t.checkout.summary.title}</h2>
             <span className="text-xs font-semibold text-graphite">
@@ -651,7 +651,7 @@ export function CheckoutView({ products }: { products: Product[] }) {
           </div>
 
           {/* Items List */}
-          <ul className="divide-y divide-line-light max-h-80 overflow-y-auto pr-1">
+          <ul className="max-h-80 divide-y divide-line-light overflow-x-hidden overflow-y-auto pe-1">
             {rows.map(({ product, size, qty, color, colorHex, image }) => {
               const firstImg = product.images[0];
               const isDirectUrl = typeof firstImg === "string" && (firstImg.startsWith("/") || firstImg.startsWith("http"));
@@ -660,7 +660,7 @@ export function CheckoutView({ products }: { products: Product[] }) {
               const imgSrc = image || defaultSrc;
               const imgAlt = matchedImg?.alt || product.name;
               return (
-                <li key={`${product.slug}-${size}-${color || "default"}`} className="py-3 flex gap-3 items-center">
+                <li key={`${product.slug}-${size}-${color || "default"}`} className="flex min-w-0 items-center gap-3 py-3">
                   <div className="relative h-16 w-14 shrink-0 overflow-hidden rounded bg-charcoal">
                     <Image
                       src={imgSrc}
@@ -670,7 +670,7 @@ export function CheckoutView({ products }: { products: Product[] }) {
                       className="object-cover"
                     />
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 flex-1">
                     <h3 className="text-sm font-semibold text-obsidian truncate">{product.name}</h3>
                     <div className="text-xs text-graphite mt-0.5 flex flex-wrap items-center gap-1.5">
                       <span>
@@ -696,8 +696,8 @@ export function CheckoutView({ products }: { products: Product[] }) {
                       </span>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-sm font-bold font-mono text-obsidian">
+                  <div className="shrink-0 text-right">
+                    <span className="whitespace-nowrap text-sm font-bold font-mono text-obsidian">
                       {formatPrice(product.price * qty)}
                     </span>
                   </div>
@@ -711,7 +711,7 @@ export function CheckoutView({ products }: { products: Product[] }) {
             <label className="block text-xs font-bold uppercase tracking-wider text-charcoal mb-1.5">
               {locale === "ar" ? "هل لديك كود خصم؟" : "Have a promo code?"}
             </label>
-            <div className="flex gap-2">
+            <div className="flex min-w-0 gap-2">
               <input
                 type="text"
                 disabled={Boolean(appliedPromo) || promoLoading}
@@ -724,7 +724,7 @@ export function CheckoutView({ products }: { products: Product[] }) {
                   }
                 }}
                 placeholder={locale === "ar" ? "أدخل كود الخصم" : "Enter promo code"}
-                className="flex-1 rounded border border-graphite bg-off-white px-3 py-2 text-xs uppercase font-mono tracking-wider text-obsidian focus:border-obsidian focus:outline-none disabled:opacity-50"
+                className="min-w-0 flex-1 rounded border border-graphite bg-off-white px-3 py-2 text-xs uppercase font-mono tracking-wider text-obsidian focus:border-obsidian focus:outline-none disabled:opacity-50"
               />
               {appliedPromo ? (
                 <button
