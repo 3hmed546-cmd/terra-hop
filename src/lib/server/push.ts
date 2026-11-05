@@ -247,3 +247,51 @@ export async function notifyAdminsAmbassadorGoalReached(data: AmbassadorGoalPayl
     )
   );
 }
+
+export interface OrderConfirmedPayload {
+  orderId: string;
+  orderNumber: string;
+  customerName: string;
+  totalCents: number;
+}
+
+/**
+ * Notify admins when a customer clicks the confirmation link in their email.
+ */
+export async function notifyAdminsOrderConfirmedByCustomer(data: OrderConfirmedPayload): Promise<void> {
+  ensureVapidConfigured();
+  const db = getDb();
+
+  const subscriptions = db.prepare(`
+    SELECT id, endpoint, p256dh, auth FROM admin_push_subscriptions
+  `).all() as { id: string; endpoint: string; p256dh: string; auth: string }[];
+
+  if (subscriptions.length === 0) return;
+
+  const adminPath = process.env.ADMIN_PATH || process.env.ADMIN_KEY || "k7q2-vault-9xm4";
+  const targetUrl = `/${adminPath}/orders/${data.orderId}`;
+  const total = Math.round(data.totalCents / 100);
+
+  const payload = JSON.stringify({
+    title: `✅ العميل أكد طلبه! (#${data.orderNumber})`,
+    body: `قام ${data.customerName} بتأكيد طلبه رسمياً عبر الإيميل (${total} ج.م). الطلب جاهز للمراجعة والموافقة.`,
+    icon: "/icon.png",
+    badge: "/icon.png",
+    tag: `confirm-${data.orderNumber}`,
+    data: {
+      url: targetUrl,
+      orderNumber: data.orderNumber,
+      timestamp: Date.now(),
+    },
+  });
+
+  await Promise.allSettled(
+    subscriptions.map((sub) =>
+      webpush.sendNotification(
+        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+        payload,
+        { TTL: 60 * 60 * 24, urgency: "high" }
+      )
+    )
+  );
+}

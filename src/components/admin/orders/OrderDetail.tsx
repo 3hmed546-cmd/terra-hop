@@ -54,8 +54,29 @@ export function OrderDetail({ orderId }: { orderId: string }) {
   const toast = useToast();
   const [dialog, setDialog] = useState<"sell" | "cancel" | null>(null);
   const [delivering, setDelivering] = useState(false);
+  const [resending, setResending] = useState(false);
   const statusRef = useRef<HTMLParagraphElement>(null);
   const refocus = useRef(false);
+
+  const handleResendEmail = async (targetOrderId: string) => {
+    setResending(true);
+    try {
+      const res = await apiFetch(`/api/admin/orders/${targetOrderId}/resend-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const json = await res.json();
+      if (json.ok) {
+        toast.push(json.data?.message || "تم إرسال الفاتورة ورابط التأكيد للعميل بنجاح.");
+      } else {
+        toast.push(json.message || "فشل إرسال الإيميل.");
+      }
+    } catch {
+      toast.push("خطأ في الاتصال بالخادم.");
+    } finally {
+      setResending(false);
+    }
+  };
 
   const handleMarkDeliveredPaid = async (targetOrderId: string) => {
     setDelivering(true);
@@ -305,11 +326,15 @@ export function OrderDetail({ orderId }: { orderId: string }) {
 
           {order.status === "PENDING_EMAIL" ? (
             <section className="adm-preview-box" aria-labelledby="ord-preview">
-              <h2 id="ord-preview" className="adm-h3">{S.previewBox.title}</h2>
-              <p className="adm-nomargin adm-muted">{S.previewBox.text}</p>
-              <div className="adm-row">
+              <h2 id="ord-preview" className="adm-h3">تأكيد البريد الإلكتروني</h2>
+              <p className="adm-nomargin adm-muted">
+                الطلب بانتظار ضغط العميل على رابط «تأكيد الأوردر» في رسالة البريد الإلكتروني ليصبح جاهزاً للشحن والموافقة.
+              </p>
+              <div className="adm-row" style={{ marginTop: 12, gap: 8, flexWrap: "wrap" }}>
+                <Button variant="secondary" disabled={resending} onClick={() => handleResendEmail(order.id)}>
+                  {resending ? "جاري الإرسال…" : "إعادة إرسال إيميل الفاتورة والتأكيد"}
+                </Button>
                 <Button variant="secondary" onClick={() => simulate("confirm")}>{S.previewBox.confirm}</Button>
-                <Button variant="secondary" onClick={() => simulate("expire")}>{S.previewBox.expire}</Button>
               </div>
             </section>
           ) : null}

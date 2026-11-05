@@ -7,6 +7,7 @@ import { seedDatabaseIfNeeded } from "@/lib/server/seed-db";
 import { markOrderDeliveredAndPaid } from "@/lib/server/ambassadors/qualification";
 import { notifyAdminsAmbassadorGoalReached } from "@/lib/server/push";
 import { decryptCode } from "@/lib/server/security";
+import { sendOrderAcceptedEmail } from "@/lib/server/mailer";
 
 export async function GET(request: NextRequest) {
   const auth = requireAdmin(request);
@@ -154,6 +155,25 @@ export async function PATCH(request: NextRequest) {
     // Authoritatively mark delivered & paid: updates fulfilment_status to DELIVERED, payment_status to PAID,
     // and credits ambassador with a confirmed qualified sale
     markOrderDeliveredAndPaid(db, orderId, auth.user!.email);
+
+    // Send Order Accepted Email with estimated delivery days
+    try {
+      const cust = decryptCustomer(order.customer_enc);
+      if (cust?.email) {
+        sendOrderAcceptedEmail(
+          {
+            number: order.number,
+            customer: cust,
+            totalCents: order.total_cents,
+          },
+          body.deliveryDays || "من 2 إلى 4 أيام عمل"
+        ).catch((err) => {
+          console.error("[Mailer] Failed to send order accepted email:", err);
+        });
+      }
+    } catch (e) {
+      console.error("[Mailer] Decrypt customer failed for accepted email:", e);
+    }
 
     // Check if ambassador reached their max uses goal
     if (order.ambassador_id) {

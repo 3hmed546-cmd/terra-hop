@@ -153,13 +153,13 @@ function run(fn: (data: AdminData, now: string) => Result<AdminData>): ActionRes
 }
 
 export const adminActions = {
-  sellOrder: (orderId: string): ActionResult => {
+  sellOrder: (orderId: string, deliveryDays?: string): ActionResult => {
     const res = run((d, now) => pureSellOrder(d, orderId, now));
     if (res.ok) {
       apiFetch("/api/admin/orders", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, status: "SOLD" }),
+        body: JSON.stringify({ orderId, status: "SOLD", deliveryDays: deliveryDays || "من 2 إلى 4 أيام عمل" }),
       }).then(() => reloadAdminData()).catch(() => {});
     }
     return res;

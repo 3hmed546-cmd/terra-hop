@@ -24,9 +24,11 @@ export function OrderDecisionDialogs({ order, mode, onClose, onDone }: Props) {
   const { actions } = useAdminStore();
   const toast = useToast();
   const [reason, setReason] = useState("");
+  const [deliveryDays, setDeliveryDays] = useState("من 2 إلى 4 أيام عمل");
 
   const close = () => {
     setReason("");
+    setDeliveryDays("من 2 إلى 4 أيام عمل");
     onClose();
   };
 
@@ -35,8 +37,8 @@ export function OrderDecisionDialogs({ order, mode, onClose, onDone }: Props) {
 
   const confirmSell = () => {
     if (!order) return;
-    const result = actions.sellOrder(order.id);
-    toast.push(result.ok ? S.sellDialog.done(order.number) : ADMIN_STRINGS.errors[result.error]);
+    const result = (actions as any).sellOrder(order.id, deliveryDays);
+    toast.push(result.ok ? `تم قبول الطلب ${order.number} وإرسال إيميل التوصيل للعميل بنجاح.` : (ADMIN_STRINGS.errors as any)[result.error] || "حدث خطأ");
     close();
     if (result.ok) onDone?.();
   };
@@ -77,6 +79,33 @@ export function OrderDecisionDialogs({ order, mode, onClose, onDone }: Props) {
             </li>
           ))}
         </ul>
+
+        <div style={{ marginTop: 18, borderTop: "1px solid var(--adm-line, #333)", paddingTop: 14 }}>
+          <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 700 }}>
+            مدة التوصيل المتوقعة (ستُرسل للعميل في الإيميل التلقائي):
+          </label>
+          <input
+            type="text"
+            className="adm-input"
+            value={deliveryDays}
+            onChange={(e) => setDeliveryDays(e.target.value)}
+            placeholder="مثال: من 2 إلى 4 أيام عمل"
+            style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--adm-line, #444)", background: "transparent", color: "inherit", fontSize: 13 }}
+          />
+          <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+            {["من 2 إلى 3 أيام عمل", "من 3 إلى 5 أيام عمل", "خلال 48 ساعة"].map((d) => (
+              <button
+                key={d}
+                type="button"
+                className="adm-btn adm-btn-secondary"
+                style={{ fontSize: 11, padding: "3px 8px", cursor: "pointer" }}
+                onClick={() => setDeliveryDays(d)}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+        </div>
       </Dialog>
 
       <Dialog

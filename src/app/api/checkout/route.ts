@@ -12,6 +12,7 @@ import { normalizePhone, EGYPT_MOBILE } from "@/lib/server/phone";
 import { getPaymentHandler } from "@/lib/server/payment";
 import { notifyAdminsNewOrder, notifyAdminsAmbassadorGoalReached } from "@/lib/server/push";
 import { decryptCode } from "@/lib/server/security";
+import { sendOrderInvoiceEmail } from "@/lib/server/mailer";
 import type Database from "better-sqlite3";
 
 const CHECKOUT_RATE_OPTIONS = { prefix: "store_checkout", max: 5, windowMs: 10 * 60 * 1000 };
@@ -81,7 +82,10 @@ export async function POST(request: NextRequest) {
   if (!EGYPT_MOBILE.test(phone)) {
     return apiError("VALIDATION", "يرجى إدخال رقم موبايل مصري صحيح (مثال: 01012345678).", 400, "customer.phone");
   }
-  if (email && !EMAIL_PATTERN.test(email)) {
+  if (!email) {
+    return apiError("VALIDATION", "يرجى إدخال البريد الإلكتروني لإرسال الفاتورة وتأكيد طلبك.", 400, "customer.email");
+  }
+  if (!EMAIL_PATTERN.test(email)) {
     return apiError("VALIDATION", "صيغة البريد الإلكتروني غير صحيحة.", 400, "customer.email");
   }
   if (!city) return apiError("VALIDATION", "يرجى تحديد المحافظة.", 400, "customer.city");
@@ -264,7 +268,7 @@ export async function POST(request: NextRequest) {
            ambassador_id, ambassador_code, referral_code_id, attribution_locked_at,
            fulfilment_status, payment_status, code_discount_percent_applied, code_discount_cents,
            created_at, revision
-         ) VALUES (?, ?, 'website', 'AWAITING_APPROVAL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NOT_SHIPPED', 'UNPAID', ?, ?, ?, 1)`,
+         ) VALUES (?, ?, 'website', 'PENDING_EMAIL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NOT_SHIPPED', 'UNPAID', ?, ?, ?, 1)`,
       ).run(
         orderId,
         orderNumber,
@@ -334,6 +338,33 @@ export async function POST(request: NextRequest) {
     firstItemName: verifiedItems[0]?.productName,
   }).catch((err) => {
     console.error("[PushNotification] Failed to notify admins:", err);
+  });
+
+  // Send Order Invoice & Confirmation Email to customer in background
+  sendOrderInvoiceEmail({
+    id: orderId,
+    number: orderNumber,
+    createdAt: now,
+    customer: {
+      name,
+      phone,
+      email,
+      city,
+      address,
+    },
+    items: verifiedItems.map((it) => ({
+      name: it.productName,
+      color: it.colorName,
+      size: it.size,
+      qty: it.qty,
+      priceCents: it.priceCents,
+    })),
+    subtotalCents,
+    shippingCents,
+    discountCents,
+    totalCents,
+  }).catch((err) => {
+    console.error("[Mailer] Failed to send order invoice email:", err);
   });
 
   // Check if ambassador reached their max uses goal

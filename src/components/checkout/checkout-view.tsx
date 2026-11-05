@@ -246,16 +246,16 @@ export function CheckoutView({ products }: { products: Product[] }) {
         </p>
 
         {/* Confirmation & Shipping Notice Banner */}
-        <div className="mt-6 rounded border border-emerald-200 bg-emerald-50/70 p-4 text-left text-xs text-emerald-950 flex items-start gap-3">
+        <div className="mt-6 rounded border border-emerald-300 bg-emerald-50/90 p-4 text-right text-xs text-emerald-950 flex items-start gap-3">
           <Truck className="h-5 w-5 shrink-0 text-emerald-700 mt-0.5" />
           <div>
             <span className="font-bold block text-sm mb-0.5">
-              {locale === "ar" ? "تأكيد الطلب والشحن السريع" : "Order Confirmation & Shipping"}
+              {locale === "ar" ? "تفقد بريدك الإلكتروني لتأكيد الأوردر ✉️" : "Check Your Email To Confirm Order"}
             </span>
             <p className="text-emerald-900 leading-normal">
               {locale === "ar"
-                ? "تم تسجيل طلبك بنجاح. سيتواصل معك فريق خدمة العملاء عبر الواتساب أو الهاتف لتأكيد موعد التسليم."
-                : "Your order is confirmed. Our support team will reach out via WhatsApp/Phone to confirm delivery details."}
+                ? "تم إرسال الفاتورة ورابط تأكيد طلبك إلى بريدك الإلكتروني. يرجى فتح الإيميل والضغط على «تأكيد الأوردر الآن» لنبدأ في تجهيز شحنتك فوراً."
+                : "Your invoice & confirmation link have been sent to your email. Please click 'Confirm Order' to begin dispatch."}
             </p>
           </div>
         </div>
@@ -386,7 +386,9 @@ export function CheckoutView({ products }: { products: Product[] }) {
     }
 
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-    if (email.trim() && !emailPattern.test(email.trim())) {
+    if (!email.trim()) {
+      errs.email = locale === "ar" ? "البريد الإلكتروني مطلوب لإرسال الفاتورة وتأكيد الطلب" : "Email is required to send your invoice & order confirmation";
+    } else if (!emailPattern.test(email.trim())) {
       errs.email = t.checkout.errors.emailInvalid;
     }
 
@@ -534,10 +536,11 @@ export function CheckoutView({ products }: { products: Product[] }) {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-charcoal mb-1.5">
-                  {t.checkout.fields.email}
+                  {t.checkout.fields.email} <span className="text-red-600">*</span>
                 </label>
                 <input
                   type="email"
+                  required
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
@@ -547,7 +550,7 @@ export function CheckoutView({ products }: { products: Product[] }) {
                   className="w-full rounded border border-graphite bg-off-white px-3.5 py-2.5 text-sm text-obsidian focus:border-obsidian focus:outline-none"
                 />
                 <span className="text-[11px] text-graphite mt-1 block">
-                  {t.checkout.fields.emailHint}
+                  {locale === "ar" ? "ستصلك الفاتورة ورابط تأكيد طلبك على هذا الإيميل" : t.checkout.fields.emailHint}
                 </span>
                 {formErrors.email && (
                   <span className="text-xs text-red-600 mt-1 block font-medium">{formErrors.email}</span>
