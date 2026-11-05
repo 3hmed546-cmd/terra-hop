@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "./admin-auth";
+
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -48,7 +50,7 @@ export async function subscribeToAdminPush(): Promise<{ success: boolean; error?
   }
 
   // 1. Get VAPID public key from backend
-  const res = await fetch("/api/admin/push");
+  const res = await apiFetch("/api/admin/push");
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     return { success: false, error: data?.error?.message || "فشل الحصول على مفتاح الإشعارات من السيرفر." };
@@ -74,7 +76,7 @@ export async function subscribeToAdminPush(): Promise<{ success: boolean; error?
     const subJson = sub.toJSON();
 
     // 3. Register subscription with backend
-    const saveRes = await fetch("/api/admin/push", {
+    const saveRes = await apiFetch("/api/admin/push", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ subscription: subJson }),
@@ -98,7 +100,7 @@ export async function unsubscribeFromAdminPush(): Promise<{ success: boolean }> 
     if (sub) {
       const endpoint = sub.endpoint;
       await sub.unsubscribe();
-      await fetch("/api/admin/push", {
+      await apiFetch("/api/admin/push", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ endpoint }),
@@ -118,7 +120,7 @@ export async function sendTestAdminPush(): Promise<{ success: boolean; error?: s
       return { success: false, error: "الجهاز غير مشترك في الإشعارات حالياً." };
     }
 
-    const res = await fetch("/api/admin/push/test", {
+    const res = await apiFetch("/api/admin/push/test", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ subscription: sub.toJSON() }),

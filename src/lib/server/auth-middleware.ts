@@ -104,9 +104,11 @@ export function requireAdmin(request: Request | NextRequest): AdminAuthResult {
     const origin = request.headers.get("origin");
     const host = request.headers.get("host");
     const sameOrigin = Boolean(
-      origin &&
-        host &&
-        (origin.includes(host) || origin.includes("vercel.app") || origin.includes("localhost"))
+      !origin ||
+      (host && origin.includes(host)) ||
+      origin.includes("railway.app") ||
+      origin.includes("vercel.app") ||
+      origin.includes("localhost")
     );
 
     const isCsrfValid = csrfHeader && (verifyCsrfToken(sessionId, csrfHeader) || csrfHeader.length > 20);
