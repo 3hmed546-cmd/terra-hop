@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import type { Transporter } from "nodemailer";
 import crypto from "crypto";
+import { getDb } from "./db";
 
 const GMAIL_USER = process.env.GMAIL_USER || "terr3hop@gmail.com";
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD || "lcrbsshfycezjziz";
@@ -20,9 +21,146 @@ function getTransporter(): Transporter {
         user: GMAIL_USER,
         pass: GMAIL_APP_PASSWORD.replace(/\s+/g, ""),
       },
+      connectionTimeout: 4000,
+      greetingTimeout: 4000,
+      socketTimeout: 4000,
     });
   }
   return transporter;
+}
+
+/**
+ * Retrieve dynamic email delivery configurations from DB settings or process.env
+ */
+export function getEmailConfig(): {
+  webhookUrl: string;
+  brevoApiKey: string;
+  resendApiKey: string;
+} {
+  let webhookUrl = process.env.GMAIL_WEBHOOK_URL || "";
+  let brevoApiKey = process.env.BREVO_API_KEY || "";
+  let resendApiKey = process.env.RESEND_API_KEY || "";
+
+  try {
+    const db = getDb();
+    const rows = db
+      .prepare("SELECT key, value FROM settings WHERE group_key = 'email'")
+      .all() as Array<{ key: string; value: string }>;
+    for (const r of rows) {
+      if (r.key === "webhook_url" && r.value) webhookUrl = r.value.trim();
+      if (r.key === "brevo_api_key" && r.value) brevoApiKey = r.value.trim();
+      if (r.key === "resend_api_key" && r.value) resendApiKey = r.value.trim();
+    }
+  } catch {}
+
+  return { webhookUrl, brevoApiKey, resendApiKey };
+}
+
+/**
+ * Unified email sender with HTTPS-first dispatch for cloud hosts (like Railway)
+ * that block outbound SMTP ports 25, 465, 587.
+ */
+export async function sendMailUnified({
+  to,
+  subject,
+  html,
+}: {
+  to: string;
+  subject: string;
+  html: string;
+}): Promise<boolean> {
+  const config = getEmailConfig();
+
+  // 1. Google Apps Script Webhook (Port 443 HTTPS - native Gmail, 100% free forever)
+  if (config.webhookUrl) {
+    try {
+      const res = await fetch(config.webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to,
+          subject,
+          html,
+          senderName: "TERRA HOP",
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && (data.ok === true || data.status === "ok" || !data.error)) {
+        console.log(`[MAILER:WEBHOOK] Successfully sent email to ${to} via Google Apps Script Webhook`);
+        return true;
+      }
+      console.warn(`[MAILER:WEBHOOK] Webhook returned non-ok:`, data);
+    } catch (err) {
+      console.error(`[MAILER:WEBHOOK] Webhook request failed:`, err);
+    }
+  }
+
+  // 2. Brevo REST API (Port 443 HTTPS - 300 free emails/day)
+  if (config.brevoApiKey) {
+    try {
+      const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "api-key": config.brevoApiKey,
+        },
+        body: JSON.stringify({
+          sender: { name: "TERRA HOP", email: GMAIL_USER },
+          to: [{ email: to }],
+          subject,
+          htmlContent: html,
+        }),
+      });
+      if (res.ok) {
+        console.log(`[MAILER:BREVO] Successfully sent email to ${to} via Brevo API`);
+        return true;
+      }
+      const errText = await res.text().catch(() => "");
+      console.warn(`[MAILER:BREVO] Brevo API responded with error (${res.status}): ${errText}`);
+    } catch (err) {
+      console.error(`[MAILER:BREVO] Brevo request failed:`, err);
+    }
+  }
+
+  // 3. Resend REST API (Port 443 HTTPS)
+  if (config.resendApiKey) {
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${config.resendApiKey}`,
+        },
+        body: JSON.stringify({
+          from: `"TERRA HOP" <onboarding@resend.dev>`,
+          to: [to],
+          subject,
+          html,
+        }),
+      });
+      if (res.ok) {
+        console.log(`[MAILER:RESEND] Successfully sent email to ${to} via Resend API`);
+        return true;
+      }
+    } catch (err) {
+      console.error(`[MAILER:RESEND] Resend request failed:`, err);
+    }
+  }
+
+  // 4. Fallback: Direct SMTP (nodemailer)
+  try {
+    const info = await getTransporter().sendMail({
+      from: `"TERRA HOP" <${GMAIL_USER}>`,
+      to,
+      subject,
+      html,
+    });
+    console.log(`[MAILER:SMTP] Email sent via SMTP to ${to}: ${info.messageId}`);
+    return true;
+  } catch (err) {
+    console.error(`[MAILER:SMTP] SMTP delivery failed to ${to}:`, err);
+    return false;
+  }
 }
 
 /**
@@ -243,19 +381,11 @@ export async function sendOrderInvoiceEmail(order: EmailOrderData): Promise<bool
 </html>
   `;
 
-  try {
-    const info = await getTransporter().sendMail({
-      from: `"TERRA HOP" <${GMAIL_USER}>`,
-      to: order.customer.email,
-      subject: `فاتورة وتأكيد الطلب #${order.number} | TERRA HOP`,
-      html,
-    });
-    console.log(`[MAILER] Order invoice email sent for #${order.number}: ${info.messageId}`);
-    return true;
-  } catch (err) {
-    console.error(`[MAILER] Failed to send order invoice email for #${order.number}:`, err);
-    return false;
-  }
+  return sendMailUnified({
+    to: order.customer.email,
+    subject: `فاتورة وتأكيد الطلب #${order.number} | TERRA HOP`,
+    html,
+  });
 }
 
 /**
@@ -364,17 +494,9 @@ export async function sendOrderAcceptedEmail(
 </html>
   `;
 
-  try {
-    const info = await getTransporter().sendMail({
-      from: `"TERRA HOP" <${GMAIL_USER}>`,
-      to: order.customer.email,
-      subject: `تم قبول وتجهيز طلبك #${order.number} 🚀 | TERRA HOP`,
-      html,
-    });
-    console.log(`[MAILER] Order accepted email sent for #${order.number}: ${info.messageId}`);
-    return true;
-  } catch (err) {
-    console.error(`[MAILER] Failed to send order accepted email for #${order.number}:`, err);
-    return false;
-  }
+  return sendMailUnified({
+    to: order.customer.email,
+    subject: `تم قبول وتجهيز طلبك #${order.number} 🚀 | TERRA HOP`,
+    html,
+  });
 }

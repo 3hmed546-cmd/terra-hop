@@ -239,25 +239,45 @@ export async function DELETE(
     return apiError("NOT_FOUND", "كود الإحالة / السفير غير موجود.", 404);
   }
 
-  db.transaction(() => {
-    // 1. Delete associated discount code products
-    const codes = db.prepare("SELECT id FROM referral_codes WHERE ambassador_id = ?").all(id) as any[];
-    for (const c of codes) {
-      db.prepare("DELETE FROM discount_code_products WHERE code_id = ?").run(c.id);
-    }
-    // 2. Delete referral codes
-    db.prepare("DELETE FROM referral_codes WHERE ambassador_id = ?").run(id);
-    // 3. Delete progress, milestones, rewards, portal users, and sale events
-    db.prepare("DELETE FROM ambassador_progress WHERE ambassador_id = ?").run(id);
-    db.prepare("DELETE FROM ambassador_milestones WHERE ambassador_id = ?").run(id);
-    db.prepare("DELETE FROM ambassador_rewards WHERE ambassador_id = ?").run(id);
-    db.prepare("DELETE FROM ambassador_portal_users WHERE ambassador_id = ?").run(id);
-    db.prepare("DELETE FROM ambassador_sale_events WHERE ambassador_id = ?").run(id);
-    // 4. Unlink any orders so order history remains intact
-    db.prepare("UPDATE orders SET ambassador_id = NULL WHERE ambassador_id = ?").run(id);
-    // 5. Delete the ambassador
-    db.prepare("DELETE FROM ambassadors WHERE id = ?").run(id);
-  })();
+  try {
+    db.transaction(() => {
+      // 1. Delete associated discount code products
+      const codes = db.prepare("SELECT id FROM referral_codes WHERE ambassador_id = ?").all(id) as any[];
+      for (const c of codes) {
+        db.prepare("DELETE FROM discount_code_products WHERE code_id = ?").run(c.id);
+      }
+
+      // 2. Unlink any orders so order history remains intact
+      db.prepare(
+        "UPDATE orders SET referral_code_id = NULL WHERE referral_code_id IN (SELECT id FROM referral_codes WHERE ambassador_id = ?)"
+      ).run(id);
+      db.prepare("UPDATE orders SET ambassador_id = NULL WHERE ambassador_id = ?").run(id);
+
+      // 3. Delete referral codes
+      db.prepare("DELETE FROM referral_codes WHERE ambassador_id = ?").run(id);
+
+      // 4. Delete progress, milestones, rewards, vouchers, sale events, fraud flags
+      db.prepare("DELETE FROM ambassador_progress WHERE ambassador_id = ?").run(id);
+      db.prepare("DELETE FROM ambassador_milestones WHERE ambassador_id = ?").run(id);
+      db.prepare("DELETE FROM ambassador_sale_events WHERE ambassador_id = ?").run(id);
+      db.prepare("UPDATE fraud_flags SET ambassador_id = NULL WHERE ambassador_id = ?").run(id);
+
+      db.prepare("DELETE FROM reward_vouchers WHERE ambassador_id = ?").run(id);
+      db.prepare("DELETE FROM ambassador_rewards WHERE ambassador_id = ?").run(id);
+
+      // 5. Delete portal users and sessions
+      db.prepare("DELETE FROM ambassador_sessions WHERE ambassador_id = ?").run(id);
+      db.prepare("DELETE FROM ambassador_users WHERE ambassador_id = ?").run(id);
+
+      // 6. Delete the ambassador
+      db.prepare("DELETE FROM ambassadors WHERE id = ?").run(id);
+    })();
+  } catch (error) {
+    console.error(`[DELETE_AMBASSADOR_ERROR] Failed to delete ambassador ${id}:`, error);
+    return apiError("INTERNAL_ERROR", "حدث خطأ أثناء حذف السفير من قاعدة البيانات.", 500);
+  }
+
+  recordChange("ambassadors", "ambassadors", id, Date.now());
 
   recordAudit({
     actor: auth.user.email,
