@@ -222,8 +222,14 @@ export function CheckoutView({ products }: { products: Product[] }) {
 
     return (
       <div className="mx-auto max-w-2xl py-12 px-4 text-center">
-        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-800">
-          <CheckCircle2 className="h-10 w-10" />
+        <div className="mx-auto mb-6 flex items-center justify-center">
+          <img
+            src="/order-success-check.png"
+            alt="تم تسجيل طلبك بنجاح"
+            className="w-20 h-20 sm:w-24 sm:h-24 object-contain animate-in zoom-in-90 duration-300 drop-shadow-xs"
+            width={96}
+            height={96}
+          />
         </div>
 
         <span className="inline-block rounded-full bg-line-light px-3 py-1 text-xs font-semibold tracking-wider uppercase text-charcoal">

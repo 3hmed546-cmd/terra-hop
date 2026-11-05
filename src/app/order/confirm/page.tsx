@@ -129,8 +129,14 @@ async function ConfirmContent({ searchParams }: ConfirmPageProps) {
           <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-emerald-500 via-emerald-400 to-teal-500" />
 
           {/* Success Check Icon */}
-          <div className="w-20 h-20 bg-emerald-500/10 border-2 border-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle2 className="w-10 h-10 text-emerald-400" />
+          <div className="w-20 h-20 flex items-center justify-center mx-auto mb-6">
+            <img
+              src="/order-success-check.png"
+              alt="تم تأكيد طلبك بنجاح"
+              className="w-20 h-20 sm:w-24 sm:h-24 object-contain animate-in zoom-in-90 duration-300 drop-shadow-md"
+              width={96}
+              height={96}
+            />
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-black mb-3 text-off-white">
