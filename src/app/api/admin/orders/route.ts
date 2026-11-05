@@ -4,6 +4,9 @@ import { getDb, recordChange, recordAudit } from "@/lib/server/db";
 import { decryptCustomer } from "@/lib/server/vault";
 import { apiSuccess, apiError } from "@/lib/server/api-envelope";
 import { seedDatabaseIfNeeded } from "@/lib/server/seed-db";
+import { markOrderDeliveredAndPaid } from "@/lib/server/ambassadors/qualification";
+import { notifyAdminsAmbassadorGoalReached } from "@/lib/server/push";
+import { decryptCode } from "@/lib/server/security";
 
 export async function GET(request: NextRequest) {
   const auth = requireAdmin(request);
@@ -147,38 +150,82 @@ export async function PATCH(request: NextRequest) {
       ? (typeof body.reason === "string" ? body.reason.trim().slice(0, 300) : "") || null
       : order.cancel_reason ?? null;
 
-  db.transaction(() => {
-    db.prepare(`
-      UPDATE orders
-      SET status = ?, sold_at = ?, cancelled_at = ?, cancel_reason = ?, revision = revision + 1
-      WHERE id = ?
-    `).run(status, soldAt, cancelledAt, cancelReason, orderId);
+  if (status === "SOLD") {
+    // Authoritatively mark delivered & paid: updates fulfilment_status to DELIVERED, payment_status to PAID,
+    // and credits ambassador with a confirmed qualified sale
+    markOrderDeliveredAndPaid(db, orderId, auth.user!.email);
 
-    // If cancelled, restore variant stock if was previously reserved or sold
-    if (status === "CANCELLED" && order.status !== "CANCELLED") {
-      const items = db.prepare("SELECT * FROM order_items WHERE order_id = ?").all(orderId) as any[];
-      const restoreStock = db.prepare("UPDATE variants SET stock = stock + ? WHERE id = ?");
-      const insertMovement = db.prepare(`
-        INSERT INTO stock_movements (id, variant_id, product_id, kind, delta, note, order_id, at, by)
-        VALUES (?, ?, ?, 'order_cancel_restock', ?, 'استرجاع مخزون بعد إلغاء الطلب', ?, ?, ?)
-      `);
+    // Check if ambassador reached their max uses goal
+    if (order.ambassador_id) {
+      try {
+        const amb = db.prepare("SELECT * FROM ambassadors WHERE id = ?").get(order.ambassador_id) as any;
+        const refCode = db.prepare("SELECT * FROM referral_codes WHERE ambassador_id = ?").get(order.ambassador_id) as any;
+        if (amb && refCode?.max_uses) {
+          const soldCountRow = db
+            .prepare("SELECT COUNT(*) as c FROM orders WHERE ambassador_id = ? AND (status = 'SOLD' OR fulfilment_status = 'DELIVERED')")
+            .get(amb.id) as { c: number };
+          const currentCount = Math.max(soldCountRow?.c ?? 0, refCode.used_count ?? 0);
+          if (currentCount >= refCode.max_uses) {
+            const milestoneKey = `goal_reached_${refCode.id}_${refCode.max_uses}`;
+            const existingMilestone = db.prepare("SELECT id FROM ambassador_milestones WHERE id = ?").get(milestoneKey);
+            if (!existingMilestone) {
+              db.prepare(`
+                INSERT INTO ambassador_milestones (id, ambassador_id, kind, order_id, description, occurred_at, created_by)
+                VALUES (?, ?, 'LEVEL_REACHED', ?, ?, ?, 'system')
+              `).run(
+                milestoneKey,
+                amb.id,
+                order.id,
+                `تم وصول الكود للحد المطلوب (${refCode.max_uses} استخدام ومبيعة). يستحق المكافأة.`,
+                now
+              );
 
-      for (const item of items) {
-        if (item.variant_id) {
-          restoreStock.run(item.qty, item.variant_id);
-          insertMovement.run(
-            `mov_${crypto.randomUUID()}`,
-            item.variant_id,
-            item.product_id,
-            item.qty,
-            orderId,
-            now,
-            auth.user!.email
-          );
+              const decryptedCode = decryptCode(refCode.encrypted_code);
+              notifyAdminsAmbassadorGoalReached({
+                ambassadorName: amb.display_name || amb.full_name,
+                code: decryptedCode || "الكود",
+                targetCount: refCode.max_uses,
+                currentCount,
+              }).catch(() => {});
+            }
+          }
+        }
+      } catch {}
+    }
+  } else {
+    db.transaction(() => {
+      db.prepare(`
+        UPDATE orders
+        SET status = ?, sold_at = ?, cancelled_at = ?, cancel_reason = ?, revision = revision + 1
+        WHERE id = ?
+      `).run(status, soldAt, cancelledAt, cancelReason, orderId);
+
+      // If cancelled, restore variant stock if was previously reserved or sold
+      if (status === "CANCELLED" && order.status !== "CANCELLED") {
+        const items = db.prepare("SELECT * FROM order_items WHERE order_id = ?").all(orderId) as any[];
+        const restoreStock = db.prepare("UPDATE variants SET stock = stock + ? WHERE id = ?");
+        const insertMovement = db.prepare(`
+          INSERT INTO stock_movements (id, variant_id, product_id, kind, delta, note, order_id, at, by)
+          VALUES (?, ?, ?, 'order_cancel_restock', ?, 'استرجاع مخزون بعد إلغاء الطلب', ?, ?, ?)
+        `);
+
+        for (const item of items) {
+          if (item.variant_id) {
+            restoreStock.run(item.qty, item.variant_id);
+            insertMovement.run(
+              `mov_${crypto.randomUUID()}`,
+              item.variant_id,
+              item.product_id,
+              item.qty,
+              orderId,
+              now,
+              auth.user!.email
+            );
+          }
         }
       }
-    }
-  })();
+    })();
+  }
 
   recordChange("orders", "orders", orderId, (order.revision || 1) + 1);
   recordAudit({

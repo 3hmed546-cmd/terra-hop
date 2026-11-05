@@ -201,3 +201,49 @@ export async function sendTestNotification(sub: PushSubscriptionData): Promise<b
 
   return true;
 }
+
+export interface AmbassadorGoalPayload {
+  ambassadorName: string;
+  code: string;
+  targetCount: number;
+  currentCount: number;
+}
+
+/**
+ * Notify all admins when an ambassador referral code reaches the maximum usage target
+ */
+export async function notifyAdminsAmbassadorGoalReached(data: AmbassadorGoalPayload): Promise<void> {
+  ensureVapidConfigured();
+  const db = getDb();
+
+  const subscriptions = db.prepare(`
+    SELECT id, endpoint, p256dh, auth FROM admin_push_subscriptions
+  `).all() as { id: string; endpoint: string; p256dh: string; auth: string }[];
+
+  if (subscriptions.length === 0) return;
+
+  const adminPath = process.env.ADMIN_PATH || process.env.ADMIN_KEY || "k7q2-vault-9xm4";
+  const targetUrl = `/${adminPath}/ambassadors`;
+
+  const payload = JSON.stringify({
+    title: `🎯 تم وصول ${data.ambassadorName} للحد المطلوب!`,
+    body: `وصل كود (${data.code}) إلى ${data.currentCount} من ${data.targetCount} استخدام/مبيعة بنجاح! يُرجى إعطاؤه المكافأة.`,
+    icon: "/icon.png",
+    badge: "/icon.png",
+    tag: `goal-${data.code}-${data.targetCount}`,
+    data: {
+      url: targetUrl,
+      timestamp: Date.now(),
+    },
+  });
+
+  await Promise.allSettled(
+    subscriptions.map((sub) =>
+      webpush.sendNotification(
+        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+        payload,
+        { TTL: 60 * 60 * 24, urgency: "high" }
+      )
+    )
+  );
+}

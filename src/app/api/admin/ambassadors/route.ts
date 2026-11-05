@@ -47,6 +47,17 @@ export async function GET(request: NextRequest) {
       activeCode = decryptCode(codeRow.encrypted_code);
     }
 
+    const soldOrdersRow = db
+      .prepare("SELECT COUNT(*) as c FROM orders WHERE ambassador_id = ? AND (status = 'SOLD' OR fulfilment_status = 'DELIVERED')")
+      .get(amb.id) as { c: number } | undefined;
+    const realSoldCount = soldOrdersRow?.c ?? 0;
+    const netSales = Math.max(amb.net_count ?? 0, realSoldCount);
+
+    const pendingOrdersRow = db
+      .prepare("SELECT COUNT(*) as c FROM orders WHERE ambassador_id = ? AND status != 'SOLD' AND status != 'CANCELLED' AND (fulfilment_status IS NULL OR fulfilment_status != 'DELIVERED')")
+      .get(amb.id) as { c: number } | undefined;
+    const pendingSales = pendingOrdersRow?.c ?? (amb.pending_count ?? 0);
+
     return {
       id: amb.id,
       displayName: amb.display_name,
@@ -63,8 +74,8 @@ export async function GET(request: NextRequest) {
       appliesTo: codeRow?.applies_to ?? "ALL_PRODUCTS",
       maxUses: codeRow?.max_uses ?? null,
       usedCount: codeRow?.used_count ?? 0,
-      netSales: amb.net_count ?? 0,
-      pendingSales: amb.pending_count ?? 0,
+      netSales,
+      pendingSales,
       levelName: amb.level_name || "Starter",
       levelRank: amb.level_rank || 1,
       firstQualifiedAt: amb.first_qualified_at,

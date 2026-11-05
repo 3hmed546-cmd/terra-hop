@@ -95,12 +95,17 @@ export async function GET(
       customerName = cust.name;
     } catch {}
 
+    const isSold = o.status === "SOLD" || o.fulfilment_status === "DELIVERED";
+    const isCancelled = o.status === "CANCELLED";
+
     return {
       id: o.id,
       number: o.number,
       status: o.status,
-      fulfilmentStatus: o.fulfilment_status || "NOT_SHIPPED",
-      paymentStatus: o.payment_status || "UNPAID",
+      fulfilmentStatus: isSold ? "DELIVERED" : (o.fulfilment_status || "NOT_SHIPPED"),
+      paymentStatus: isSold ? "PAID" : (o.payment_status || "UNPAID"),
+      isSold,
+      isCancelled,
       totalCents: o.total_cents,
       total: Math.round((o.total_cents || 0) / 100),
       discountCents: o.discount_cents,
@@ -109,6 +114,11 @@ export async function GET(
       deliveredAt: o.delivered_at,
     };
   });
+
+  const soldOrdersCount = orders.filter((o) => o.isSold).length;
+  const pendingOrdersCount = orders.filter((o) => !o.isSold && !o.isCancelled).length;
+  const netSales = Math.max(ambassador.net_count ?? 0, soldOrdersCount);
+  const pendingSales = Math.max(ambassador.pending_count ?? 0, pendingOrdersCount);
 
   return apiSuccess({
     ambassador: {
@@ -123,8 +133,8 @@ export async function GET(
       status: ambassador.status,
       suspendedReason: ambassador.suspended_reason,
       joinedAt: ambassador.joined_at,
-      netSales: ambassador.net_count ?? 0,
-      pendingSales: ambassador.pending_count ?? 0,
+      netSales,
+      pendingSales,
       levelName: ambassador.level_name || "Starter",
       levelRank: ambassador.level_rank || 1,
       firstQualifiedAt: ambassador.first_qualified_at,
@@ -212,4 +222,50 @@ export async function PATCH(
   });
 
   return apiSuccess({ ok: true, id, message: "تم تحديث بيانات السفير بنجاح." });
+}
+
+export async function DELETE(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  const auth = requireAdmin(request);
+  if (!auth.authenticated || !auth.user) return auth.responseError!;
+
+  const { id } = await context.params;
+  const db = getDb();
+
+  const ambassador = db.prepare("SELECT * FROM ambassadors WHERE id = ?").get(id) as any;
+  if (!ambassador) {
+    return apiError("NOT_FOUND", "كود الإحالة / السفير غير موجود.", 404);
+  }
+
+  db.transaction(() => {
+    // 1. Delete associated discount code products
+    const codes = db.prepare("SELECT id FROM referral_codes WHERE ambassador_id = ?").all(id) as any[];
+    for (const c of codes) {
+      db.prepare("DELETE FROM discount_code_products WHERE code_id = ?").run(c.id);
+    }
+    // 2. Delete referral codes
+    db.prepare("DELETE FROM referral_codes WHERE ambassador_id = ?").run(id);
+    // 3. Delete progress, milestones, rewards, portal users, and sale events
+    db.prepare("DELETE FROM ambassador_progress WHERE ambassador_id = ?").run(id);
+    db.prepare("DELETE FROM ambassador_milestones WHERE ambassador_id = ?").run(id);
+    db.prepare("DELETE FROM ambassador_rewards WHERE ambassador_id = ?").run(id);
+    db.prepare("DELETE FROM ambassador_portal_users WHERE ambassador_id = ?").run(id);
+    db.prepare("DELETE FROM ambassador_sale_events WHERE ambassador_id = ?").run(id);
+    // 4. Unlink any orders so order history remains intact
+    db.prepare("UPDATE orders SET ambassador_id = NULL WHERE ambassador_id = ?").run(id);
+    // 5. Delete the ambassador
+    db.prepare("DELETE FROM ambassadors WHERE id = ?").run(id);
+  })();
+
+  recordAudit({
+    actor: auth.user.email,
+    action: "DELETE_AMBASSADOR",
+    entity: "ambassadors",
+    entityId: id,
+    before: { name: ambassador.full_name },
+  });
+
+  return apiSuccess({ deleted: true, message: "تم حذف كود الإحالة والسفير بنجاح." });
 }

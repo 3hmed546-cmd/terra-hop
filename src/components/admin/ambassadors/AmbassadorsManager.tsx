@@ -91,6 +91,7 @@ export function AmbassadorsManager() {
   const [detailLoading, setDetailLoading] = useState(false);
 
   const [suspendTarget, setSuspendTarget] = useState<AmbassadorItem | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AmbassadorItem | null>(null);
 
   const set = <K extends keyof typeof EMPTY_FORM>(k: K, v: (typeof EMPTY_FORM)[K]) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -164,6 +165,24 @@ export function AmbassadorsManager() {
   const toggle = (item: AmbassadorItem) => {
     if (item.status === "ACTIVE") setSuspendTarget(item); // suspending is destructive: confirm first
     else setStatus(item, "ACTIVE");
+  };
+
+  const submitDelete = async (item: AmbassadorItem) => {
+    try {
+      const res = await apiFetch(`/api/admin/ambassadors/${item.id}`, {
+        method: "DELETE",
+      });
+      const json = await res.json();
+      if (json.ok) {
+        toast.push(`تم حذف ${item.displayName || item.fullName} وكود الإحالة بنجاح.`);
+        setDeleteTarget(null);
+        load();
+      } else {
+        toast.push(json.message || "فشل حذف كود الإحالة.");
+      }
+    } catch {
+      toast.push("حدث خطأ أثناء محاولة الحذف.");
+    }
   };
 
   const submitCreate = async (e: FormEvent) => {
@@ -268,6 +287,14 @@ export function AmbassadorsManager() {
           <Button variant="ghost" className="adm-btn-sm" onClick={() => toggle(a)}>
             {a.status === "ACTIVE" ? "إيقاف" : "تفعيل"}
           </Button>
+          <Button
+            variant="ghost"
+            className="adm-btn-sm"
+            style={{ color: "#dc2626" }}
+            onClick={() => setDeleteTarget(a)}
+          >
+            حذف
+          </Button>
         </div>
       ),
     },
@@ -303,10 +330,6 @@ export function AmbassadorsManager() {
         ) : (
           <div className="adm-stats">{[0, 1, 2, 3].map((i) => <div key={i} className="adm-skeleton" />)}</div>
         )}
-        <p className="adm-muted adm-small" style={{ marginTop: 12 }}>
-          رابط دخول السفراء:{" "}
-          <a href="/ambassador/login" target="_blank" rel="noreferrer" className="adm-plink" dir="ltr">/ambassador/login</a>
-        </p>
       </section>
 
       <section className="adm-section" aria-labelledby="amb-list-title">
@@ -345,6 +368,7 @@ export function AmbassadorsManager() {
               <div className="adm-actions">
                 <Button variant="secondary" className="adm-btn-sm" onClick={() => openDetail(a.id)}>التفاصيل</Button>
                 <Button variant="ghost" className="adm-btn-sm" onClick={() => toggle(a)}>{a.status === "ACTIVE" ? "إيقاف" : "تفعيل"}</Button>
+                <Button variant="ghost" className="adm-btn-sm" style={{ color: "#dc2626" }} onClick={() => setDeleteTarget(a)}>حذف</Button>
               </div>
             </div>
           )}
@@ -537,6 +561,27 @@ export function AmbassadorsManager() {
         }
       />
 
+      {/* ---------- confirm delete ---------- */}
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        title={`حذف ${deleteTarget?.displayName || deleteTarget?.fullName || "كود الإحالة"}؟`}
+        description="سيتم حذف كود الإحالة وبيانات السفير نهائياً من قاعدة البيانات. لا يمكن التراجع عن هذا الإجراء."
+        footer={
+          <>
+            <Button
+              style={{ backgroundColor: "#dc2626", borderColor: "#dc2626", color: "#fff" }}
+              onClick={() => {
+                if (deleteTarget) submitDelete(deleteTarget);
+              }}
+            >
+              تأكيد الحذف النهائي
+            </Button>
+            <Button variant="secondary" onClick={() => setDeleteTarget(null)}>إلغاء</Button>
+          </>
+        }
+      />
+
       {/* ---------- detail ---------- */}
       <Dialog open={Boolean(detailId)} onClose={() => setDetailId(null)} title="ملف السفير">
         <div className="adm-amb-wide">
@@ -614,8 +659,8 @@ export function AmbassadorsManager() {
                         </div>
                         <div className="adm-row">
                           <span className="adm-num">{o.total} ج.م</span>
-                          <span className={`adm-badge ${o.fulfilmentStatus === "DELIVERED" ? "adm-badge-sold" : "adm-badge-amb"}`}>
-                            {o.fulfilmentStatus === "DELIVERED" ? "تم التسليم والتحصيل" : "قيد التوصيل"}
+                          <span className={`adm-badge ${o.isSold || o.fulfilmentStatus === "DELIVERED" || o.status === "SOLD" ? "adm-badge-sold" : "adm-badge-amb"}`}>
+                            {o.isSold || o.fulfilmentStatus === "DELIVERED" || o.status === "SOLD" ? "تم البيع" : "قيد التوصيل"}
                           </span>
                         </div>
                       </li>

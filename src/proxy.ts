@@ -156,27 +156,14 @@ export function proxy(request: NextRequest) {
     return res;
   }
 
-  // 3. Ambassador Portal Protection & Isolation
+  // 3. Ambassador Portal Disabled: redirect all /ambassador routes to home /
   if (pathname === "/ambassador" || pathname.startsWith("/ambassador/")) {
-    if (pathname === "/ambassador/login") {
-      // If already logged in, redirect to dashboard
-      if (isAmbSession) {
-        return NextResponse.redirect(new URL("/ambassador", request.url));
-      }
-      const res = NextResponse.next();
-      res.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
-      return res;
-    }
+    return NextResponse.redirect(new URL("/", request.url));
+  }
 
-    // Protect all other /ambassador routes
-    if (!isAmbSession) {
-      return NextResponse.redirect(new URL("/ambassador/login", request.url));
-    }
-
-    const res = NextResponse.next();
-    res.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
-    res.headers.set("Cache-Control", "no-store");
-    return res;
+  // Ambassador API routes are also disabled
+  if (pathname.startsWith("/api/ambassador")) {
+    return NextResponse.json({ error: "DISABLED", message: "بوابة السفراء غير مفعّلة." }, { status: 404 });
   }
 
   return NextResponse.next();

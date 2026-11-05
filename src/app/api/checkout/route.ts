@@ -10,7 +10,8 @@ import { evaluatePromo } from "@/lib/server/promo";
 import { lookupAndValidateCode } from "@/lib/server/ambassadors/codes";
 import { normalizePhone, EGYPT_MOBILE } from "@/lib/server/phone";
 import { getPaymentHandler } from "@/lib/server/payment";
-import { notifyAdminsNewOrder } from "@/lib/server/push";
+import { notifyAdminsNewOrder, notifyAdminsAmbassadorGoalReached } from "@/lib/server/push";
+import { decryptCode } from "@/lib/server/security";
 import type Database from "better-sqlite3";
 
 const CHECKOUT_RATE_OPTIONS = { prefix: "store_checkout", max: 5, windowMs: 10 * 60 * 1000 };
@@ -334,6 +335,40 @@ export async function POST(request: NextRequest) {
   }).catch((err) => {
     console.error("[PushNotification] Failed to notify admins:", err);
   });
+
+  // Check if ambassador reached their max uses goal
+  if (referralCodeId) {
+    try {
+      const codeRow = db.prepare("SELECT * FROM referral_codes WHERE id = ?").get(referralCodeId) as any;
+      if (codeRow?.max_uses && codeRow.used_count >= codeRow.max_uses) {
+        const amb = db.prepare("SELECT * FROM ambassadors WHERE id = ?").get(codeRow.ambassador_id) as any;
+        if (amb) {
+          const milestoneKey = `goal_reached_${codeRow.id}_${codeRow.max_uses}`;
+          const existingMilestone = db.prepare("SELECT id FROM ambassador_milestones WHERE id = ?").get(milestoneKey);
+          if (!existingMilestone) {
+            db.prepare(`
+              INSERT INTO ambassador_milestones (id, ambassador_id, kind, order_id, description, occurred_at, created_by)
+              VALUES (?, ?, 'LEVEL_REACHED', ?, ?, ?, 'system')
+            `).run(
+              milestoneKey,
+              amb.id,
+              orderId,
+              `تم وصول الكود للحد المطلوب (${codeRow.max_uses} استخدام). يستحق المكافأة.`,
+              now
+            );
+
+            const decryptedCode = decryptCode(codeRow.encrypted_code);
+            notifyAdminsAmbassadorGoalReached({
+              ambassadorName: amb.display_name || amb.full_name,
+              code: decryptedCode || "الكود",
+              targetCount: codeRow.max_uses,
+              currentCount: codeRow.used_count,
+            }).catch(() => {});
+          }
+        }
+      }
+    } catch {}
+  }
 
   // الرد كامل لصفحة التأكيد
   return apiSuccess(
