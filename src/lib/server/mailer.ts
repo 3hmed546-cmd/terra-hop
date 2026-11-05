@@ -256,15 +256,15 @@ export async function sendOrderInvoiceEmail(order: EmailOrderData): Promise<bool
 
           <!-- Header & Order Confirmation Request -->
           <tr>
-            <td style="padding: 0 4px 24px; text-align: right;">
-              <div style="color: #888888; font-size: 14px; margin-bottom: 6px;">
-                الطلب #${order.number}
+            <td style="padding: 0 4px 24px; direction: rtl; text-align: right;">
+              <div style="color: #888888; font-size: 14px; margin-bottom: 8px; direction: rtl; text-align: right;">
+                <span style="unicode-bidi: isolate;">طلب رقم:</span>&nbsp;<bdi dir="ltr" style="unicode-bidi: isolate; display: inline-block; font-family: Consolas, monospace; color: #ffffff; font-weight: 700;">#${order.number}</bdi>
               </div>
-              <h1 style="color: #ffffff; font-size: 24px; font-weight: 700; margin: 0 0 12px; line-height: 1.3;">
-                شكراً لطلبك!
+              <h1 style="color: #ffffff; font-size: 24px; font-weight: 800; margin: 0 0 14px; line-height: 1.4; direction: rtl; text-align: right;">
+                شكراً لطلبك من&nbsp;<bdi dir="ltr" style="unicode-bidi: isolate; display: inline-block; white-space: nowrap;">TERRA HOP</bdi>
               </h1>
-              <p style="color: #a3a3a3; font-size: 14px; line-height: 1.6; margin: 0 0 22px;">
-                نحن نجهز طلبك ليتم شحنه. سنعلمك عند إرساله.
+              <p style="color: #a3a3a3; font-size: 14px; line-height: 1.7; margin: 0 0 22px; direction: rtl; text-align: right;">
+                نحن نجهز قطعك ليتم شحنها. يرجى تأكيد رغبتك بالضغط على الزر أدناه لبدء الشحن فوراً.
               </p>
 
               <!-- Action Button ONLY (No raw links) -->
@@ -341,7 +341,7 @@ export async function sendOrderInvoiceEmail(order: EmailOrderData): Promise<bool
 
               <div style="margin-bottom: 22px;">
                 <div style="color: #888888; font-size: 13px; margin-bottom: 4px;">عنوان الشحن</div>
-                <div style="color: #ffffff; font-size: 14px; font-weight: 600; line-height: 1.5;">${order.customer.name}</div>
+                <div style="color: #ffffff; font-size: 14px; font-weight: 700; line-height: 1.5;"><bdi dir="auto" style="unicode-bidi: isolate;">${order.customer.name}</bdi></div>
                 <div style="color: #a3a3a3; font-size: 14px; line-height: 1.6;">${order.customer.address}</div>
                 <div style="color: #a3a3a3; font-size: 14px; line-height: 1.6;">${order.customer.city}</div>
                 <div style="color: #a3a3a3; font-size: 14px; line-height: 1.6;">مصر</div>
@@ -367,9 +367,9 @@ export async function sendOrderInvoiceEmail(order: EmailOrderData): Promise<bool
 
           <!-- Footer -->
           <tr>
-            <td style="padding: 24px 4px 12px; border-top: 1px solid #262626; text-align: center; color: #737373; font-size: 12px; line-height: 1.7;">
-              إذا كانت لديك أي أسئلة، رد على هذا البريد الإلكتروني أو تواصل معنا على<br>
-              <span style="color: #a3a3a3;">terr3hop@gmail.com</span>
+            <td style="padding: 24px 4px 12px; border-top: 1px solid #262626; text-align: center; color: #737373; font-size: 12px; line-height: 1.7; direction: rtl;">
+              <span dir="ltr" style="unicode-bidi: isolate; display: inline-block;">TERRA HOP · Streetwear Redefined © 2026</span><br>
+              <span dir="ltr" style="color: #a3a3a3; unicode-bidi: isolate; display: inline-block;">terr3hop@gmail.com</span>
             </td>
           </tr>
 
@@ -384,7 +384,7 @@ export async function sendOrderInvoiceEmail(order: EmailOrderData): Promise<bool
   const res = await sendBrevoEmail({
     to: order.customer.email,
     recipientName: order.customer.name,
-    subject: `تم تأكيد الطلب #${order.number}`,
+    subject: `فاتورة وتأكيد طلبك رقم ${order.number} | TERRA HOP`,
     html,
   });
 
@@ -442,22 +442,23 @@ export async function sendOrderAcceptedEmail(
 
           <!-- Acceptance Content -->
           <tr>
-            <td style="padding: 0 4px 24px; text-align: right;">
-              <div style="color: #888888; font-size: 14px; margin-bottom: 6px;">
-                الطلب #${order.number}
+            <td style="padding: 0 4px 24px; direction: rtl; text-align: right;">
+              <div style="color: #888888; font-size: 14px; margin-bottom: 8px; direction: rtl; text-align: right;">
+                <span style="unicode-bidi: isolate;">طلب رقم:</span>&nbsp;<bdi dir="ltr" style="unicode-bidi: isolate; display: inline-block; font-family: Consolas, monospace; color: #ffffff; font-weight: 700;">#${order.number}</bdi>
               </div>
-              <h1 style="color: #ffffff; font-size: 24px; font-weight: 700; margin: 0 0 12px; line-height: 1.3;">
-                تم قبول وتجهيز طلبك!
+              <h1 style="color: #ffffff; font-size: 24px; font-weight: 800; margin: 0 0 14px; line-height: 1.4; direction: rtl; text-align: right;">
+                تم قبول وتجهيز طلبك
               </h1>
-              <p style="color: #a3a3a3; font-size: 14px; line-height: 1.6; margin: 0 0 22px;">
-                يسعدنا إبلاغك بأن طلبك رقم #${order.number} تم تأكيده وتجهيزه للتسليم لشركة الشحن.
+              <p style="color: #d4d4d4; font-size: 14px; line-height: 1.8; margin: 0 0 22px; direction: rtl; text-align: right;">
+                <span>مرحباً</span>&nbsp;<strong style="color: #ffffff;"><bdi dir="auto" style="unicode-bidi: isolate; display: inline-block;">${order.customer.name}</bdi></strong>،<br>
+                <span style="color: #a3a3a3;">يسعدنا إبلاغك بأن طلبك رقم&nbsp;<bdi dir="ltr" style="unicode-bidi: isolate; font-weight: 700; color: #ffffff;">#${order.number}</bdi>&nbsp;تم تأكيده وتجهيزه للتسليم لشركة الشحن.</span>
               </p>
 
               <!-- Delivery Timeframe -->
-              <div style="background-color: #1a1a1a; border: 1px solid #2e2e2e; border-right: 4px solid #22c55e; border-radius: 6px; padding: 18px; margin-bottom: 22px;">
+              <div style="background-color: #1a1a1a; border: 1px solid #2e2e2e; border-right: 4px solid #22c55e; border-radius: 6px; padding: 18px; margin-bottom: 22px; direction: rtl; text-align: right;">
                 <div style="font-size: 13px; color: #888888; font-weight: 600; margin-bottom: 4px;">موعد التوصيل المتوقع</div>
-                <div style="font-size: 18px; color: #ffffff; font-weight: 700;">
-                  خلال ${deliveryDays}
+                <div style="font-size: 18px; color: #ffffff; font-weight: 800;">
+                  <bdi dir="auto" style="unicode-bidi: isolate;">${deliveryDays}</bdi>
                 </div>
                 <div style="font-size: 13px; color: #a3a3a3; margin-top: 6px; line-height: 1.6;">
                   سيتواصل معك مندوب شركة الشحن هاتفياً قبل الوصول لتسليم الشحنة.
@@ -465,7 +466,7 @@ export async function sendOrderAcceptedEmail(
               </div>
 
               <!-- Payment Box -->
-              <div style="background-color: #1a1a1a; border: 1px solid #2e2e2e; border-radius: 6px; padding: 18px; margin-bottom: 22px;">
+              <div style="background-color: #1a1a1a; border: 1px solid #2e2e2e; border-radius: 6px; padding: 18px; margin-bottom: 22px; direction: rtl; text-align: right;">
                 <div style="color: #888888; font-size: 13px;">المبلغ المطلوب عند الاستلام:</div>
                 <div style="color: #ffffff; font-size: 20px; font-weight: 800; margin: 4px 0;" dir="ltr">EGP ${totalFormatted}</div>
                 <div style="color: #a3a3a3; font-size: 12px;">الدفع نقداً بعد المعاينة والقياس.</div>
@@ -475,9 +476,9 @@ export async function sendOrderAcceptedEmail(
 
           <!-- Footer -->
           <tr>
-            <td style="padding: 24px 4px 12px; border-top: 1px solid #262626; text-align: center; color: #737373; font-size: 12px; line-height: 1.7;">
-              إذا كانت لديك أي أسئلة، رد على هذا البريد الإلكتروني أو تواصل معنا على<br>
-              <span style="color: #a3a3a3;">terr3hop@gmail.com</span>
+            <td style="padding: 24px 4px 12px; border-top: 1px solid #262626; text-align: center; color: #737373; font-size: 12px; line-height: 1.7; direction: rtl;">
+              <span dir="ltr" style="unicode-bidi: isolate; display: inline-block;">TERRA HOP · Streetwear Redefined © 2026</span><br>
+              <span dir="ltr" style="color: #a3a3a3; unicode-bidi: isolate; display: inline-block;">terr3hop@gmail.com</span>
             </td>
           </tr>
 
@@ -492,7 +493,7 @@ export async function sendOrderAcceptedEmail(
   const res = await sendBrevoEmail({
     to: order.customer.email,
     recipientName: order.customer.name,
-    subject: `تم قبول وشحن طلبك #${order.number} | TERRA HOP`,
+    subject: `تم قبول وشحن طلبك رقم ${order.number} | TERRA HOP`,
     html,
   });
 
@@ -545,26 +546,26 @@ export async function sendOrderRejectedEmail(
 
           <!-- Rejection Content -->
           <tr>
-            <td style="padding: 0 4px 24px; text-align: right;">
-              <div style="color: #888888; font-size: 14px; margin-bottom: 6px;">
-                الطلب #${order.number}
+            <td style="padding: 0 4px 24px; direction: rtl; text-align: right;">
+              <div style="color: #888888; font-size: 14px; margin-bottom: 8px; direction: rtl; text-align: right;">
+                <span style="unicode-bidi: isolate;">طلب رقم:</span>&nbsp;<bdi dir="ltr" style="unicode-bidi: isolate; display: inline-block; font-family: Consolas, monospace; color: #ffffff; font-weight: 700;">#${order.number}</bdi>
               </div>
-              <h1 style="color: #ffffff; font-size: 24px; font-weight: 700; margin: 0 0 12px; line-height: 1.3;">
-                نعتذر منك، ${order.customer.name}
+              <h1 style="color: #ffffff; font-size: 24px; font-weight: 800; margin: 0 0 14px; line-height: 1.4; direction: rtl; text-align: right;">
+                نعتذر منك&nbsp;<bdi dir="auto" style="unicode-bidi: isolate; display: inline-block;">${order.customer.name}</bdi>
               </h1>
-              <p style="color: #a3a3a3; font-size: 14px; line-height: 1.6; margin: 0 0 22px;">
-                نأسف لإبلاغك بأنه تعذر استكمال وتجهيز طلبك رقم #${order.number} وتم إلغاؤه من قِبل إدارة المتجر.
+              <p style="color: #d4d4d4; font-size: 14px; line-height: 1.8; margin: 0 0 22px; direction: rtl; text-align: right;">
+                <span style="color: #a3a3a3;">نأسف لإبلاغك بأنه تعذر استكمال وتجهيز طلبك رقم&nbsp;<bdi dir="ltr" style="unicode-bidi: isolate; font-weight: 700; color: #ffffff;">#${order.number}</bdi>&nbsp;وتم إلغاؤه من قِبل إدارة المتجر.</span>
               </p>
 
               <!-- Reason Box -->
-              <div style="background-color: #1a1a1a; border: 1px solid #2e2e2e; border-right: 4px solid #e11d48; border-radius: 6px; padding: 18px; margin-bottom: 22px;">
+              <div style="background-color: #1a1a1a; border: 1px solid #2e2e2e; border-right: 4px solid #e11d48; border-radius: 6px; padding: 18px; margin-bottom: 22px; direction: rtl; text-align: right;">
                 <div style="font-size: 13px; color: #888888; font-weight: 600; margin-bottom: 4px;">سبب الإلغاء</div>
                 <div style="font-size: 15px; color: #ffffff; font-weight: 600; line-height: 1.6;">
-                  ${reason}
+                  <bdi dir="auto" style="unicode-bidi: isolate;">${reason}</bdi>
                 </div>
               </div>
 
-              <p style="color: #888888; font-size: 13px; line-height: 1.7; margin: 0;">
+              <p style="color: #888888; font-size: 13px; line-height: 1.7; margin: 0; direction: rtl; text-align: right;">
                 نعتذر بشدة عن أي إزعاج قد سببه ذلك لك، ويسعدنا دائماً زيارتك للمتجر مرة أخرى لاختيار أي قطع بديلة.
               </p>
             </td>
@@ -572,9 +573,9 @@ export async function sendOrderRejectedEmail(
 
           <!-- Footer -->
           <tr>
-            <td style="padding: 24px 4px 12px; border-top: 1px solid #262626; text-align: center; color: #737373; font-size: 12px; line-height: 1.7;">
-              إذا كانت لديك أي أسئلة، رد على هذا البريد الإلكتروني أو تواصل معنا على<br>
-              <span style="color: #a3a3a3;">terr3hop@gmail.com</span>
+            <td style="padding: 24px 4px 12px; border-top: 1px solid #262626; text-align: center; color: #737373; font-size: 12px; line-height: 1.7; direction: rtl;">
+              <span dir="ltr" style="unicode-bidi: isolate; display: inline-block;">TERRA HOP · Streetwear Redefined © 2026</span><br>
+              <span dir="ltr" style="color: #a3a3a3; unicode-bidi: isolate; display: inline-block;">terr3hop@gmail.com</span>
             </td>
           </tr>
 
@@ -589,7 +590,7 @@ export async function sendOrderRejectedEmail(
   const res = await sendBrevoEmail({
     to: order.customer.email,
     recipientName: order.customer.name,
-    subject: `تحديث بخصوص طلبك #${order.number} | TERRA HOP`,
+    subject: `تحديث بخصوص طلبك رقم ${order.number} | TERRA HOP`,
     html,
   });
 
@@ -641,40 +642,42 @@ export async function sendOrderDeliveredThankYouEmail(order: {
 
           <!-- Thank You & Delivered Content -->
           <tr>
-            <td style="padding: 0 4px 24px; text-align: right;">
-              <div style="color: #888888; font-size: 14px; margin-bottom: 6px;">
-                الطلب #${order.number}
+            <td style="padding: 0 4px 24px; direction: rtl; text-align: right;">
+              <div style="color: #888888; font-size: 14px; margin-bottom: 8px; direction: rtl; text-align: right;">
+                <span style="unicode-bidi: isolate;">طلب رقم:</span>&nbsp;<bdi dir="ltr" style="unicode-bidi: isolate; display: inline-block; font-family: Consolas, monospace; color: #ffffff; font-weight: 700;">#${order.number}</bdi>
               </div>
-              <h1 style="color: #ffffff; font-size: 24px; font-weight: 700; margin: 0 0 12px; line-height: 1.3;">
-                شكراً لتعاملك مع TERRA HOP!
+
+              <h1 style="color: #ffffff; font-size: 24px; font-weight: 800; margin: 0 0 14px; line-height: 1.4; direction: rtl; text-align: right;">
+                شكراً لتعاملك مع&nbsp;<bdi dir="ltr" style="unicode-bidi: isolate; display: inline-block; white-space: nowrap;">TERRA HOP</bdi>
               </h1>
-              <p style="color: #a3a3a3; font-size: 14px; line-height: 1.6; margin: 0 0 20px;">
-                مرحباً ${order.customer.name}،<br>
-                يسعدنا إبلاغك بأنه تم تسليم طلبك بنجاح. نتمنى أن تنال القطع إعجابك وتناسب ستايلك المميز.
+
+              <p style="color: #d4d4d4; font-size: 14px; line-height: 1.8; margin: 0 0 22px; direction: rtl; text-align: right;">
+                <span>مرحباً</span>&nbsp;<strong style="color: #ffffff;"><bdi dir="auto" style="unicode-bidi: isolate; display: inline-block;">${order.customer.name}</bdi></strong>،<br>
+                <span style="color: #a3a3a3;">يسعدنا إبلاغك بأنه تم تسليم طلبك بنجاح. نتمنى أن تنال القطع إعجابك وتناسب ستايلك المميز.</span>
               </p>
 
               <!-- Delivery Confirmed Box -->
-              <div style="background-color: #1a1a1a; border: 1px solid #2e2e2e; border-right: 4px solid #22c55e; border-radius: 6px; padding: 16px; margin-bottom: 24px;">
-                <div style="font-size: 13px; color: #888888; font-weight: 600; margin-bottom: 2px;">حالة الطلب</div>
+              <div style="background-color: #1a1a1a; border: 1px solid #2e2e2e; border-right: 4px solid #22c55e; border-radius: 6px; padding: 16px; margin-bottom: 24px; direction: rtl; text-align: right;">
+                <div style="font-size: 13px; color: #888888; font-weight: 600; margin-bottom: 4px;">حالة الطلب</div>
                 <div style="font-size: 16px; color: #ffffff; font-weight: 700;">
                   تم التسليم واستلام المبلغ بنجاح
                 </div>
               </div>
 
               <!-- VIP WhatsApp Community Card -->
-              <div style="background-color: #18181b; border: 1px solid #27272a; border-radius: 8px; padding: 22px 18px; text-align: center; margin-bottom: 24px;">
-                <div style="color: #ffffff; font-size: 16px; font-weight: 700; margin-bottom: 8px;">
-                  انضم إلى مجتمع TERRA HOP VIP
+              <div style="background-color: #18181b; border: 1px solid #27272a; border-radius: 8px; padding: 24px 20px; text-align: center; margin-bottom: 24px; direction: rtl;">
+                <div style="color: #ffffff; font-size: 17px; font-weight: 800; margin-bottom: 8px; direction: rtl; text-align: center;">
+                  انضم إلى مجتمع&nbsp;<bdi dir="ltr" style="unicode-bidi: isolate; display: inline-block; white-space: nowrap;">TERRA HOP VIP</bdi>
                 </div>
-                <p style="color: #a1a1aa; font-size: 13px; line-height: 1.6; margin: 0 0 18px;">
+                <p style="color: #a1a1aa; font-size: 13px; line-height: 1.7; margin: 0 auto 20px; max-width: 420px; direction: rtl; text-align: center;">
                   انضم لجروب الواتساب الخاص بعملائنا المميزين للحصول على أكواد خصم حصرية وإشعارات مبكرة بأحدث الكولكشنز والقطع المحدودة.
                 </p>
-                <a href="${whatsappUrl}" style="display: inline-block; background-color: #25D366; color: #ffffff; padding: 12px 28px; border-radius: 6px; font-weight: 700; font-size: 14px; text-decoration: none;">
-                  الانضمام لجروب VIP على واتساب
+                <a href="${whatsappUrl}" style="display: inline-block; background-color: #22c55e; color: #ffffff; padding: 13px 44px; border-radius: 6px; font-weight: 800; font-size: 15px; text-decoration: none; text-align: center; box-shadow: 0 2px 10px rgba(34, 197, 94, 0.35);">
+                  انضم الآن
                 </a>
               </div>
 
-              <p style="color: #737373; font-size: 13px; line-height: 1.6; margin: 0;">
+              <p style="color: #737373; font-size: 13px; line-height: 1.6; margin: 0; direction: rtl; text-align: right;">
                 إذا كانت لديك أي استفسارات أو ملاحظات، يمكنك دائماً الرد على هذا البريد الإلكتروني.
               </p>
             </td>
@@ -682,9 +685,9 @@ export async function sendOrderDeliveredThankYouEmail(order: {
 
           <!-- Footer -->
           <tr>
-            <td style="padding: 24px 4px 12px; border-top: 1px solid #262626; text-align: center; color: #737373; font-size: 12px; line-height: 1.7;">
-              TERRA HOP · Streetwear Redefined © 2026<br>
-              <span style="color: #a3a3a3;">terr3hop@gmail.com</span>
+            <td style="padding: 24px 4px 12px; border-top: 1px solid #262626; text-align: center; color: #737373; font-size: 12px; line-height: 1.7; direction: rtl;">
+              <span dir="ltr" style="unicode-bidi: isolate; display: inline-block;">TERRA HOP · Streetwear Redefined © 2026</span><br>
+              <span dir="ltr" style="color: #a3a3a3; unicode-bidi: isolate; display: inline-block;">terr3hop@gmail.com</span>
             </td>
           </tr>
 
@@ -699,7 +702,7 @@ export async function sendOrderDeliveredThankYouEmail(order: {
   const res = await sendBrevoEmail({
     to: order.customer.email,
     recipientName: order.customer.name,
-    subject: `تم تسليم طلبك #${order.number} | شكراً لتعاملك مع TERRA HOP`,
+    subject: `تم تسليم طلبك رقم ${order.number} | شكراً لتعاملك مع TERRA HOP`,
     html,
   });
 
