@@ -43,9 +43,30 @@
 .adm-brand { font-family: var(--adm-font-head); font-weight: 800; letter-spacing: 0.12em; text-decoration: none; }
 .adm-main { padding: 24px 16px 64px; max-width: 1200px; outline: none; }
 
+html:has(.adm), body:has(.adm) {
+  overflow-x: clip !important;
+}
+
 @media (min-width: 1024px) {
-  .adm-shell { display: grid; grid-template-columns: 240px minmax(0, 1fr); }
-  .adm-sidebar { display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; padding: 24px 16px; background: var(--adm-obsidian); color: var(--adm-offwhite); }
+  .adm-shell {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+    min-height: 100vh;
+    align-items: start;
+  }
+  .adm-sidebar {
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    max-height: 100vh;
+    overflow-y: auto;
+    z-index: 40;
+    padding: 24px 16px;
+    background: var(--adm-obsidian);
+    color: var(--adm-offwhite);
+  }
   .adm-topbar { display: none; }
   .adm-main { padding: 40px 40px 80px; }
 }

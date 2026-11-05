@@ -7,6 +7,7 @@ import { checkOrderStock } from "@/lib/admin/inventory";
 import { canCancel, lineTotal, sellBlockReason } from "@/lib/admin/orders";
 import { adminHref } from "@/lib/admin/paths";
 import { useAdminStore } from "@/lib/admin/store";
+import { apiFetch } from "@/lib/admin-auth";
 import type { Order, OrderItem, TimelineEvent } from "@/lib/admin/types";
 import { PageHeader } from "../PageHeader";
 import { Button, EmptyState, StatusBadge, Table, useToast, type Column } from "../ui";
@@ -59,7 +60,7 @@ export function OrderDetail({ orderId }: { orderId: string }) {
   const handleMarkDeliveredPaid = async (targetOrderId: string) => {
     setDelivering(true);
     try {
-      const res = await fetch(`/api/admin/orders/${targetOrderId}/mark-delivered-paid`, {
+      const res = await apiFetch(`/api/admin/orders/${targetOrderId}/mark-delivered-paid`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),

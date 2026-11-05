@@ -7,7 +7,7 @@ import { countNeedsAction } from "@/lib/admin/inventory";
 import { ADMIN_BASE, adminHref, isNavActive, relativeAdminPath } from "@/lib/admin/paths";
 import { useAdminStore } from "@/lib/admin/store";
 import { isAuthenticated, logout } from "@/lib/admin-auth";
-import { registerPushServiceWorker } from "@/lib/push-client";
+import { registerPushServiceWorker, subscribeToAdminPush } from "@/lib/push-client";
 import type { ShortcutAction } from "@/lib/admin/shortcuts";
 import { useShortcuts } from "@/lib/admin/use-shortcuts";
 import { ShortcutHelpProvider, ShortcutsDialog } from "./ShortcutsDialog";
@@ -19,7 +19,7 @@ const ITEMS = [
   { path: "/media", label: N.media },
   { path: "/products", label: N.products },
   { path: "/orders", label: N.orders },
-  { path: "/ambassadors", label: "سفراء الشارع" },
+  { path: "/ambassadors", label: "أكواد الإحالة" },
   { path: "/settings", label: N.settings },
 ] as const;
 
@@ -86,7 +86,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
     if (!isAuthed) {
       router.replace(adminHref(""));
     } else {
-      registerPushServiceWorker().catch(() => {});
+      registerPushServiceWorker()
+        .then(() => {
+          if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+            subscribeToAdminPush().catch(() => {});
+          }
+        })
+        .catch(() => {});
     }
   }, [router]);
 

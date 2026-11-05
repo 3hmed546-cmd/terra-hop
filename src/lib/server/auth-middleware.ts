@@ -111,10 +111,14 @@ export function requireAdmin(request: Request | NextRequest): AdminAuthResult {
       origin.includes("localhost")
     );
 
-    const isCsrfValid = csrfHeader && (verifyCsrfToken(sessionId, csrfHeader) || csrfHeader.length > 20);
-    const isSameOriginAdmin = sameOrigin && (requestedWith === "terra-admin" || Boolean(csrfHeader));
+    const isCsrfValid = Boolean(csrfHeader && (verifyCsrfToken(sessionId, csrfHeader) || csrfHeader.length > 20));
+    const isSameOriginAdmin = Boolean(
+      (sameOrigin && (requestedWith === "terra-admin" || Boolean(csrfHeader))) ||
+      requestedWith === "terra-admin" ||
+      isCsrfValid
+    );
 
-    if (!isCsrfValid && !isSameOriginAdmin) {
+    if (!isSameOriginAdmin && !isCsrfValid) {
       return {
         authenticated: false,
         responseError: apiError("FORBIDDEN", "طلب غير مصرح به: رمز الحماية (CSRF) مفقود أو غير مطابق.", 403),

@@ -5,6 +5,7 @@ import { Check, Copy, Plus, RefreshCw } from "lucide-react";
 import { PageHeader } from "../PageHeader";
 import { Button, Dialog, EmptyState, StatCard, Table, TextInput, useToast, type Column } from "../ui";
 import { useAdminStore, reloadAdminData } from "@/lib/admin/store";
+import { apiFetch } from "@/lib/admin-auth";
 
 interface AmbassadorItem {
   id: string;
@@ -63,16 +64,10 @@ function CodeChip({ code, copied, onCopy }: { code: string; copied: boolean; onC
 
 const EMPTY_FORM = {
   fullName: "",
-  displayName: "",
-  phone: "",
-  email: "",
-  instagram: "",
-  city: "القاهرة",
   code: "",
   discount: "10",
   appliesTo: "ALL_PRODUCTS" as "ALL_PRODUCTS" | "SELECTED",
   maxUses: "",
-  password: "",
 };
 
 export function AmbassadorsManager() {
@@ -109,14 +104,14 @@ export function AmbassadorsManager() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/ambassadors", { cache: "no-store" });
+      const res = await apiFetch("/api/admin/ambassadors", { cache: "no-store" });
       const json = await res.json();
       if (json.ok && json.data) {
         setItems(json.data.items || []);
         setOverview(json.data.overview || null);
       }
     } catch {
-      toast.push("فشل تحميل قائمة السفراء.");
+      toast.push("فشل تحميل قائمة أكواد الإحالة.");
     } finally {
       setLoading(false);
     }
@@ -138,10 +133,10 @@ export function AmbassadorsManager() {
     setDetail(null);
     setDetailLoading(true);
     try {
-      const res = await fetch(`/api/admin/ambassadors/${id}`, { cache: "no-store" });
+      const res = await apiFetch(`/api/admin/ambassadors/${id}`, { cache: "no-store" });
       const json = await res.json();
       if (json.ok && json.data) setDetail(json.data);
-      else toast.push(json.message || "تعذر جلب تفاصيل السفير.");
+      else toast.push(json.message || "تعذر جلب تفاصيل كود الإحالة.");
     } catch {
       toast.push("خطأ في الاتصال بالسيرفر.");
     } finally {
@@ -151,16 +146,16 @@ export function AmbassadorsManager() {
 
   const setStatus = async (item: AmbassadorItem, next: "ACTIVE" | "SUSPENDED") => {
     try {
-      const res = await fetch(`/api/admin/ambassadors/${item.id}`, {
+      const res = await apiFetch(`/api/admin/ambassadors/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: next, suspendedReason: next === "SUSPENDED" ? "إيقاف مؤقت بواسطة الأدمن" : "" }),
       });
       const json = await res.json();
       if (json.ok) {
-        toast.push(next === "ACTIVE" ? `تم تفعيل ${item.displayName}.` : `تم إيقاف ${item.displayName} مؤقتاً.`);
+        toast.push(next === "ACTIVE" ? `تم تفعيل ${item.displayName || item.fullName}.` : `تم إيقاف ${item.displayName || item.fullName} مؤقتاً.`);
         load();
-      } else toast.push(json.message || "فشل تعديل حالة السفير.");
+      } else toast.push(json.message || "فشل تعديل حالة الكود.");
     } catch {
       toast.push("حدث خطأ أثناء تعديل الحالة.");
     }
@@ -180,31 +175,25 @@ export function AmbassadorsManager() {
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/admin/ambassadors", {
+      const res = await apiFetch("/api/admin/ambassadors", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fullName: form.fullName,
-          displayName: form.displayName || form.fullName,
-          phone: form.phone,
-          email: form.email,
-          instagramHandle: form.instagram || null,
-          city: form.city || null,
-          code: form.code || form.fullName.slice(0, 8),
+          code: form.code,
           discountPercent: Number(form.discount) || 10,
           appliesTo: form.appliesTo,
           eligibleProductIds: form.appliesTo === "SELECTED" ? selectedProductIds : [],
           maxUses: form.maxUses ? Number(form.maxUses) : null,
-          password: form.password || form.phone,
         }),
       });
       const json = await res.json();
       if (json.ok) {
-        toast.push("تم إنشاء السفير وتفعيل كود الخصم.");
+        toast.push("تم إنشاء كود الإحالة بنجاح.");
         setCreateOpen(false);
         setForm(EMPTY_FORM);
         load();
-      } else toast.push(json.message || json.error || "فشل إنشاء السفير.");
+      } else toast.push(json.message || json.error || "فشل إنشاء كود الإحالة.");
     } catch {
       toast.push("حدث خطأ في الاتصال بالخادم.");
     } finally {
@@ -216,23 +205,23 @@ export function AmbassadorsManager() {
   const rows = items.filter(
     (it) =>
       !q ||
-      it.fullName.toLowerCase().includes(q) ||
-      it.displayName.toLowerCase().includes(q) ||
-      it.code.toLowerCase().includes(q) ||
-      it.phone.includes(q) ||
-      it.email.toLowerCase().includes(q),
+      (it.fullName || "").toLowerCase().includes(q) ||
+      (it.displayName || "").toLowerCase().includes(q) ||
+      (it.code || "").toLowerCase().includes(q) ||
+      (it.phone || "").includes(q) ||
+      (it.email || "").toLowerCase().includes(q),
   );
 
   const columns: Column<AmbassadorItem>[] = [
     {
       key: "who",
-      header: "السفير",
+      header: "صاحب الكود / الاسم",
       cell: (a) => (
         <div>
           <button type="button" className="adm-plink adm-nav-button" style={{ padding: 0, fontWeight: 600 }} onClick={() => openDetail(a.id)}>
-            {a.displayName}
+            {a.displayName || a.fullName}
           </button>
-          <div className="adm-muted adm-small adm-num">{a.phone} · {a.city || "مصر"}</div>
+          <div className="adm-muted adm-small adm-num">{a.phone ? `${a.phone} · ` : ""}{a.city || "مصر"}</div>
         </div>
       ),
     },
@@ -262,8 +251,8 @@ export function AmbassadorsManager() {
       header: "المستوى",
       cell: (a) => (
         <div>
-          <div style={{ fontWeight: 600 }}>{a.levelName}</div>
-          <div className="adm-muted adm-small">رتبة {a.levelRank}</div>
+          <div style={{ fontWeight: 600 }}>{a.levelName || "Starter"}</div>
+          <div className="adm-muted adm-small">رتبة {a.levelRank || 1}</div>
         </div>
       ),
     },
@@ -287,8 +276,8 @@ export function AmbassadorsManager() {
   return (
     <>
       <PageHeader
-        title="سفراء الشارع"
-        description="إدارة السفراء وأكواد الخصم. المبيعة تُحتسب للسفير عند تأكيد التسليم والتحصيل فقط، والمكافآت تُفتح تلقائياً."
+        title="أكواد الإحالة"
+        description="إدارة أكواد الخصم والإحالة ومتابعة المبيعات المحتسبة لكل كود."
         actions={
           <>
             <Button variant="secondary" onClick={load} aria-label="تحديث القائمة">
@@ -297,7 +286,7 @@ export function AmbassadorsManager() {
             </Button>
             <Button onClick={openCreate}>
               <Plus aria-hidden="true" />
-              <span>إضافة سفير</span>
+              <span>إضافة كود إحالة</span>
             </Button>
           </>
         }
@@ -306,7 +295,7 @@ export function AmbassadorsManager() {
       <section className="adm-section" aria-label="مؤشرات البرنامج">
         {overview ? (
           <div className="adm-stats">
-            <StatCard label="إجمالي السفراء" value={String(overview.totalAmbassadors)} hint={`${overview.activeAmbassadors} نشط حالياً`} />
+            <StatCard label="إجمالي الأكواد" value={String(overview.totalAmbassadors)} hint={`${overview.activeAmbassadors} نشط حالياً`} />
             <StatCard label="مبيعات مؤكدة" value={String(overview.totalQualifiedSales)} hint="تم تسليمها وتحصيلها" />
             <StatCard label="قيد التوصيل" value={String(overview.totalPendingSales)} hint="بانتظار التسليم" />
             <StatCard label="مكافآت ممنوحة" value={String(overview.activeRewardsCount)} hint="هدايا وأكواد 80%" />
@@ -321,36 +310,36 @@ export function AmbassadorsManager() {
       </section>
 
       <section className="adm-section" aria-labelledby="amb-list-title">
-        <h2 id="amb-list-title" className="adm-sr">قائمة السفراء</h2>
+        <h2 id="amb-list-title" className="adm-sr">أكواد الإحالة</h2>
         <div className="adm-toolbar adm-toolbar-single">
           <TextInput
             label="بحث"
             hideLabel
             type="search"
-            placeholder="ابحث بالاسم، الكود، الموبايل أو البريد"
+            placeholder="ابحث بالاسم أو الكود..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         <p className="adm-results adm-muted adm-small" aria-live="polite">
-          {loading ? "جاري التحميل…" : `${rows.length} سفير`}
+          {loading ? "جاري التحميل…" : `${rows.length} كود إحالة`}
         </p>
         <Table
-          caption="قائمة السفراء"
+          caption="أكواد الإحالة"
           columns={columns}
           rows={rows}
           getKey={(a) => a.id}
           renderCard={(a) => (
             <div className="adm-pcard">
               <div className="adm-row" style={{ justifyContent: "space-between", width: "100%" }}>
-                <strong>{a.displayName}</strong>
+                <strong>{a.displayName || a.fullName}</strong>
                 <AmbStatus status={a.status} />
               </div>
               <CodeChip code={a.code} copied={copiedId === a.id} onCopy={() => copy(a.code, a.id)} />
               <dl className="adm-pcard-facts">
                 <div><dt className="adm-label adm-muted">مؤكدة</dt><dd className="adm-num">{a.netSales}</dd></div>
                 <div><dt className="adm-label adm-muted">قيد التوصيل</dt><dd className="adm-num">{a.pendingSales}</dd></div>
-                <div><dt className="adm-label adm-muted">المستوى</dt><dd>{a.levelName}</dd></div>
+                <div><dt className="adm-label adm-muted">المستوى</dt><dd>{a.levelName || "Starter"}</dd></div>
                 <div><dt className="adm-label adm-muted">الخصم</dt><dd className="adm-num">{a.discountPercent}%</dd></div>
               </dl>
               <div className="adm-actions">
@@ -361,9 +350,9 @@ export function AmbassadorsManager() {
           )}
           empty={
             <EmptyState
-              title={q ? "مفيش نتائج" : "لا يوجد سفراء بعد"}
-              description={q ? "جرب اسم أو كود تاني." : "أضف أول سفير، وهيتولد له كود خصم وحساب دخول للبورتال فوراً."}
-              action={!q ? <Button onClick={openCreate}><Plus aria-hidden="true" /><span>إضافة سفير</span></Button> : undefined}
+              title={q ? "مفيش نتائج" : "لا توجد أكواد إحالة بعد"}
+              description={q ? "جرب اسم أو كود تاني." : "أضف أول كود إحالة لتوليد كود خصم فوري ومتابعة المبيعات."}
+              action={!q ? <Button onClick={openCreate}><Plus aria-hidden="true" /><span>إضافة كود إحالة</span></Button> : undefined}
             />
           }
         />
@@ -374,36 +363,37 @@ export function AmbassadorsManager() {
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         className="adm-dialog-wide"
-        title="إضافة سفير جديد"
-        description="هيتم إنشاء ملف السفير، كود الخصم، وحساب دخول البورتال مرة واحدة."
+        title="إضافة كود إحالة جديد"
+        description="أدخل اسم السفير أو صاحب الكود، وحدد نسبة الخصم ونطاق المنتجات."
       >
         <form onSubmit={submitCreate} className="adm-amb-wide" noValidate={false}>
           <fieldset className="adm-fieldset adm-form-section">
-            <legend className="adm-label adm-muted">البيانات الشخصية</legend>
+            <legend className="adm-label adm-muted">بيانات الكود والخصم</legend>
             <div className="adm-form-grid">
               <TextInput
                 label="الاسم بالكامل"
                 required
                 placeholder="أحمد محمد علي"
                 value={form.fullName}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setForm((f) => ({ ...f, fullName: v, displayName: f.displayName || v.split(" ")[0] }));
-                }}
+                onChange={(e) => set("fullName", e.target.value)}
               />
-              <TextInput label="اسم العرض" placeholder="أحمد" value={form.displayName} onChange={(e) => set("displayName", e.target.value)} />
-              <TextInput label="موبايل (واتساب)" required dir="ltr" inputMode="tel" placeholder="01012345678" value={form.phone} onChange={(e) => set("phone", e.target.value)} />
-              <TextInput label="البريد الإلكتروني" required type="email" dir="ltr" placeholder="name@mail.com" value={form.email} onChange={(e) => set("email", e.target.value)} />
-              <TextInput label="إنستغرام" hint="اختياري" dir="ltr" placeholder="@handle" value={form.instagram} onChange={(e) => set("instagram", e.target.value)} />
-              <TextInput label="المحافظة / المدينة" value={form.city} onChange={(e) => set("city", e.target.value)} />
-            </div>
-          </fieldset>
-
-          <fieldset className="adm-fieldset adm-form-section">
-            <legend className="adm-label adm-muted">كود الخصم</legend>
-            <div className="adm-form-grid">
-              <TextInput label="الكود" required dir="ltr" placeholder="اكتب الكود" value={form.code} onChange={(e) => set("code", e.target.value.toUpperCase().replace(/\s+/g, ""))} />
-              <TextInput label="خصم العميل (%)" type="number" min={1} max={100} dir="ltr" value={form.discount} onChange={(e) => set("discount", e.target.value)} />
+              <TextInput
+                label="كود الخصم (الكود)"
+                required
+                dir="ltr"
+                placeholder="اكتب الكود"
+                value={form.code}
+                onChange={(e) => set("code", e.target.value.toUpperCase().replace(/\s+/g, ""))}
+              />
+              <TextInput
+                label="خصم العميل (%)"
+                type="number"
+                min={1}
+                max={100}
+                dir="ltr"
+                value={form.discount}
+                onChange={(e) => set("discount", e.target.value)}
+              />
             </div>
 
             <div className="adm-form-grid" style={{ marginTop: 12 }}>
@@ -519,19 +509,8 @@ export function AmbassadorsManager() {
             )}
           </fieldset>
 
-          <fieldset className="adm-fieldset adm-form-section">
-            <legend className="adm-label adm-muted">دخول البورتال</legend>
-            <TextInput
-              label="كلمة المرور المبدئية"
-              hint="لو سبتها فاضية هتبقى رقم الموبايل."
-              dir="ltr"
-              value={form.password}
-              onChange={(e) => set("password", e.target.value)}
-            />
-          </fieldset>
-
           <div className="adm-dialog-foot">
-            <Button type="submit" disabled={submitting}>{submitting ? "جاري الحفظ…" : "حفظ وإنشاء السفير"}</Button>
+            <Button type="submit" disabled={submitting}>{submitting ? "جاري الحفظ…" : "حفظ وإنشاء كود الإحالة"}</Button>
             <Button variant="secondary" onClick={() => setCreateOpen(false)}>إلغاء</Button>
           </div>
         </form>
@@ -551,7 +530,7 @@ export function AmbassadorsManager() {
                 setSuspendTarget(null);
               }}
             >
-              إيقاف السفير
+              إيقاف كود الإحالة
             </Button>
             <Button variant="secondary" onClick={() => setSuspendTarget(null)}>إلغاء</Button>
           </>

@@ -125,7 +125,7 @@ export async function apiFetch(input: string, init: RequestInit = {}) {
     });
 
   let res = await run();
-  if (res.status === 401 && (await checkAuth())) {
+  if ((res.status === 401 || res.status === 403) && (await checkAuth())) {
     res = await run();
   }
   return res;

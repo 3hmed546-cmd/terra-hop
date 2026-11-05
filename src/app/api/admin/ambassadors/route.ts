@@ -109,35 +109,51 @@ export async function POST(request: NextRequest) {
 
   const fullName = String(body.fullName || "").trim();
   const displayName = String(body.displayName || fullName).trim();
-  const phone = normalizePhone(String(body.phone || "").trim());
-  const email = String(body.email || "").trim().toLowerCase();
-  const instagramHandle = String(body.instagramHandle || "").trim() || null;
-  const city = String(body.city || "").trim() || null;
-  const notes = String(body.notes || "").trim() || null;
-
-  if (fullName.length < 3) {
-    return apiError("VALIDATION", "يرجى كتابة الاسم الثلاثي بالكامل.", 400, "fullName");
-  }
-  if (!phone || phone.length < 10) {
-    return apiError("VALIDATION", "يرجى إدخال رقم هاتف صحيح.", 400, "phone");
-  }
-  if (!email || !email.includes("@")) {
-    return apiError("VALIDATION", "يرجى إدخال بريد إلكتروني صحيح.", 400, "email");
-  }
-
-  // Check unique phone & email
-  const existingAmb = db
-    .prepare("SELECT id FROM ambassadors WHERE phone = ? OR email = ?")
-    .get(phone, email) as any;
-  if (existingAmb) {
-    return apiError("VALIDATION", "رقم الهاتف أو البريد الإلكتروني مسجل لسفير آخر بالفعل.", 409);
-  }
 
   // Code normalization & encryption
   const rawCode = String(body.code || displayName)
     .trim()
     .toUpperCase()
     .replace(/[^A-Z0-9-]/g, "");
+
+  if (fullName.length < 2) {
+    return apiError("VALIDATION", "يرجى كتابة الاسم بالكامل.", 400, "fullName");
+  }
+
+  // Provide fallback phone and email if omitted in simplified referral form
+  let phone = String(body.phone || "").trim();
+  if (phone) {
+    phone = normalizePhone(phone);
+    if (!phone || phone.length < 10) {
+      return apiError("VALIDATION", "يرجى إدخال رقم هاتف صحيح.", 400, "phone");
+    }
+  } else {
+    phone = `010${Math.floor(10000000 + Math.random() * 90000000)}`;
+  }
+
+  let email = String(body.email || "").trim().toLowerCase();
+  if (email) {
+    if (!email.includes("@")) {
+      return apiError("VALIDATION", "يرجى إدخال بريد إلكتروني صحيح.", 400, "email");
+    }
+  } else {
+    const safeTag = (rawCode.toLowerCase() || crypto.randomUUID().slice(0, 8)).replace(/[^a-z0-9]/g, "");
+    email = `ref_${safeTag}_${Date.now().toString(36)}@terrahop.internal`;
+  }
+
+  const instagramHandle = String(body.instagramHandle || "").trim() || null;
+  const city = String(body.city || "").trim() || null;
+  const notes = String(body.notes || "").trim() || null;
+
+  // Check unique phone & email if real values provided
+  if (body.phone || body.email) {
+    const existingAmb = db
+      .prepare("SELECT id FROM ambassadors WHERE phone = ? OR email = ?")
+      .get(phone, email) as any;
+    if (existingAmb) {
+      return apiError("VALIDATION", "رقم الهاتف أو البريد الإلكتروني مسجل لسفير آخر بالفعل.", 409);
+    }
+  }
 
   if (rawCode.length < 3 || rawCode.length > 20) {
     return apiError("VALIDATION", "كود الخصم يجب أن يتكون من 3 إلى 20 حرف ورقم إنجليزي.", 400, "code");
