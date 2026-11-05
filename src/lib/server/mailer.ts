@@ -1,45 +1,26 @@
-import nodemailer from "nodemailer";
-import type { Transporter } from "nodemailer";
 import crypto from "crypto";
 import { getDb } from "./db";
 
-const GMAIL_USER = process.env.GMAIL_USER || "terr3hop@gmail.com";
-const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD || "lcrbsshfycezjziz";
+const DEFAULT_SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL || process.env.GMAIL_USER || "terr3hop@gmail.com";
+const DEFAULT_SENDER_NAME = "TERRA HOP";
+
 const APP_BASE_URL =
   process.env.APP_BASE_URL ||
   (process.env.RAILWAY_PUBLIC_DOMAIN
     ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
     : "https://terra-hop-production.up.railway.app");
 
-let transporter: Transporter | null = null;
-
-function getTransporter(): Transporter {
-  if (!transporter) {
-    transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: GMAIL_USER,
-        pass: GMAIL_APP_PASSWORD.replace(/\s+/g, ""),
-      },
-      connectionTimeout: 4000,
-      greetingTimeout: 4000,
-      socketTimeout: 4000,
-    });
-  }
-  return transporter;
-}
-
 /**
- * Retrieve dynamic email delivery configurations from DB settings or process.env
+ * Retrieve Brevo API Key and sender settings from DB settings or process.env
  */
-export function getEmailConfig(): {
-  webhookUrl: string;
-  brevoApiKey: string;
-  resendApiKey: string;
+export function getBrevoConfig(): {
+  apiKey: string;
+  senderEmail: string;
+  senderName: string;
 } {
-  let webhookUrl = process.env.GMAIL_WEBHOOK_URL || "";
-  let brevoApiKey = process.env.BREVO_API_KEY || "";
-  let resendApiKey = process.env.RESEND_API_KEY || "";
+  let apiKey = process.env.BREVO_API_KEY || "";
+  let senderEmail = DEFAULT_SENDER_EMAIL;
+  let senderName = DEFAULT_SENDER_NAME;
 
   try {
     const db = getDb();
@@ -47,119 +28,75 @@ export function getEmailConfig(): {
       .prepare("SELECT key, value FROM settings WHERE group_key = 'email'")
       .all() as Array<{ key: string; value: string }>;
     for (const r of rows) {
-      if (r.key === "webhook_url" && r.value) webhookUrl = r.value.trim();
-      if (r.key === "brevo_api_key" && r.value) brevoApiKey = r.value.trim();
-      if (r.key === "resend_api_key" && r.value) resendApiKey = r.value.trim();
+      if (r.key === "brevo_api_key" && r.value) apiKey = r.value.trim();
+      if (r.key === "sender_email" && r.value) senderEmail = r.value.trim();
+      if (r.key === "sender_name" && r.value) senderName = r.value.trim();
     }
   } catch {}
 
-  return { webhookUrl, brevoApiKey, resendApiKey };
+  return { apiKey, senderEmail, senderName };
 }
 
 /**
- * Unified email sender with HTTPS-first dispatch for cloud hosts (like Railway)
- * that block outbound SMTP ports 25, 465, 587.
+ * Send email via Brevo REST API over HTTPS Port 443.
+ * Completely immune to cloud firewall / SMTP port blocking.
  */
-export async function sendMailUnified({
+export async function sendBrevoEmail({
   to,
   subject,
   html,
+  recipientName,
 }: {
   to: string;
   subject: string;
   html: string;
-}): Promise<boolean> {
-  const config = getEmailConfig();
+  recipientName?: string;
+}): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+  const config = getBrevoConfig();
 
-  // 1. Google Apps Script Webhook (Port 443 HTTPS - native Gmail, 100% free forever)
-  if (config.webhookUrl) {
-    try {
-      const res = await fetch(config.webhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to,
-          subject,
-          html,
-          senderName: "TERRA HOP",
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && (data.ok === true || data.status === "ok" || !data.error)) {
-        console.log(`[MAILER:WEBHOOK] Successfully sent email to ${to} via Google Apps Script Webhook`);
-        return true;
-      }
-      console.warn(`[MAILER:WEBHOOK] Webhook returned non-ok:`, data);
-    } catch (err) {
-      console.error(`[MAILER:WEBHOOK] Webhook request failed:`, err);
-    }
+  if (!config.apiKey) {
+    const msg = "لم يتم إدخال مفتاح Brevo API Key بعد. يرجى إضافة المفتاح في لوحة التحكم لتفعيل إرسال الإيميلات للعملاء.";
+    console.warn(`[BREVO:WAITING_KEY] ${msg}`);
+    return { ok: false, error: msg };
   }
 
-  // 2. Brevo REST API (Port 443 HTTPS - 300 free emails/day)
-  if (config.brevoApiKey) {
-    try {
-      const res = await fetch("https://api.brevo.com/v3/smtp/email", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "api-key": config.brevoApiKey,
-        },
-        body: JSON.stringify({
-          sender: { name: "TERRA HOP", email: GMAIL_USER },
-          to: [{ email: to }],
-          subject,
-          htmlContent: html,
-        }),
-      });
-      if (res.ok) {
-        console.log(`[MAILER:BREVO] Successfully sent email to ${to} via Brevo API`);
-        return true;
-      }
-      const errText = await res.text().catch(() => "");
-      console.warn(`[MAILER:BREVO] Brevo API responded with error (${res.status}): ${errText}`);
-    } catch (err) {
-      console.error(`[MAILER:BREVO] Brevo request failed:`, err);
-    }
-  }
-
-  // 3. Resend REST API (Port 443 HTTPS)
-  if (config.resendApiKey) {
-    try {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${config.resendApiKey}`,
-        },
-        body: JSON.stringify({
-          from: `"TERRA HOP" <onboarding@resend.dev>`,
-          to: [to],
-          subject,
-          html,
-        }),
-      });
-      if (res.ok) {
-        console.log(`[MAILER:RESEND] Successfully sent email to ${to} via Resend API`);
-        return true;
-      }
-    } catch (err) {
-      console.error(`[MAILER:RESEND] Resend request failed:`, err);
-    }
-  }
-
-  // 4. Fallback: Direct SMTP (nodemailer)
   try {
-    const info = await getTransporter().sendMail({
-      from: `"TERRA HOP" <${GMAIL_USER}>`,
-      to,
-      subject,
-      html,
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "api-key": config.apiKey,
+        accept: "application/json",
+      },
+      body: JSON.stringify({
+        sender: {
+          name: config.senderName,
+          email: config.senderEmail,
+        },
+        to: [
+          {
+            email: to,
+            name: recipientName || undefined,
+          },
+        ],
+        subject,
+        htmlContent: html,
+      }),
     });
-    console.log(`[MAILER:SMTP] Email sent via SMTP to ${to}: ${info.messageId}`);
-    return true;
-  } catch (err) {
-    console.error(`[MAILER:SMTP] SMTP delivery failed to ${to}:`, err);
-    return false;
+
+    const data = await res.json().catch(() => ({}));
+
+    if (res.ok) {
+      console.log(`[BREVO:SUCCESS] Sent email to ${to}. MessageId: ${data?.messageId}`);
+      return { ok: true, messageId: data?.messageId };
+    }
+
+    const errDesc = data?.message || `Brevo API error (${res.status})`;
+    console.error(`[BREVO:ERROR] Failed to send email to ${to}:`, errDesc);
+    return { ok: false, error: errDesc };
+  } catch (err: any) {
+    console.error(`[BREVO:NETWORK_ERROR] Network request failed to Brevo API:`, err);
+    return { ok: false, error: err?.message || "فشل الاتصال بخدمة Brevo." };
   }
 }
 
@@ -213,7 +150,7 @@ export interface EmailOrderData {
 }
 
 /**
- * Send invoice and order confirmation request email to customer.
+ * Send invoice and order confirmation request email to customer via Brevo.
  */
 export async function sendOrderInvoiceEmail(order: EmailOrderData): Promise<boolean> {
   if (!order.customer.email) return false;
@@ -381,15 +318,18 @@ export async function sendOrderInvoiceEmail(order: EmailOrderData): Promise<bool
 </html>
   `;
 
-  return sendMailUnified({
+  const res = await sendBrevoEmail({
     to: order.customer.email,
+    recipientName: order.customer.name,
     subject: `فاتورة وتأكيد الطلب #${order.number} | TERRA HOP`,
     html,
   });
+
+  return res.ok;
 }
 
 /**
- * Send order accepted & delivery timeframe notification email to customer.
+ * Send order accepted & delivery timeframe notification email to customer via Brevo.
  */
 export async function sendOrderAcceptedEmail(
   order: {
@@ -494,9 +434,12 @@ export async function sendOrderAcceptedEmail(
 </html>
   `;
 
-  return sendMailUnified({
+  const res = await sendBrevoEmail({
     to: order.customer.email,
+    recipientName: order.customer.name,
     subject: `تم قبول وتجهيز طلبك #${order.number} 🚀 | TERRA HOP`,
     html,
   });
+
+  return res.ok;
 }

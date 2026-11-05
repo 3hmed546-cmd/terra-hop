@@ -2,21 +2,18 @@ import { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/server/auth-middleware";
 import { apiSuccess, apiError } from "@/lib/server/api-envelope";
 import { getDb, recordAudit } from "@/lib/server/db";
-import { getEmailConfig, sendMailUnified } from "@/lib/server/mailer";
+import { getBrevoConfig, sendBrevoEmail } from "@/lib/server/mailer";
 
 export async function GET(request: NextRequest) {
   const auth = requireAdmin(request);
   if (!auth.authenticated || !auth.user) return auth.responseError!;
 
-  const config = getEmailConfig();
+  const config = getBrevoConfig();
   return apiSuccess({
-    webhookUrl: config.webhookUrl || "",
-    brevoApiKey: config.brevoApiKey ? `${config.brevoApiKey.slice(0, 8)}...` : "",
-    resendApiKey: config.resendApiKey ? `${config.resendApiKey.slice(0, 8)}...` : "",
-    hasWebhook: Boolean(config.webhookUrl),
-    hasBrevo: Boolean(config.brevoApiKey),
-    hasResend: Boolean(config.resendApiKey),
-    gmailUser: process.env.GMAIL_USER || "terr3hop@gmail.com",
+    brevoApiKey: config.apiKey ? `${config.apiKey.slice(0, 10)}...` : "",
+    hasBrevo: Boolean(config.apiKey),
+    senderEmail: config.senderEmail,
+    senderName: config.senderName,
   });
 }
 
@@ -38,14 +35,14 @@ export async function POST(request: NextRequest) {
   // If this is a test email request
   if (body.action === "TEST_EMAIL") {
     const to = String(body.to || userEmail || "terr3hop@gmail.com").trim();
-    const ok = await sendMailUnified({
+    const result = await sendBrevoEmail({
       to,
-      subject: "تجربة إرسال الإيميل من متجر TERRA HOP 🖤",
+      subject: "تجربة إرسال الإيميل من متجر TERRA HOP عبر Brevo 🖤",
       html: `
         <div dir="rtl" style="font-family: sans-serif; background-color: #0f0f0f; color: #f5f5f5; padding: 30px; border-radius: 12px; text-align: right;">
-          <h1 style="color: #ffffff; font-size: 22px;">تم إرسال إيميل التجربة بنجاح! 🎉</h1>
+          <h1 style="color: #ffffff; font-size: 22px;">تم إرسال إيميل التجربة عبر Brevo بنجاح! 🎉</h1>
           <p style="color: #cccccc; font-size: 15px; line-height: 1.6;">
-            هذه الرسالة تؤكد أن نظام إرسال الإيميلات في متجر <strong>TERRA HOP</strong> يعمل بكفاءة ودون أي مشاكل في شبكة السيرفر.
+            هذه الرسالة تؤكد أن ربط <strong>Brevo API</strong> مع متجر <strong>TERRA HOP</strong> يعمل بكفاءة 100%، وأن فواتير وإشعارات تأكيد الطلبات ستصل لعملائك فوراً.
           </p>
           <div style="background: #222; padding: 12px; border-radius: 8px; font-size: 13px; color: #888;">
             وقت الإرسال: ${new Date().toLocaleString("ar-EG")}
@@ -54,31 +51,22 @@ export async function POST(request: NextRequest) {
       `,
     });
 
-    if (ok) {
+    if (result.ok) {
       return apiSuccess({ ok: true, message: `تم إرسال الإيميل التجريبي بنجاح إلى ${to}` });
     } else {
       return apiError(
         "INTERNAL_ERROR",
-        "فشل إرسال الإيميل التجريبي. تأكد من إعداد رابط Google Apps Script Webhook أو مفتاح Brevo بشكل صحيح.",
+        result.error || "فشل إرسال الإيميل التجريبي. تأكد من صحة مفتاح Brevo API Key وتفعيل الحساب.",
         500
       );
     }
   }
 
   // Otherwise, save settings
-  const webhookUrl = body.webhookUrl !== undefined ? String(body.webhookUrl).trim() : null;
   const brevoApiKey = body.brevoApiKey !== undefined ? String(body.brevoApiKey).trim() : null;
-  const resendApiKey = body.resendApiKey !== undefined ? String(body.resendApiKey).trim() : null;
+  const senderEmail = body.senderEmail !== undefined ? String(body.senderEmail).trim() : null;
 
   db.transaction(() => {
-    if (webhookUrl !== null) {
-      db.prepare(`
-        INSERT INTO settings (group_key, key, value, updated_at, updated_by)
-        VALUES ('email', 'webhook_url', ?, ?, ?)
-        ON CONFLICT(group_key, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at, updated_by = excluded.updated_by
-      `).run(webhookUrl, now, userEmail);
-    }
-
     if (brevoApiKey !== null && !brevoApiKey.includes("...")) {
       db.prepare(`
         INSERT INTO settings (group_key, key, value, updated_at, updated_by)
@@ -87,22 +75,22 @@ export async function POST(request: NextRequest) {
       `).run(brevoApiKey, now, userEmail);
     }
 
-    if (resendApiKey !== null && !resendApiKey.includes("...")) {
+    if (senderEmail !== null && senderEmail.length > 3) {
       db.prepare(`
         INSERT INTO settings (group_key, key, value, updated_at, updated_by)
-        VALUES ('email', 'resend_api_key', ?, ?, ?)
+        VALUES ('email', 'sender_email', ?, ?, ?)
         ON CONFLICT(group_key, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at, updated_by = excluded.updated_by
-      `).run(resendApiKey, now, userEmail);
+      `).run(senderEmail, now, userEmail);
     }
   })();
 
   recordAudit({
     actor: userEmail,
-    action: "UPDATE_EMAIL_SETTINGS",
+    action: "UPDATE_BREVO_SETTINGS",
     entity: "settings",
     entityId: "email",
-    after: { hasWebhook: Boolean(webhookUrl), hasBrevo: Boolean(brevoApiKey) },
+    after: { hasBrevo: Boolean(brevoApiKey) },
   });
 
-  return apiSuccess({ ok: true, message: "تم حفظ إعدادات إرسال الإيميلات بنجاح." });
+  return apiSuccess({ ok: true, message: "تم حفظ إعدادات Brevo بنجاح." });
 }
