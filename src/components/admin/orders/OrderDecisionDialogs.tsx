@@ -48,9 +48,7 @@ export function OrderDecisionDialogs({ order, mode, onClose, onDone }: Props) {
     const result = actions.cancelOrder(order.id, reason.trim());
     toast.push(
       result.ok
-        ? returnsStock
-          ? S.cancelDialog.doneRestocked(order.number)
-          : S.cancelDialog.done(order.number)
+        ? `تم إلغاء الطلب ${order.number} وإرسال إيميل التوضيح للعميل بنجاح.`
         : ADMIN_STRINGS.errors[result.error],
     );
     close();
@@ -134,12 +132,30 @@ export function OrderDecisionDialogs({ order, mode, onClose, onDone }: Props) {
         ) : null}
         <Textarea
           label={S.cancelDialog.reason}
-          hint={S.cancelDialog.reasonHint}
+          hint="سيتم إرسال هذا السبب للعميل في رسالة بريد إلكتروني رسمية بلباقة."
           value={reason}
           maxLength={300}
           rows={3}
           onChange={(e) => setReason(e.target.value)}
         />
+        <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+          {[
+            "نفاد الكمية مؤقتاً",
+            "العنوان خارج نطاق التوصيل",
+            "تعذر التواصل هاتفياً لتأكيد الطلب",
+            "بناءً على طلب العميل",
+          ].map((r) => (
+            <button
+              key={r}
+              type="button"
+              className="adm-btn adm-btn-secondary"
+              style={{ fontSize: 11, padding: "3px 8px", cursor: "pointer" }}
+              onClick={() => setReason(r)}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
       </Dialog>
     </>
   );

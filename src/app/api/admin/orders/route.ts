@@ -7,7 +7,7 @@ import { seedDatabaseIfNeeded } from "@/lib/server/seed-db";
 import { markOrderDeliveredAndPaid } from "@/lib/server/ambassadors/qualification";
 import { notifyAdminsAmbassadorGoalReached } from "@/lib/server/push";
 import { decryptCode } from "@/lib/server/security";
-import { sendOrderAcceptedEmail } from "@/lib/server/mailer";
+import { sendOrderAcceptedEmail, sendOrderRejectedEmail } from "@/lib/server/mailer";
 
 export async function GET(request: NextRequest) {
   const auth = requireAdmin(request);
@@ -242,6 +242,24 @@ export async function PATCH(request: NextRequest) {
               auth.user!.email
             );
           }
+        }
+
+        // Send Order Rejection Email with cancellation reason
+        try {
+          const cust = decryptCustomer(order.customer_enc);
+          if (cust?.email) {
+            sendOrderRejectedEmail(
+              {
+                number: order.number,
+                customer: cust,
+              },
+              cancelReason || "تعذر تأكيد أو شحن الطلب في الوقت الحالي"
+            ).catch((err) => {
+              console.error("[Mailer] Failed to send order rejected email:", err);
+            });
+          }
+        } catch (e) {
+          console.error("[Mailer] Decrypt customer failed for rejected email:", e);
         }
       }
     })();

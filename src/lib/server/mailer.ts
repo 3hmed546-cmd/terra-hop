@@ -443,3 +443,108 @@ export async function sendOrderAcceptedEmail(
 
   return res.ok;
 }
+
+/**
+ * Send polite order rejected / cancelled notification email to customer via Brevo.
+ */
+export async function sendOrderRejectedEmail(
+  order: {
+    number: string;
+    customer: {
+      name: string;
+      email: string;
+    };
+  },
+  reason: string = "تعذر تأكيد أو شحن الطلب في الوقت الحالي"
+): Promise<boolean> {
+  if (!order.customer.email) return false;
+
+  const storeUrl = APP_BASE_URL;
+
+  const html = `
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تحديث بخصوص طلبك #${order.number}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #0c0c0c; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #e5e5e5; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #0c0c0c; padding: 30px 15px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width: 580px; background-color: #171717; border-radius: 12px; border: 1px solid #262626; overflow: hidden; text-align: right;" cellpadding="0" cellspacing="0">
+          
+          <!-- Logo & Header -->
+          <tr>
+            <td style="padding: 36px 32px 24px; text-align: center; border-bottom: 1px solid #262626; background: linear-gradient(180deg, #1f1f1f 0%, #171717 100%);">
+              <div style="font-size: 32px; font-weight: 900; letter-spacing: 4px; color: #ffffff; font-family: sans-serif;">TERRA HOP</div>
+              <div style="font-size: 11px; letter-spacing: 3px; color: #e11d48; font-weight: 700; text-transform: uppercase; margin-top: 4px;">Streetwear Redefined</div>
+            </td>
+          </tr>
+
+          <!-- Main Content -->
+          <tr>
+            <td style="padding: 32px 32px 28px;">
+              <div style="display: inline-block; background-color: rgba(225, 29, 72, 0.15); color: #f43f5e; border: 1px solid #e11d48; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; margin-bottom: 14px;">
+                طلب ملغي
+              </div>
+
+              <h1 style="color: #ffffff; font-size: 24px; font-weight: 800; margin: 0 0 12px; line-height: 1.4;">
+                نعتذر منك، ${order.customer.name} 🖤
+              </h1>
+
+              <p style="color: #d4d4d4; font-size: 15px; line-height: 1.7; margin: 0 0 24px;">
+                نأسف لإبلاغك بأنه تعذر استكمال وتجهيز طلبك رقم <strong style="color: #ffffff; font-family: monospace;">#${order.number}</strong> وتم إلغاؤه من قِبل إدارة المتجر.
+              </p>
+
+              <!-- Reason Box -->
+              <div style="background: linear-gradient(135deg, #222222 0%, #1a1a1a 100%); border: 1px solid #333333; border-right: 4px solid #e11d48; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+                <div style="font-size: 13px; color: #a3a3a3; font-weight: 600; margin-bottom: 4px;">سبب الإلغاء:</div>
+                <div style="font-size: 16px; color: #ffffff; font-weight: 700; line-height: 1.6;">
+                  ${reason}
+                </div>
+              </div>
+
+              <p style="color: #a3a3a3; font-size: 13px; line-height: 1.7; margin: 0 0 28px;">
+                نعتذر بشدة عن أي إزعاج قد سببه ذلك لك. يسعدنا دائماً زيارتك للمتجر مرة أخرى لاختيار أي قطع بديلة، أو التواصل مع فريق الدعم لمساعدتك في أي استفسار.
+              </p>
+
+              <!-- Store Link -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center">
+                    <a href="${storeUrl}" style="background-color: #ffffff; color: #000000; display: inline-block; padding: 14px 32px; border-radius: 6px; font-size: 15px; font-weight: 700; text-decoration: none; text-align: center;">
+                      تصفح متجر TERRA HOP
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 24px 32px; background-color: #121212; border-top: 1px solid #262626; text-align: center; color: #737373; font-size: 12px; line-height: 1.7;">
+              فريق TERRA HOP في خدمتك دائماً.<br>
+              إذا كانت لديك أي استفسارات، يمكنك الرد مباشرة على هذا البريد الإلكتروني.
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+
+  const res = await sendBrevoEmail({
+    to: order.customer.email,
+    recipientName: order.customer.name,
+    subject: `تحديث بخصوص طلبك #${order.number} | TERRA HOP`,
+    html,
+  });
+
+  return res.ok;
+}
