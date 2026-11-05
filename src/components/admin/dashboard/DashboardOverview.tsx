@@ -43,7 +43,9 @@ export function DashboardOverview() {
   const { data, ready, actions } = useAdminStore();
   const toast = useToast();
 
-  const [sellTarget, setSellTarget] = useState<Order | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<Order | null>(null);
+  const [deliverTarget, setDeliverTarget] = useState<Order | null>(null);
+  const [deliveryDays, setDeliveryDays] = useState("خلال 48 ساعة");
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
   const [cancelReason, setCancelReason] = useState("");
 
@@ -54,7 +56,7 @@ export function DashboardOverview() {
   const products = useMemo(() => data?.products ?? [], [data]);
 
   const needsActionOrders = useMemo(() => {
-    return orders.filter((o) => o.status === "AWAITING_APPROVAL");
+    return orders.filter((o) => o.status === "AWAITING_APPROVAL" || o.status === "PROCESSING");
   }, [orders]);
 
   const soldOrders = useMemo(() => {
@@ -81,16 +83,26 @@ export function DashboardOverview() {
     });
   }, [products, threshold]);
 
-  function handleQuickSell(orderToSell?: Order) {
-    const target = orderToSell || sellTarget;
-    if (!target) return;
-    const res = actions.sellOrder(target.id);
+  function handleConfirmOrder() {
+    if (!confirmTarget) return;
+    const res = actions.confirmOrderProcessing(confirmTarget.id, deliveryDays);
     if (res.ok) {
-      toast.push(`✅ تم تأكيد بيع وشحن الطلب ${target.number} وخصم القطع من المخزن فوراً.`);
+      toast.push(`تم تأكيد أوردر ${confirmTarget.number} وبدء الشحن وإرسال إيميل المواعيد للعميل بنجاح.`);
     } else {
-      toast.push(`تعذر تأكيد البيع: ${ADMIN_STRINGS.errors[res.error] || res.error}`);
+      toast.push(`تعذر تأكيد الأوردر: ${ADMIN_STRINGS.errors[res.error] || res.error}`);
     }
-    setSellTarget(null);
+    setConfirmTarget(null);
+  }
+
+  function handleCompleteDelivery() {
+    if (!deliverTarget) return;
+    const res = actions.completeOrderDelivery(deliverTarget.id);
+    if (res.ok) {
+      toast.push(`تم اكتمال تسليم أوردر ${deliverTarget.number} وتحصيله، وإرسال إيميل الشكر ودعوة واتساب VIP للعميل بنجاح!`);
+    } else {
+      toast.push(`تعذر تأكيد التسليم: ${ADMIN_STRINGS.errors[res.error] || res.error}`);
+    }
+    setDeliverTarget(null);
   }
 
   function handleQuickCancel() {
@@ -380,14 +392,28 @@ export function DashboardOverview() {
                         إلغاء الطلب
                       </Button>
 
-                      <Button
-                        type="button"
-                        onClick={() => handleQuickSell(o)}
-                        className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold py-2 px-4 shadow-sm flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <CheckCircle size={15} />
-                        الموافقة وتأكيد الشحن (خصم من المخزن)
-                      </Button>
+                      {o.status === "PROCESSING" ? (
+                        <Button
+                          type="button"
+                          onClick={() => setDeliverTarget(o)}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 px-4 shadow-sm flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <CheckCircle size={15} />
+                          اكتمال تسليم الأوردر
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            setDeliveryDays("خلال 48 ساعة");
+                            setConfirmTarget(o);
+                          }}
+                          className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-4 shadow-sm flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <CheckCircle size={15} />
+                          تأكيد الأوردر وبدء الشحن
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -460,35 +486,97 @@ export function DashboardOverview() {
         )}
       </section>
 
-      {/* Confirmation Dialog: Quick Mark as Sold */}
+      {/* Confirmation Dialog: Step 1 - Confirm Order & Ship */}
       <Dialog
-        open={sellTarget !== null}
-        onClose={() => setSellTarget(null)}
-        title={sellTarget ? `تأكيد بيع الطلب: ${sellTarget.number}` : ""}
+        open={confirmTarget !== null}
+        onClose={() => setConfirmTarget(null)}
+        title={confirmTarget ? `تأكيد أوردر ${confirmTarget.number} وبدء الشحن` : ""}
       >
-        {sellTarget && (
+        {confirmTarget && (
           <div className="space-y-4">
             <p className="text-sm text-graphite">
-              تأكيد هذا الطلب كـ <strong className="text-obsidian">تم البيع</strong> سيقوم فوراً
-              بخصم الكميات المطلوبة من رصيد المستودع الحالي.
+              سيتم تغيير حالة الطلب إلى <strong className="text-obsidian">مؤكد وقيد الشحن</strong> وإرسال إيميل رسمي تلقائي للعميل بجدول التوصيل.
             </p>
             <div className="rounded border border-line-light bg-off-white p-3 text-xs space-y-1.5">
-              <div className="font-semibold text-obsidian">ملخص خصم المخزون:</div>
-              {sellTarget.items.map((item, idx) => (
+              <div className="font-semibold text-obsidian">القطع في هذا الطلب:</div>
+              {confirmTarget.items.map((item, idx) => (
                 <div key={idx} className="flex justify-between text-charcoal">
                   <span>
                     {item.productName} ({item.colorName} / {item.size})
                   </span>
-                  <span className="font-mono font-bold text-obsidian">−{item.qty} قطعة</span>
+                  <span className="font-mono font-bold text-obsidian">× {item.qty}</span>
                 </div>
               ))}
             </div>
+
+            <div className="pt-2 border-t border-line-light">
+              <TextInput
+                label="موعد التوصيل المتوقع (يُرسل في إيميل الشحن للعميل)"
+                value={deliveryDays}
+                onChange={(e) => setDeliveryDays(e.target.value)}
+                placeholder="مثال: خلال 48 ساعة"
+              />
+              <div className="flex gap-1.5 mt-2 flex-wrap">
+                {["خلال 48 ساعة", "من 2 إلى 3 أيام عمل", "من 3 إلى 5 أيام عمل"].map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setDeliveryDays(d)}
+                    className="text-[11px] px-2 py-0.5 rounded bg-line-light hover:bg-line-light/80 text-obsidian font-semibold cursor-pointer"
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="flex justify-end gap-3 pt-2">
-              <Button type="button" variant="secondary" onClick={() => setSellTarget(null)}>
+              <Button type="button" variant="secondary" onClick={() => setConfirmTarget(null)}>
                 إلغاء
               </Button>
-              <Button type="button" onClick={() => handleQuickSell()}>
-                تأكيد وتسجيل البيع
+              <Button type="button" onClick={handleConfirmOrder}>
+                تأكيد الأوردر وبدء الشحن
+              </Button>
+            </div>
+          </div>
+        )}
+      </Dialog>
+
+      {/* Confirmation Dialog: Step 2 - Complete Order Delivery & COD Paid */}
+      <Dialog
+        open={deliverTarget !== null}
+        onClose={() => setDeliverTarget(null)}
+        title={deliverTarget ? `اكتمال تسليم الأوردر: ${deliverTarget.number}` : ""}
+      >
+        {deliverTarget && (
+          <div className="space-y-4">
+            <div className="rounded border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-700 dark:text-emerald-300 font-semibold">
+              تأكيد أن مندوب الشحن سلّم الشحنة للعميل وحصّل المبلغ نقداً. سيتم تسجيل المبيعة والتحصيل، وتأكيد عمولة السفير، وإرسال رسالة شكر للعميل برابط جروب واتساب VIP.
+            </div>
+
+            <div className="rounded border border-line-light bg-off-white p-3 text-xs space-y-1.5">
+              <div className="flex justify-between text-charcoal">
+                <span>العميل:</span>
+                <span className="font-bold text-obsidian">{deliverTarget.customer.name}</span>
+              </div>
+              <div className="flex justify-between text-charcoal">
+                <span>المبلغ المطلوب استلامه (نقداً):</span>
+                <span className="font-mono font-bold text-obsidian text-sm">
+                  {formatMoney(deliverTarget.totalCents)}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button type="button" variant="secondary" onClick={() => setDeliverTarget(null)}>
+                إلغاء
+              </Button>
+              <Button
+                type="button"
+                onClick={handleCompleteDelivery}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+              >
+                تأكيد اكتمال التسليم والتحصيل
               </Button>
             </div>
           </div>

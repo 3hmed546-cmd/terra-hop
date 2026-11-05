@@ -216,11 +216,47 @@ function updateOrder(data: AdminData, orderId: string, fn: (o: Order) => Order):
   return { ...data, orders: data.orders.map((o) => (o.id === orderId ? fn(o) : o)) };
 }
 
+/** Step 1: Confirm order & set to PROCESSING / SHIPPED without marking as paid or deducting sale. */
+export function confirmOrderProcessing(data: AdminData, orderId: string, now: string): Result<AdminData> {
+  const order = data.orders.find((o) => o.id === orderId);
+  if (!order) return fail("ORDER_NOT_FOUND");
+  if (order.status !== "AWAITING_APPROVAL" && order.status !== "PENDING_EMAIL") return fail("ORDER_NOT_AWAITING");
+
+  return ok(
+    updateOrder(data, orderId, (o) => ({
+      ...o,
+      status: "PROCESSING",
+      fulfilmentStatus: "SHIPPED",
+      timeline: [...o.timeline, { at: now, type: "processing", actor: "owner" }],
+    })),
+  );
+}
+
+/** Step 2: Complete order delivery: marks as SOLD, DELIVERED & PAID. */
+export function completeOrderDelivery(data: AdminData, orderId: string, now: string): Result<AdminData> {
+  const order = data.orders.find((o) => o.id === orderId);
+  if (!order) return fail("ORDER_NOT_FOUND");
+  if (order.status === "SOLD") return ok(data);
+
+  return ok(
+    updateOrder(data, orderId, (o) => ({
+      ...o,
+      status: "SOLD",
+      fulfilmentStatus: "DELIVERED",
+      paymentStatus: "PAID",
+      soldAt: now,
+      deliveredAt: now,
+      paidAt: now,
+      timeline: [...o.timeline, { at: now, type: "sold", actor: "owner" }],
+    })),
+  );
+}
+
 /** "Mark as sold": deducts stock for every item, all-or-nothing. */
 export function sellOrder(data: AdminData, orderId: string, now: string): Result<AdminData> {
   const order = data.orders.find((o) => o.id === orderId);
   if (!order) return fail("ORDER_NOT_FOUND");
-  if (order.status !== "AWAITING_APPROVAL") return fail("ORDER_NOT_AWAITING");
+  if (order.status !== "AWAITING_APPROVAL" && order.status !== "PROCESSING") return fail("ORDER_NOT_AWAITING");
 
   // Website orders had stock reserved/deducted upon checkout by server; just transition status
   if (order.source === "website") {

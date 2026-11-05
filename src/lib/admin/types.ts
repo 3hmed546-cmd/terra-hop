@@ -59,6 +59,7 @@ export interface Product {
 export type OrderStatus =
   | "PENDING_EMAIL"
   | "AWAITING_APPROVAL"
+  | "PROCESSING"
   | "SOLD"
   | "CANCELLED"
   | "EXPIRED";
@@ -85,6 +86,7 @@ export interface Customer {
 export type TimelineType =
   | "placed"
   | "email_confirmed"
+  | "processing"
   | "expired"
   | "sold"
   | "cancelled"

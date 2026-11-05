@@ -595,3 +595,113 @@ export async function sendOrderRejectedEmail(
 
   return res.ok;
 }
+
+/**
+ * Send Order Delivered & Thank-You email with VIP WhatsApp Community button.
+ * Zero emojis, clean dark Testa Toro luxury branding.
+ */
+export async function sendOrderDeliveredThankYouEmail(order: {
+  number: string;
+  customer: {
+    name: string;
+    email: string;
+  };
+}): Promise<boolean> {
+  if (!order.customer.email) return false;
+
+  const storeUrl = APP_BASE_URL;
+  const whatsappUrl = "https://chat.whatsapp.com/EWcBrybFmbr7jbMJUJGSUk?s=cl&p=a&iam=2";
+
+  const html = `
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تم تسليم طلبك #${order.number} | TERRA HOP</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #121212; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #d4d4d4; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #121212; padding: 28px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width: 520px; text-align: right;" cellpadding="0" cellspacing="0">
+
+          <!-- Centered Logo Card -->
+          <tr>
+            <td align="center" style="padding: 16px 0 28px; text-align: center;">
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+                <tr>
+                  <td style="background-color: #ffffff; padding: 12px 20px; border-radius: 6px; text-align: center; border: 1px solid #ffffff;">
+                    <img src="${storeUrl}/logo/terra-hop-logo-card.png" alt="TERRA HOP" width="130" style="display: block; width: 130px; height: auto;" />
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Thank You & Delivered Content -->
+          <tr>
+            <td style="padding: 0 4px 24px; text-align: right;">
+              <div style="color: #888888; font-size: 14px; margin-bottom: 6px;">
+                الطلب #${order.number}
+              </div>
+              <h1 style="color: #ffffff; font-size: 24px; font-weight: 700; margin: 0 0 12px; line-height: 1.3;">
+                شكراً لتعاملك مع TERRA HOP!
+              </h1>
+              <p style="color: #a3a3a3; font-size: 14px; line-height: 1.6; margin: 0 0 20px;">
+                مرحباً ${order.customer.name}،<br>
+                يسعدنا إبلاغك بأنه تم تسليم طلبك بنجاح. نتمنى أن تنال القطع إعجابك وتناسب ستايلك المميز.
+              </p>
+
+              <!-- Delivery Confirmed Box -->
+              <div style="background-color: #1a1a1a; border: 1px solid #2e2e2e; border-right: 4px solid #22c55e; border-radius: 6px; padding: 16px; margin-bottom: 24px;">
+                <div style="font-size: 13px; color: #888888; font-weight: 600; margin-bottom: 2px;">حالة الطلب</div>
+                <div style="font-size: 16px; color: #ffffff; font-weight: 700;">
+                  تم التسليم واستلام المبلغ بنجاح
+                </div>
+              </div>
+
+              <!-- VIP WhatsApp Community Card -->
+              <div style="background-color: #18181b; border: 1px solid #27272a; border-radius: 8px; padding: 22px 18px; text-align: center; margin-bottom: 24px;">
+                <div style="color: #ffffff; font-size: 16px; font-weight: 700; margin-bottom: 8px;">
+                  انضم إلى مجتمع TERRA HOP VIP
+                </div>
+                <p style="color: #a1a1aa; font-size: 13px; line-height: 1.6; margin: 0 0 18px;">
+                  انضم لجروب الواتساب الخاص بعملائنا المميزين للحصول على أكواد خصم حصرية وإشعارات مبكرة بأحدث الكولكشنز والقطع المحدودة.
+                </p>
+                <a href="${whatsappUrl}" style="display: inline-block; background-color: #25D366; color: #ffffff; padding: 12px 28px; border-radius: 6px; font-weight: 700; font-size: 14px; text-decoration: none;">
+                  الانضمام لجروب VIP على واتساب
+                </a>
+              </div>
+
+              <p style="color: #737373; font-size: 13px; line-height: 1.6; margin: 0;">
+                إذا كانت لديك أي استفسارات أو ملاحظات، يمكنك دائماً الرد على هذا البريد الإلكتروني.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 24px 4px 12px; border-top: 1px solid #262626; text-align: center; color: #737373; font-size: 12px; line-height: 1.7;">
+              TERRA HOP · Streetwear Redefined © 2026<br>
+              <span style="color: #a3a3a3;">terr3hop@gmail.com</span>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+
+  const res = await sendBrevoEmail({
+    to: order.customer.email,
+    recipientName: order.customer.name,
+    subject: `تم تسليم طلبك #${order.number} | شكراً لتعاملك مع TERRA HOP`,
+    html,
+  });
+
+  return res.ok;
+}

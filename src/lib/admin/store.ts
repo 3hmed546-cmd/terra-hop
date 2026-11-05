@@ -8,6 +8,8 @@ import {
   adjustStock as pureAdjustStock,
   canMakeAvailable,
   cancelOrder as pureCancelOrder,
+  confirmOrderProcessing as pureConfirmOrderProcessing,
+  completeOrderDelivery as pureCompleteOrderDelivery,
   deleteProduct as pureDeleteProduct,
   duplicateProduct as pureDuplicateProduct,
   recordManualSale as pureRecordManualSale,
@@ -153,16 +155,46 @@ function run(fn: (data: AdminData, now: string) => Result<AdminData>): ActionRes
 }
 
 export const adminActions = {
-  sellOrder: (orderId: string, deliveryDays?: string): ActionResult => {
-    const res = run((d, now) => pureSellOrder(d, orderId, now));
+  /**
+   * Step 1: Admin confirms order & schedules delivery.
+   * Status moves to PROCESSING, sends accepted email with timeframe (e.g. خلال 48 ساعة).
+   * Does NOT mark as paid or count as completed sale yet.
+   */
+  confirmOrderProcessing: (orderId: string, deliveryDays?: string): ActionResult => {
+    const res = run((d, now) => pureConfirmOrderProcessing(d, orderId, now));
     if (res.ok) {
       apiFetch("/api/admin/orders", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, status: "SOLD", deliveryDays: deliveryDays || "من 2 إلى 4 أيام عمل" }),
+        body: JSON.stringify({
+          orderId,
+          status: "PROCESSING",
+          deliveryDays: deliveryDays || "خلال 48 ساعة",
+        }),
       }).then(() => reloadAdminData()).catch(() => {});
     }
     return res;
+  },
+
+  /**
+   * Step 2: Courier delivers and customer pays COD.
+   * Status moves to SOLD, paymentStatus to PAID, fulfilmentStatus to DELIVERED.
+   * Deducts final sale, qualifies ambassador, sends Thank-You email with VIP WhatsApp Community link.
+   */
+  completeOrderDelivery: (orderId: string): ActionResult => {
+    const res = run((d, now) => pureCompleteOrderDelivery(d, orderId, now));
+    if (res.ok) {
+      apiFetch(`/api/admin/orders/${orderId}/mark-delivered-paid`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }).then(() => reloadAdminData()).catch(() => {});
+    }
+    return res;
+  },
+
+  sellOrder: (orderId: string, deliveryDays?: string): ActionResult => {
+    return adminActions.confirmOrderProcessing(orderId, deliveryDays);
   },
 
   cancelOrder: (orderId: string, reason: string): ActionResult => {

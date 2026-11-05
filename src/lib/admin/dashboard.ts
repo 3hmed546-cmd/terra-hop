@@ -44,10 +44,10 @@ export function salesSummary(orders: Order[], nowIso: string): SalesSummary {
   return out;
 }
 
-/** The newest orders waiting for the owner's decision, plus how many there are in total. */
+/** The newest orders waiting for the owner's decision or delivery completion, plus how many there are in total. */
 export function decisionQueue(orders: Order[], limit = 5): { rows: Order[]; total: number } {
   const waiting = orders
-    .filter((o) => o.status === "AWAITING_APPROVAL")
+    .filter((o) => o.status === "AWAITING_APPROVAL" || o.status === "PROCESSING")
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return { rows: waiting.slice(0, limit), total: waiting.length };
 }

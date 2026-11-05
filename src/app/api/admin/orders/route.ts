@@ -7,7 +7,7 @@ import { seedDatabaseIfNeeded } from "@/lib/server/seed-db";
 import { markOrderDeliveredAndPaid } from "@/lib/server/ambassadors/qualification";
 import { notifyAdminsAmbassadorGoalReached } from "@/lib/server/push";
 import { decryptCode } from "@/lib/server/security";
-import { sendOrderAcceptedEmail, sendOrderRejectedEmail } from "@/lib/server/mailer";
+import { sendOrderAcceptedEmail, sendOrderRejectedEmail, sendOrderDeliveredThankYouEmail } from "@/lib/server/mailer";
 
 export async function GET(request: NextRequest) {
   const auth = requireAdmin(request);
@@ -63,6 +63,9 @@ export async function GET(request: NextRequest) {
     const timeline: Array<{ at: string; type: string; actor: string; note?: string }> = [
       { at: o.created_at, type: "placed", actor: "customer" },
     ];
+    if (o.status === "PROCESSING" || o.fulfilment_status === "SHIPPED") {
+      timeline.push({ at: o.created_at, type: "processing", actor: "owner" });
+    }
     if (o.status === "SOLD" && o.sold_at) {
       timeline.push({ at: o.sold_at, type: "sold", actor: "owner" });
     }
@@ -132,7 +135,7 @@ export async function PATCH(request: NextRequest) {
     return apiError("VALIDATION", "معرف الطلب (orderId) والحالة الجديدة (status) مطلوبان.", 400);
   }
 
-  const validStatuses = ["AWAITING_APPROVAL", "SOLD", "CANCELLED", "PENDING_EMAIL"];
+  const validStatuses = ["AWAITING_APPROVAL", "PROCESSING", "SOLD", "CANCELLED", "PENDING_EMAIL"];
   if (!validStatuses.includes(status)) {
     return apiError("VALIDATION", `الحالة (${status}) غير صالحة.`, 400);
   }
@@ -151,14 +154,18 @@ export async function PATCH(request: NextRequest) {
       ? (typeof body.reason === "string" ? body.reason.trim().slice(0, 300) : "") || null
       : order.cancel_reason ?? null;
 
-  if (status === "SOLD") {
-    // Authoritatively mark delivered & paid: updates fulfilment_status to DELIVERED, payment_status to PAID,
-    // and credits ambassador with a confirmed qualified sale
-    markOrderDeliveredAndPaid(db, orderId, auth.user!.email);
+  if (status === "PROCESSING") {
+    // 1. Owner Confirmed Order: Move status to PROCESSING & fulfilment to SHIPPED.
+    // Stock remains reserved; order is NOT marked as paid or final sold yet.
+    db.prepare(`
+      UPDATE orders
+      SET status = 'PROCESSING', fulfilment_status = 'SHIPPED', revision = revision + 1
+      WHERE id = ?
+    `).run(orderId);
 
     // Send Order Accepted Email with estimated delivery days
     try {
-      const cust = decryptCustomer(order.customer_enc);
+      const cust = decryptCustomer(Buffer.from(order.customer_enc));
       if (cust?.email) {
         sendOrderAcceptedEmail(
           {
@@ -166,13 +173,33 @@ export async function PATCH(request: NextRequest) {
             customer: cust,
             totalCents: order.total_cents,
           },
-          body.deliveryDays || "من 2 إلى 4 أيام عمل"
+          body.deliveryDays || "خلال 48 ساعة"
         ).catch((err) => {
           console.error("[Mailer] Failed to send order accepted email:", err);
         });
       }
     } catch (e) {
       console.error("[Mailer] Decrypt customer failed for accepted email:", e);
+    }
+  } else if (status === "SOLD") {
+    // 2. Courier Completed Delivery: Authoritatively mark delivered & paid:
+    // updates fulfilment_status to DELIVERED, payment_status to PAID,
+    // and credits ambassador with a confirmed qualified sale
+    markOrderDeliveredAndPaid(db, orderId, auth.user!.email);
+
+    // Send Order Delivered & Thank You Email with VIP WhatsApp Community button
+    try {
+      const cust = decryptCustomer(Buffer.from(order.customer_enc));
+      if (cust?.email) {
+        sendOrderDeliveredThankYouEmail({
+          number: order.number,
+          customer: cust,
+        }).catch((err) => {
+          console.error("[Mailer] Failed to send thank you email:", err);
+        });
+      }
+    } catch (e) {
+      console.error("[Mailer] Decrypt customer failed for thank you email:", e);
     }
 
     // Check if ambassador reached their max uses goal

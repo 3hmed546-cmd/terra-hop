@@ -25,6 +25,20 @@ export function StatusBadge({ kind, left }: { kind: BadgeKind; left?: number }) 
       return <span className="adm-badge adm-badge-pending">{S.pendingEmail}</span>;
     case "AWAITING_APPROVAL":
       return <span className="adm-badge adm-badge-needs">{S.needsAction}</span>;
+    case "PROCESSING":
+      return (
+        <span
+          className="adm-badge"
+          style={{
+            background: "rgba(37, 99, 235, 0.15)",
+            color: "#60a5fa",
+            border: "1px solid rgba(59, 130, 246, 0.4)",
+            fontWeight: 700,
+          }}
+        >
+          {S.processing}
+        </span>
+      );
     case "SOLD":
       return <span className="adm-badge adm-badge-sold">{S.sold}</span>;
     case "CANCELLED":

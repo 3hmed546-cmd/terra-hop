@@ -20,6 +20,7 @@ const statusText = (o: Order): string =>
   ({
     PENDING_EMAIL: STATUS_TEXT.pendingEmail,
     AWAITING_APPROVAL: STATUS_TEXT.needsAction,
+    PROCESSING: STATUS_TEXT.processing,
     SOLD: STATUS_TEXT.sold,
     CANCELLED: STATUS_TEXT.cancelled,
     EXPIRED: STATUS_TEXT.expired,
@@ -52,7 +53,7 @@ function EventRow({ event, order }: { event: TimelineEvent; order: Order }) {
 export function OrderDetail({ orderId }: { orderId: string }) {
   const { data, ready, actions, reload } = useAdminStore();
   const toast = useToast();
-  const [dialog, setDialog] = useState<"sell" | "cancel" | null>(null);
+  const [dialog, setDialog] = useState<"confirm" | "deliver" | "sell" | "cancel" | null>(null);
   const [delivering, setDelivering] = useState(false);
   const [resending, setResending] = useState(false);
   const statusRef = useRef<HTMLParagraphElement>(null);
@@ -205,13 +206,16 @@ export function OrderDetail({ orderId }: { orderId: string }) {
 
   const subtotal = order.items.reduce((sum, i) => sum + lineTotal(i), 0);
   const phoneHref = `tel:${order.customer.phone.replace(/\s+/g, "")}`;
+  const processing = order.status === "PROCESSING";
   const decisionNote = awaiting
     ? S.decision.needsNote
-    : order.status === "SOLD"
-      ? S.decision.soldNote
-      : order.status === "PENDING_EMAIL"
-        ? S.decision.pendingNote
-        : S.decision.closed;
+    : processing
+      ? S.decision.processingNote
+      : order.status === "SOLD"
+        ? S.decision.soldNote
+        : order.status === "PENDING_EMAIL"
+          ? S.decision.pendingNote
+          : S.decision.closed;
 
   return (
     <>
@@ -279,9 +283,9 @@ export function OrderDetail({ orderId }: { orderId: string }) {
                   <Button
                     aria-disabled={blocked ? true : undefined}
                     aria-describedby={blocked ? "sell-blocked" : undefined}
-                    onClick={openSell}
+                    onClick={() => setDialog("confirm")}
                   >
-                    {S.decision.sell}
+                    تأكيد الأوردر وبدء الشحن
                   </Button>
                   <Button variant="secondary" onClick={() => setDialog("cancel")}>
                     {S.decision.cancel}
@@ -289,6 +293,18 @@ export function OrderDetail({ orderId }: { orderId: string }) {
                 </div>
                 {blocked ? <p id="sell-blocked" className="adm-warn">{S.decision.blocked}</p> : null}
               </>
+            ) : processing ? (
+              <div className="adm-decision">
+                <Button
+                  style={{ backgroundColor: "#10b981", color: "#ffffff" }}
+                  onClick={() => setDialog("deliver")}
+                >
+                  اكتمال تسليم الأوردر
+                </Button>
+                <Button variant="secondary" onClick={() => setDialog("cancel")}>
+                  {S.decision.cancel}
+                </Button>
+              </div>
             ) : canCancel(order) ? (
               <div className="adm-decision">
                 <Button variant="secondary" onClick={() => setDialog("cancel")}>

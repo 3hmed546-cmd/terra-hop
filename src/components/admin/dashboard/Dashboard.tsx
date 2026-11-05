@@ -61,6 +61,31 @@ export function Dashboard() {
   const decisionButtons = (order: Order) => {
     const blocked = sellBlockReason(data, order) === "insufficient_stock";
     const noteId = `blocked-${order.id}`;
+
+    if (order.status === "PROCESSING") {
+      return (
+        <div className="adm-stack-sm">
+          <div className="adm-actions">
+            <Button
+              className="adm-btn-sm"
+              style={{ backgroundColor: "#10b981", color: "#ffffff" }}
+              onClick={() => setDecision({ order, mode: "deliver" })}
+            >
+              اكتمال تسليم الأوردر
+            </Button>
+            <Button
+              variant="secondary"
+              className="adm-btn-sm"
+              aria-label={D.decision.cancelAria(order.number)}
+              onClick={() => setDecision({ order, mode: "cancel" })}
+            >
+              {D.decision.cancel}
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="adm-stack-sm">
         <div className="adm-actions">
@@ -69,9 +94,9 @@ export function Dashboard() {
             aria-label={D.decision.sellAria(order.number)}
             aria-disabled={blocked ? true : undefined}
             aria-describedby={blocked ? noteId : undefined}
-            onClick={() => { if (!blocked) setDecision({ order, mode: "sell" }); }}
+            onClick={() => { if (!blocked) setDecision({ order, mode: "confirm" }); }}
           >
-            {D.decision.sell}
+            تأكيد الأوردر
           </Button>
           <Button variant="secondary" className="adm-btn-sm" aria-label={D.decision.cancelAria(order.number)} onClick={() => setDecision({ order, mode: "cancel" })}>
             {D.decision.cancel}

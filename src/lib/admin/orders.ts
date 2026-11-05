@@ -18,6 +18,7 @@ export const ORDER_TABS: OrderTab[] = ["needs_action", "pending_email", "sold", 
 export function orderTabOf(status: OrderStatus): Exclude<OrderTab, "all"> {
   switch (status) {
     case "AWAITING_APPROVAL":
+    case "PROCESSING":
       return "needs_action";
     case "PENDING_EMAIL":
       return "pending_email";
