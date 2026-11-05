@@ -13,6 +13,56 @@ import { readVaultFile } from "@/lib/server/vault-sync";
 
 function getCatalogProducts(): Product[] {
   try {
+    const { getDb } = require("@/lib/server/db");
+    const db = getDb();
+    const rows = db
+      .prepare("SELECT * FROM products WHERE status = 'active' ORDER BY position ASC, created_at DESC")
+      .all() as any[];
+
+    if (Array.isArray(rows) && rows.length > 0) {
+      let placements: any[] = [];
+      try {
+        placements = db
+          .prepare(
+            "SELECT p.*, a.sha256 FROM image_placements p JOIN assets a ON p.asset_id = a.id WHERE p.slot_key = 'product' AND p.active = 1 ORDER BY p.position ASC"
+          )
+          .all();
+      } catch {}
+
+      const imagesByProd = new Map<string, any[]>();
+      for (const p of placements) {
+        if (!p.owner_id) continue;
+        const list = imagesByProd.get(p.owner_id) || [];
+        let meta: any = {};
+        try {
+          meta = JSON.parse(p.meta || "{}");
+        } catch {}
+        list.push(meta.sourceUrl || `/media/${p.sha256}.webp`);
+        imagesByProd.set(p.owner_id, list);
+      }
+
+      return rows.map((p: any) => {
+        const imgs = imagesByProd.get(p.id) || [];
+        return {
+          slug: p.slug,
+          name: p.name_ar || p.name_en || p.slug,
+          category: (p.category === "tshirt" || p.category === "T-shirts") ? "T-shirts" : "Hoodies",
+          price: (p.price_cents || 0) / 100,
+          originalPrice: p.compare_at_cents ? p.compare_at_cents / 100 : undefined,
+          status: p.force_sold_out === 1 ? "Sold out" : "Preorder",
+          description: p.description_ar || p.description_en || "",
+          sizes: ["S", "M", "L", "XL", "XXL"],
+          images: imgs.length > 0 ? imgs : ["/preview-images/hero.jpg"],
+          colors: [],
+          variants: [],
+          href: `/shop/${p.slug}`,
+          demo: false,
+        };
+      });
+    }
+  } catch {}
+
+  try {
     const raw = readVaultFile<any[]>("products-data.json");
     if (Array.isArray(raw) && raw.length > 0) {
       return raw.map((p: any) => ({

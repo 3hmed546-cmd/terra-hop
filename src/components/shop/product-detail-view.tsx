@@ -284,7 +284,47 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
     }
   };
 
-  const relatedProducts = allProducts.filter((p) => p.slug !== product.slug);
+  // Derive live all products from SSE/stream or fallback to server allProducts
+  const effectiveAllProducts = useMemo<Product[]>(() => {
+    if (Array.isArray(liveProducts) && liveProducts.length > 0) {
+      return liveProducts.map((p: any) => {
+        const isSoldOut = p.forceSoldOut === true || p.status === "sold_out";
+        const imagesList = Array.isArray(p.images)
+          ? p.images.map((i: any) => (typeof i === "object" ? i.url || i.src : i)).filter(Boolean)
+          : [];
+        return {
+          slug: p.slug || p.id,
+          name: p.name || p.nameAr || p.nameEn || p.slug,
+          category: (p.category === "tshirt" || p.category === "T-shirts") ? "T-shirts" : "Hoodies",
+          price: typeof p.price === "number" ? p.price : (p.priceCents || 0) / 100,
+          originalPrice:
+            typeof p.compareAtPrice === "number"
+              ? p.compareAtPrice
+              : p.compareAtCents
+              ? p.compareAtCents / 100
+              : undefined,
+          status: isSoldOut ? "Sold out" : "Preorder",
+          description: p.description || p.descriptionAr || "",
+          sizes: p.sizes || (p.variants || []).map((v: any) => v.size).filter(Boolean),
+          images:
+            imagesList.length > 0
+              ? imagesList
+              : product.slug === (p.slug || p.id)
+              ? product.images
+              : ["/preview-images/hero.jpg"],
+          colors: p.colors || [],
+          variants: p.variants || [],
+          href: `/shop/${p.slug || p.id}`,
+          demo: false,
+        };
+      });
+    }
+    return allProducts;
+  }, [liveProducts, allProducts, product]);
+
+  const relatedProducts = useMemo(() => {
+    return effectiveAllProducts.filter((p) => p.slug !== product.slug && (p as any).id !== product.slug);
+  }, [effectiveAllProducts, product.slug]);
 
   return (
     <PageShell>
@@ -887,13 +927,10 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
         </div>
       </div>
 
-      {/* 3. "تحب تشوف حاجة تانية ؟" (Related Products Section - Reference Image 4) */}
+      {/* 3. "تحب تشوف حاجة تانية ؟" (Related Products Section - Shows all platform products, no 'تشكيلة مختارة' badge) */}
       {relatedProducts.length > 0 && (
         <section className="mt-20 border-t border-line-light pt-12 sm:pt-16">
           <div className="text-center max-w-xl mx-auto mb-8 sm:mb-10">
-            <span className="inline-block rounded-full bg-red-50 border border-red-200 text-red-700 text-xs font-extrabold px-3 py-1 mb-2">
-              {locale === "ar" ? "تشكيلة مختارة" : "Curated Selection"}
-            </span>
             <h2 className="text-2xl sm:text-3xl font-black text-obsidian tracking-tight">
               {t.productPage.relatedHeading}
             </h2>
@@ -902,11 +939,17 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
-            {relatedProducts.slice(0, 4).map((rel) => {
-              const relImg = resolveImage(rel.images[0]);
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+            {relatedProducts.map((rel) => {
+              const rawImg =
+                rel.images && rel.images.length > 0
+                  ? typeof rel.images[0] === "object"
+                    ? (rel.images[0] as any).url || (rel.images[0] as any).src
+                    : rel.images[0]
+                  : "/preview-images/hero.jpg";
+              const relImg = resolveImage(rawImg);
               const relName =
-                locale === "ar" && t.products[rel.slug]?.name
+                locale === "ar" && t.products?.[rel.slug]?.name
                   ? t.products[rel.slug].name
                   : rel.name;
 
@@ -924,9 +967,10 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
                   <div className="relative aspect-[4/5] overflow-hidden bg-charcoal">
                     <Image
                       src={relImg.src}
-                      alt={relImg.alt}
+                      alt={relImg.alt || relName}
                       fill
-                      sizes="(min-width: 768px) 25vw, 50vw"
+                      sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw"
+                      unoptimized={typeof relImg.src === "string" && (relImg.src.startsWith("data:") || relImg.src.startsWith("http"))}
                       className="object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                     {relHasDiscount && (

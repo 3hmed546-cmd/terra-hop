@@ -172,7 +172,7 @@ export function Hero({ hero }: HeroProps) {
       </div>
 
       {/* Rotating Hoodie Images Showcase - Mobile (Positioned below caption with no face overlap) */}
-      <div className="flex md:hidden absolute inset-x-0 bottom-0 top-[220px] sm:top-[240px] -z-10 pointer-events-none items-end justify-center overflow-hidden">
+      <div className="flex md:hidden absolute inset-x-0 bottom-0 top-[255px] sm:top-[275px] -z-10 pointer-events-none items-end justify-center overflow-hidden">
         <div className="relative h-[72vh] w-full max-w-[440px]">
           {hoodiesList.map((h, i) => (
             // eslint-disable-next-line @next/next/no-img-element
@@ -195,19 +195,19 @@ export function Hero({ hero }: HeroProps) {
 
       {/* DESKTOP LAYOUT (md:flex) */}
       <div className="hidden md:flex flex-1 items-center px-4 md:px-6 lg:px-10 pt-16 md:pt-0">
-        {/* Main Big Logo on left */}
-        <h1 className="w-full md:w-[54%] lg:w-[48%] z-10 text-left">
+        {/* Main Big Logo on left - Lowered by 20px */}
+        <h1 className="w-full md:w-[54%] lg:w-[48%] z-10 text-left translate-y-[20px]">
           <AnimatedLogo>
             <Logo className="w-full drop-shadow-md" />
           </AnimatedLogo>
         </h1>
       </div>
 
-      {/* Desktop Bottom-Right Caption (Rotating smoothly with each slide) */}
+      {/* Desktop Bottom-Right Caption (Rotating smoothly with each slide, enlarged by 30%) */}
       {currentCaption && (
         <div
           dir={locale === "ar" ? "rtl" : "ltr"}
-          className="hidden md:flex flex-col items-start text-right z-10 md:absolute md:bottom-28 lg:bottom-32 md:right-8 lg:right-14 max-w-md xl:max-w-xl select-none"
+          className="hidden md:flex flex-col items-start text-right z-10 md:absolute md:bottom-28 lg:bottom-32 md:right-8 lg:right-14 max-w-lg xl:max-w-2xl select-none"
         >
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
@@ -218,14 +218,14 @@ export function Hero({ hero }: HeroProps) {
               transition={{ duration: 0.38, ease: "easeOut" }}
             >
               <div className="flex items-center gap-3">
-                <span className="text-3xl lg:text-4xl xl:text-5xl font-extrabold text-white tracking-tight">
+                <span className="text-[39px] lg:text-[47px] xl:text-[62px] font-extrabold text-white tracking-tight">
                   {currentCaption.prefix}
                 </span>
-                <span className="bg-[#b31428] text-white text-2xl lg:text-3xl xl:text-4xl font-extrabold px-3 py-1 rounded-md shadow-md">
+                <span className="bg-[#b31428] text-white text-[31px] lg:text-[39px] xl:text-[47px] font-extrabold px-4 py-1.5 rounded-md shadow-md">
                   {currentCaption.accent}
                 </span>
               </div>
-              <p className="mt-2 text-sm lg:text-base font-semibold text-stone-200/90 tracking-wide drop-shadow-sm max-w-sm">
+              <p className="mt-2.5 text-[18px] lg:text-[21px] font-semibold text-stone-200/90 tracking-wide drop-shadow-sm max-w-md">
                 {currentCaption.sub}
               </p>
             </motion.div>
@@ -233,20 +233,20 @@ export function Hero({ hero }: HeroProps) {
         </div>
       )}
 
-      {/* MOBILE LAYOUT (< md) - Clean logo and responsive compact caption above model */}
+      {/* MOBILE LAYOUT (< md) - Clean logo lowered by 20px, +15px spacing to caption, +20% enlarged caption */}
       <div className="flex md:hidden flex-col items-center justify-start flex-1 px-4 pt-[32px] sm:pt-[40px] z-10">
-        {/* Big White TERRA HOP Logo in Mobile */}
-        <h1 className="w-full max-w-[260px] sm:max-w-[300px] text-center mb-0">
+        {/* Big White TERRA HOP Logo in Mobile - Lowered by 20px */}
+        <h1 className="w-full max-w-[260px] sm:max-w-[300px] text-center mb-0 mt-[20px]">
           <AnimatedLogo>
             <Logo className="w-full drop-shadow-md" />
           </AnimatedLogo>
         </h1>
 
-        {/* Mobile Upper Caption (Centered, cleanly spaced between Logo and model head) */}
+        {/* Mobile Upper Caption (+15px spacing: mt-[27px], +20% enlarged fonts) */}
         {currentCaption && (
           <div
             dir={locale === "ar" ? "rtl" : "ltr"}
-            className="flex flex-col items-center text-center mt-3 z-10 select-none"
+            className="flex flex-col items-center text-center mt-[27px] z-10 select-none"
           >
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
@@ -258,10 +258,10 @@ export function Hero({ hero }: HeroProps) {
                 className="flex flex-col items-center"
               >
                 <div className="flex items-center justify-center gap-2">
-                  <span className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight drop-shadow-sm leading-tight">
+                  <span className="text-[29px] sm:text-[36px] font-extrabold text-white tracking-tight drop-shadow-sm leading-tight">
                     {currentCaption.prefix}
                   </span>
-                  <span className="bg-[#b31428] text-white text-xl sm:text-2xl font-extrabold px-3 py-0.5 rounded-md shadow-md leading-tight">
+                  <span className="bg-[#b31428] text-white text-[24px] sm:text-[29px] font-extrabold px-3.5 py-1 rounded-md shadow-md leading-tight">
                     {currentCaption.accent}
                   </span>
                 </div>
@@ -272,7 +272,7 @@ export function Hero({ hero }: HeroProps) {
                         ? "'Cairo', var(--font-inter), system-ui, sans-serif"
                         : "inherit",
                   }}
-                  className="mt-1.5 text-xs sm:text-sm font-semibold text-stone-200/90 tracking-wide drop-shadow-md text-center max-w-[320px]"
+                  className="mt-2 text-[14.5px] sm:text-[17px] font-semibold text-stone-200/90 tracking-wide drop-shadow-md text-center max-w-[360px]"
                 >
                   {currentCaption.sub}
                 </p>

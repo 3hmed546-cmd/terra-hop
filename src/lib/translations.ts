@@ -566,7 +566,7 @@ export const translations: Record<Locale, Translations> = {
         returnsBody: "لك كامل الحق في فحص وتجربة الشحنة عند الاستلام مع المندوب. كما نوفر خدمة استبدال المقاس خلال 14 يوماً من تاريخ الاستلام بكل سهولة وبدون أي تعقيد عبر التواصل مع خدمة العملاء.",
       },
       relatedHeading: "تحب تشوف حاجة تانية ؟",
-      relatedSubtitle: "تشكيلة مختارة من كولكشن DROP 01 الحصري",
+      relatedSubtitle: "استكشف باقي تشكيلة منتجات TERRA HOP الحصرية",
       stickyBuyNow: "شراء الآن",
       detailsHeading: "تفاصيل القطعة",
       details: [
@@ -904,7 +904,7 @@ export const translations: Record<Locale, Translations> = {
         returnsBody: "Full inspection rights at delivery. If not satisfied, reject on the spot at 0 shipping fee. Size exchanges are also honored within 14 days of receipt.",
       },
       relatedHeading: "You May Also Like",
-      relatedSubtitle: "Handpicked styles from our exclusive DROP 01 collection",
+      relatedSubtitle: "Explore more exclusive pieces from TERRA HOP",
       stickyBuyNow: "Buy Now",
       detailsHeading: "Details",
       details: [
