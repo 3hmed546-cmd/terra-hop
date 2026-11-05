@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/server/auth-middleware";
 import { apiSuccess, apiError } from "@/lib/server/api-envelope";
 import { getDb, recordAudit } from "@/lib/server/db";
-import { getBrevoConfig, sendBrevoEmail } from "@/lib/server/mailer";
+import { getBrevoConfig, sendBrevoEmail, sendOrderInvoiceEmail } from "@/lib/server/mailer";
 
 export async function GET(request: NextRequest) {
   const auth = requireAdmin(request);
@@ -35,28 +35,39 @@ export async function POST(request: NextRequest) {
   // If this is a test email request
   if (body.action === "TEST_EMAIL") {
     const to = String(body.to || userEmail || "terr3hop@gmail.com").trim();
-    const result = await sendBrevoEmail({
-      to,
-      subject: "تجربة إرسال الإيميل من متجر TERRA HOP عبر Brevo 🖤",
-      html: `
-        <div dir="rtl" style="font-family: sans-serif; background-color: #0f0f0f; color: #f5f5f5; padding: 30px; border-radius: 12px; text-align: right;">
-          <h1 style="color: #ffffff; font-size: 22px;">تم إرسال إيميل التجربة عبر Brevo بنجاح! 🎉</h1>
-          <p style="color: #cccccc; font-size: 15px; line-height: 1.6;">
-            هذه الرسالة تؤكد أن ربط <strong>Brevo API</strong> مع متجر <strong>TERRA HOP</strong> يعمل بكفاءة 100%، وأن فواتير وإشعارات تأكيد الطلبات ستصل لعملائك فوراً.
-          </p>
-          <div style="background: #222; padding: 12px; border-radius: 8px; font-size: 13px; color: #888;">
-            وقت الإرسال: ${new Date().toLocaleString("ar-EG")}
-          </div>
-        </div>
-      `,
+    const ok = await sendOrderInvoiceEmail({
+      id: "test_order_" + Date.now(),
+      number: "TH-1002",
+      createdAt: now,
+      customer: {
+        name: "أحمد عبد الباسط",
+        phone: "01285694670",
+        email: to,
+        city: "الجيزة",
+        address: "شارع صابر عطية - مركز أوسيم",
+      },
+      items: [
+        {
+          name: "هودي عنابي أوفرسايز (Burgundy Oversized Hoodie)",
+          color: "عنابي مارون",
+          size: "XL",
+          qty: 1,
+          priceCents: 125000,
+          imageUrl: "/products/burgundy-hoodie-model.jpg",
+        },
+      ],
+      subtotalCents: 125000,
+      shippingCents: 6000,
+      discountCents: 0,
+      totalCents: 131000,
     });
 
-    if (result.ok) {
-      return apiSuccess({ ok: true, message: `تم إرسال الإيميل التجريبي بنجاح إلى ${to}` });
+    if (ok) {
+      return apiSuccess({ ok: true, message: `تم إرسال إيميل الفاتورة وتأكيد الطلب التجريبي بنجاح إلى ${to}` });
     } else {
       return apiError(
         "INTERNAL_ERROR",
-        result.error || "فشل إرسال الإيميل التجريبي. تأكد من صحة مفتاح Brevo API Key وتفعيل الحساب.",
+        "فشل إرسال الإيميل التجريبي. تأكد من صحة مفتاح Brevo API Key وتفعيل الحساب.",
         500
       );
     }

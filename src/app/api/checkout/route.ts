@@ -115,6 +115,7 @@ export async function POST(request: NextRequest) {
     size: string;
     qty: number;
     priceCents: number;
+    imageUrl?: string;
   }> = [];
 
   for (const item of body.items) {
@@ -164,6 +165,35 @@ export async function POST(request: NextRequest) {
 
     subtotalCents += product.price_cents * qty;
     totalQty += qty;
+
+    let itemImageUrl: string | undefined = undefined;
+    if (colorRow?.id) {
+      try {
+        const cRow = db.prepare("SELECT image_url FROM product_colors WHERE id = ?").get(colorRow.id) as any;
+        if (cRow?.image_url) itemImageUrl = cRow.image_url;
+      } catch {}
+    }
+    if (!itemImageUrl) {
+      try {
+        const pl = db.prepare(`
+          SELECT p.meta, a.sha256
+          FROM image_placements p
+          JOIN assets a ON p.asset_id = a.id
+          WHERE p.slot_key = 'product' AND p.owner_id = ? AND p.active = 1
+          ORDER BY p.position ASC LIMIT 1
+        `).get(product.id) as any;
+        if (pl) {
+          if (pl.meta) {
+            try {
+              const m = JSON.parse(pl.meta);
+              if (m.sourceUrl) itemImageUrl = m.sourceUrl;
+            } catch {}
+          }
+          if (!itemImageUrl && pl.sha256) itemImageUrl = `/media/${pl.sha256}.webp`;
+        }
+      } catch {}
+    }
+
     verifiedItems.push({
       productId: product.id,
       productSlug: product.slug,
@@ -173,6 +203,7 @@ export async function POST(request: NextRequest) {
       size: variant.size,
       qty,
       priceCents: product.price_cents,
+      imageUrl: itemImageUrl,
     });
   }
 
@@ -358,6 +389,7 @@ export async function POST(request: NextRequest) {
       size: it.size,
       qty: it.qty,
       priceCents: it.priceCents,
+      imageUrl: it.imageUrl,
     })),
     subtotalCents,
     shippingCents,

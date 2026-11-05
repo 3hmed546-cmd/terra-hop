@@ -142,6 +142,7 @@ export interface EmailOrderData {
     qty: number;
     priceCents: number;
     image?: string;
+    imageUrl?: string;
   }>;
   subtotalCents: number;
   shippingCents: number;
@@ -150,7 +151,33 @@ export interface EmailOrderData {
 }
 
 /**
+ * Format cents to standard decimal string (e.g. 1,250.00)
+ */
+function formatEgp(cents: number): string {
+  return (cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/**
+ * Resolve absolute product thumbnail image URL for email rendering.
+ */
+function getItemImageUrl(item: { name: string; color?: string; image?: string; imageUrl?: string }): string {
+  let url = item.imageUrl || item.image;
+  if (!url) {
+    const text = `${item.name} ${item.color || ""}`.toLowerCase();
+    if (text.includes("عنابي") || text.includes("burgundy")) url = "/products/burgundy-hoodie-model.jpg";
+    else if (text.includes("أسود") || text.includes("black") || text.includes("obsidian")) url = "/products/black-hoodie-model.jpg";
+    else if (text.includes("كريمي") || text.includes("cream") || text.includes("vintage")) url = "/products/cream-hoodie-model.jpg";
+    else if (text.includes("زمردي") || text.includes("forest") || text.includes("emerald") || text.includes("أخضر")) url = "/products/forest-hoodie-model.jpg";
+    else if (text.includes("موكا") || text.includes("brown") || text.includes("mocha") || text.includes("بني")) url = "/products/brown-hoodie-model.jpg";
+    else if (text.includes("كحلي") || text.includes("navy")) url = "/products/navy-hoodie-model.jpg";
+    else url = "/products/burgundy-hoodie-model.jpg";
+  }
+  return url.startsWith("http") ? url : `${APP_BASE_URL}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+
+/**
  * Send invoice and order confirmation request email to customer via Brevo.
+ * Design is clean, Shopify/Testa-Toro styled, dark mode with white logo card and item images.
  */
 export async function sendOrderInvoiceEmail(order: EmailOrderData): Promise<boolean> {
   if (!order.customer.email) return false;
@@ -159,31 +186,41 @@ export async function sendOrderInvoiceEmail(order: EmailOrderData): Promise<bool
   const confirmUrl = `${APP_BASE_URL}/order/confirm?id=${encodeURIComponent(order.id)}&token=${encodeURIComponent(confirmToken)}`;
   const storeUrl = APP_BASE_URL;
 
-  const subtotalFormatted = (order.subtotalCents / 100).toLocaleString("ar-EG", { minimumFractionDigits: 2 });
+  const subtotalFormatted = formatEgp(order.subtotalCents);
   const shippingFormatted =
     order.shippingCents === 0
       ? "مجاني"
-      : `${(order.shippingCents / 100).toLocaleString("ar-EG", { minimumFractionDigits: 2 })} ج.م`;
+      : `EGP ${formatEgp(order.shippingCents)}`;
   const discountFormatted =
     order.discountCents > 0
-      ? `${(order.discountCents / 100).toLocaleString("ar-EG", { minimumFractionDigits: 2 })} ج.م`
+      ? formatEgp(order.discountCents)
       : null;
-  const totalFormatted = (order.totalCents / 100).toLocaleString("ar-EG", { minimumFractionDigits: 2 });
+  const totalFormatted = formatEgp(order.totalCents);
 
   const itemsHtml = order.items
     .map((item) => {
-      const price = ((item.priceCents * item.qty) / 100).toLocaleString("ar-EG", { minimumFractionDigits: 2 });
-      const meta = [item.color, item.size ? `مقاس: ${item.size}` : null, `الكمية: ${item.qty}`]
-        .filter(Boolean)
-        .join(" · ");
+      const priceFormatted = formatEgp(item.priceCents * item.qty);
+      const imgUrl = getItemImageUrl(item);
+      const variantDetails = [item.color, item.size].filter(Boolean).join(" / ");
       return `
         <tr>
-          <td style="padding: 14px 0; border-bottom: 1px solid #262626; text-align: right; vertical-align: top;">
-            <div style="font-weight: 700; color: #ffffff; font-size: 15px; margin-bottom: 4px;">${item.name}</div>
-            <div style="color: #a3a3a3; font-size: 13px;">${meta}</div>
+          <!-- Product image thumbnail (Right in RTL) -->
+          <td width="70" style="vertical-align: top; padding: 14px 0 14px 12px; width: 70px;">
+            <img src="${imgUrl}" width="64" height="64" alt="${item.name}" style="display: block; width: 64px; height: 64px; object-fit: cover; border-radius: 6px; border: 1px solid #333333;" />
           </td>
-          <td style="padding: 14px 0; border-bottom: 1px solid #262626; text-align: left; vertical-align: top; font-weight: 700; color: #ffffff; font-size: 15px; white-space: nowrap;">
-            ${price} ج.م
+          <!-- Title & Attributes (Middle in RTL) -->
+          <td style="vertical-align: top; padding: 14px 8px; text-align: right;">
+            <div style="font-weight: 600; color: #ffffff; font-size: 14px; line-height: 1.4; margin-bottom: 4px;">
+              ${item.name}
+            </div>
+            <div style="color: #888888; font-size: 13px; margin-bottom: 2px;">
+              × ${item.qty}
+            </div>
+            ${variantDetails ? `<div style="color: #888888; font-size: 12px;">${variantDetails}</div>` : ""}
+          </td>
+          <!-- Price (Left in RTL) -->
+          <td style="vertical-align: top; padding: 14px 0; text-align: left; font-weight: 600; color: #ffffff; font-size: 14px; white-space: nowrap;" dir="ltr">
+            EGP ${priceFormatted}
           </td>
         </tr>
       `;
@@ -196,117 +233,143 @@ export async function sendOrderInvoiceEmail(order: EmailOrderData): Promise<bool
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>فاتورة وتأكيد الطلب #${order.number}</title>
+  <title>تم تأكيد الطلب #${order.number}</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #0c0c0c; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #e5e5e5; -webkit-font-smoothing: antialiased;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #0c0c0c; padding: 30px 15px;">
+<body style="margin: 0; padding: 0; background-color: #121212; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #d4d4d4; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #121212; padding: 28px 12px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="100%" style="max-width: 580px; background-color: #171717; border-radius: 12px; border: 1px solid #262626; overflow: hidden; text-align: right;" cellpadding="0" cellspacing="0">
-          
-          <!-- Logo & Header -->
+        <table role="presentation" width="100%" style="max-width: 520px; text-align: right;" cellpadding="0" cellspacing="0">
+
+          <!-- Centered Logo Card (Identical to Testa Toro) -->
           <tr>
-            <td style="padding: 36px 32px 24px; text-align: center; border-bottom: 1px solid #262626; background: linear-gradient(180deg, #1f1f1f 0%, #171717 100%);">
-              <div style="font-size: 32px; font-weight: 900; letter-spacing: 4px; color: #ffffff; font-family: sans-serif;">TERRA HOP</div>
-              <div style="font-size: 11px; letter-spacing: 3px; color: #e11d48; font-weight: 700; text-transform: uppercase; margin-top: 4px;">Streetwear Redefined</div>
+            <td align="center" style="padding: 16px 0 28px; text-align: center;">
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+                <tr>
+                  <td style="background-color: #ffffff; padding: 12px 20px; border-radius: 6px; text-align: center; border: 1px solid #ffffff;">
+                    <img src="${storeUrl}/logo/terra-hop-logo-card.png" alt="TERRA HOP" width="130" style="display: block; width: 130px; height: auto;" />
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
 
-          <!-- Main Greeting & Confirm Action -->
+          <!-- Header & Order Confirmation Request -->
           <tr>
-            <td style="padding: 32px 32px 24px;">
-              <div style="color: #a3a3a3; font-size: 13px; font-weight: 600; margin-bottom: 6px;">طلب رقم: <span style="color: #ffffff; font-family: monospace;">${order.number}</span></div>
-              <h1 style="color: #ffffff; font-size: 24px; font-weight: 800; margin: 0 0 12px; line-height: 1.4;">شكراً لطلبك، ${order.customer.name}! 🎉</h1>
-              <p style="color: #d4d4d4; font-size: 15px; line-height: 1.7; margin: 0 0 24px;">
-                لقد استلمنا بيانات طلبك بنجاح. لبدء تجهيز قطعك وحجزها لك، يرجى الضغط على زر <strong>تأكيد الأوردر</strong> أدناه:
+            <td style="padding: 0 4px 24px; text-align: right;">
+              <div style="color: #888888; font-size: 14px; margin-bottom: 6px;">
+                الطلب #${order.number}
+              </div>
+              <h1 style="color: #ffffff; font-size: 24px; font-weight: 700; margin: 0 0 12px; line-height: 1.3;">
+                شكراً لطلبك!
+              </h1>
+              <p style="color: #a3a3a3; font-size: 14px; line-height: 1.6; margin: 0 0 22px;">
+                نحن نجهز طلبك ليتم شحنه. سنعلمك عند إرساله.
               </p>
 
-              <!-- CTA Button -->
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 28px;">
+              <!-- Action Button ONLY (No raw links) -->
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom: 28px;">
                 <tr>
-                  <td align="center">
-                    <a href="${confirmUrl}" style="background-color: #ffffff; color: #000000; display: inline-block; padding: 16px 36px; border-radius: 8px; font-size: 16px; font-weight: 800; text-decoration: none; text-align: center; box-shadow: 0 4px 14px rgba(255,255,255,0.15);">
-                      ✓ تأكيد الأوردر الآن
+                  <td>
+                    <a href="${confirmUrl}" style="background-color: #262626; color: #ffffff; display: inline-block; padding: 14px 28px; border-radius: 6px; font-size: 14px; font-weight: 700; text-decoration: none; border: 1px solid #404040; text-align: center;">
+                      تأكيد طلبك
                     </a>
                   </td>
                 </tr>
               </table>
-
-              <p style="color: #888888; font-size: 12px; line-height: 1.6; margin: 0; text-align: center;">
-                إذا كان الزر لا يعمل معك، يمكنك الضغط مباشرة على هذا الرابط:<br>
-                <a href="${confirmUrl}" style="color: #e11d48; text-decoration: underline; word-break: break-all;">${confirmUrl}</a>
-              </p>
             </td>
           </tr>
 
-          <!-- Items Summary -->
+          <!-- Order Summary Section -->
           <tr>
-            <td style="padding: 0 32px 24px;">
-              <h2 style="color: #ffffff; font-size: 17px; font-weight: 700; border-bottom: 2px solid #e11d48; padding-bottom: 8px; margin: 0 0 16px;">
+            <td style="padding: 0 4px 12px; text-align: right;">
+              <h2 style="color: #ffffff; font-size: 18px; font-weight: 700; margin: 0 0 16px;">
                 ملخص الطلب
               </h2>
 
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
                 ${itemsHtml}
               </table>
+            </td>
+          </tr>
 
-              <!-- Totals Table -->
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 16px; border-top: 1px solid #262626; padding-top: 14px;">
+          <!-- Totals -->
+          <tr>
+            <td style="padding: 16px 4px 28px; border-top: 1px solid #262626;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td style="color: #a3a3a3; font-size: 14px; padding: 5px 0;">المجموع الفرعي:</td>
-                  <td style="color: #ffffff; font-size: 14px; padding: 5px 0; text-align: left; font-weight: 600;">${subtotalFormatted} ج.م</td>
+                  <td style="color: #888888; font-size: 14px; padding: 6px 0; text-align: right;">المجموع الفرعي</td>
+                  <td style="color: #ffffff; font-size: 14px; padding: 6px 0; text-align: left;" dir="ltr">EGP ${subtotalFormatted}</td>
                 </tr>
                 ${
                   discountFormatted
                     ? `<tr>
-                        <td style="color: #e11d48; font-size: 14px; padding: 5px 0;">خصم كود الإحالة/البرومو:</td>
-                        <td style="color: #e11d48; font-size: 14px; padding: 5px 0; text-align: left; font-weight: 600;">-${discountFormatted}</td>
+                        <td style="color: #e11d48; font-size: 14px; padding: 6px 0; text-align: right;">الخصم</td>
+                        <td style="color: #e11d48; font-size: 14px; padding: 6px 0; text-align: left;" dir="ltr">-EGP ${discountFormatted}</td>
                       </tr>`
                     : ""
                 }
                 <tr>
-                  <td style="color: #a3a3a3; font-size: 14px; padding: 5px 0;">الشحن والتوصيل:</td>
-                  <td style="color: #ffffff; font-size: 14px; padding: 5px 0; text-align: left; font-weight: 600;">${shippingFormatted}</td>
+                  <td style="color: #888888; font-size: 14px; padding: 6px 0; text-align: right;">الشحن</td>
+                  <td style="color: #ffffff; font-size: 14px; padding: 6px 0; text-align: left;" dir="ltr">${shippingFormatted}</td>
                 </tr>
                 <tr>
-                  <td style="color: #ffffff; font-size: 18px; font-weight: 800; padding: 14px 0 6px; border-top: 1px solid #333333;">الإجمالي النهائي:</td>
-                  <td style="color: #ffffff; font-size: 20px; font-weight: 900; padding: 14px 0 6px; text-align: left; border-top: 1px solid #333333;">${totalFormatted} ج.م</td>
+                  <td style="color: #888888; font-size: 14px; padding: 6px 0; text-align: right;">الضرائب</td>
+                  <td style="color: #ffffff; font-size: 14px; padding: 6px 0; text-align: left;" dir="ltr">EGP 0.00</td>
                 </tr>
                 <tr>
-                  <td style="color: #a3a3a3; font-size: 12px; padding: 2px 0;">إجمالي المدفوع اليوم:</td>
-                  <td style="color: #22c55e; font-size: 12px; padding: 2px 0; text-align: left; font-weight: 600;">0.00 ج.م (دفع عند الاستلام)</td>
+                  <td style="color: #ffffff; font-size: 16px; font-weight: 700; padding: 18px 0 2px; text-align: right;">الإجمالي</td>
+                  <td style="color: #ffffff; font-size: 22px; font-weight: 800; padding: 18px 0 2px; text-align: left;" dir="ltr">
+                    EGP ${totalFormatted}<br>
+                    <span style="font-size: 11px; color: #888888; font-weight: normal;">EGP</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="color: #888888; font-size: 13px; padding: 6px 0; text-align: right;">إجمالي المدفوع اليوم</td>
+                  <td style="color: #ffffff; font-size: 13px; padding: 6px 0; text-align: left;" dir="ltr">EGP 0.00 EGP</td>
                 </tr>
               </table>
             </td>
           </tr>
 
-          <!-- Customer & Shipping Info -->
+          <!-- Customer Info -->
           <tr>
-            <td style="padding: 0 32px 32px;">
-              <h2 style="color: #ffffff; font-size: 17px; font-weight: 700; border-bottom: 2px solid #e11d48; padding-bottom: 8px; margin: 0 0 16px;">
-                معلومات العميل والشحن
+            <td style="padding: 20px 4px 28px; border-top: 1px solid #262626; text-align: right;">
+              <h2 style="color: #ffffff; font-size: 18px; font-weight: 700; margin: 0 0 18px;">
+                معلومات العميل
               </h2>
 
-              <div style="background-color: #1f1f1f; border-radius: 8px; padding: 18px; font-size: 14px; line-height: 1.8;">
-                <div style="color: #ffffff;"><strong>الاسم:</strong> ${order.customer.name}</div>
-                <div style="color: #d4d4d4;"><strong>الموبايل:</strong> <span dir="ltr">${order.customer.phone}</span></div>
-                <div style="color: #d4d4d4;"><strong>المحافظة:</strong> ${order.customer.city}</div>
-                <div style="color: #d4d4d4;"><strong>العنوان بالتفصيل:</strong> ${order.customer.address}</div>
-                <div style="color: #d4d4d4; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #333333;">
-                  <strong>طريقة الدفع:</strong> الدفع نقداً عند الاستلام والمعاينة (COD)
-                </div>
+              <div style="margin-bottom: 22px;">
+                <div style="color: #888888; font-size: 13px; margin-bottom: 4px;">عنوان الشحن</div>
+                <div style="color: #ffffff; font-size: 14px; font-weight: 600; line-height: 1.5;">${order.customer.name}</div>
+                <div style="color: #a3a3a3; font-size: 14px; line-height: 1.6;">${order.customer.address}</div>
+                <div style="color: #a3a3a3; font-size: 14px; line-height: 1.6;">${order.customer.city}</div>
+                <div style="color: #a3a3a3; font-size: 14px; line-height: 1.6;">مصر</div>
+                <div style="color: #a3a3a3; font-size: 14px; line-height: 1.6;" dir="ltr">${order.customer.phone}</div>
+              </div>
+
+              <div style="margin-bottom: 22px;">
+                <div style="color: #888888; font-size: 13px; margin-bottom: 4px;">عنوان الفوترة</div>
+                <div style="color: #a3a3a3; font-size: 14px; line-height: 1.6;">مطابق لعنوان الشحن</div>
+              </div>
+
+              <div style="margin-bottom: 22px;">
+                <div style="color: #888888; font-size: 13px; margin-bottom: 4px;">الدفع</div>
+                <div style="color: #ffffff; font-size: 14px;">الدفع عند الاستلام (COD)</div>
+              </div>
+
+              <div>
+                <div style="color: #888888; font-size: 13px; margin-bottom: 4px;">طريقة الشحن</div>
+                <div style="color: #ffffff; font-size: 14px; line-height: 1.6;">شحن سريع ومعاينة وقياس قبل الاستلام</div>
               </div>
             </td>
           </tr>
 
           <!-- Footer -->
           <tr>
-            <td style="padding: 24px 32px; background-color: #121212; border-top: 1px solid #262626; text-align: center; color: #737373; font-size: 12px; line-height: 1.7;">
-              إذا كانت لديك أي استفسارات، يمكنك الرد مباشرة على هذا البريد الإلكتروني.<br>
-              <div style="margin-top: 12px;">
-                <a href="${storeUrl}" style="color: #e5e5e5; text-decoration: underline; margin: 0 8px;">زيارة المتجر</a> · 
-                <span style="color: #525252;">TERRA HOP © 2026 جميع الحقوق محفوظة</span>
-              </div>
+            <td style="padding: 24px 4px 12px; border-top: 1px solid #262626; text-align: center; color: #737373; font-size: 12px; line-height: 1.7;">
+              إذا كانت لديك أي أسئلة، رد على هذا البريد الإلكتروني أو تواصل معنا على<br>
+              <span style="color: #a3a3a3;">terr3hop@gmail.com</span>
             </td>
           </tr>
 
@@ -321,7 +384,7 @@ export async function sendOrderInvoiceEmail(order: EmailOrderData): Promise<bool
   const res = await sendBrevoEmail({
     to: order.customer.email,
     recipientName: order.customer.name,
-    subject: `فاتورة وتأكيد الطلب #${order.number} | TERRA HOP`,
+    subject: `تم تأكيد الطلب #${order.number}`,
     html,
   });
 
@@ -347,7 +410,7 @@ export async function sendOrderAcceptedEmail(
 ): Promise<boolean> {
   if (!order.customer.email) return false;
 
-  const totalFormatted = (order.totalCents / 100).toLocaleString("ar-EG", { minimumFractionDigits: 2 });
+  const totalFormatted = formatEgp(order.totalCents);
   const storeUrl = APP_BASE_URL;
 
   const html = `
@@ -356,73 +419,65 @@ export async function sendOrderAcceptedEmail(
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>تم قبول وتجهيز طلبك #${order.number}</title>
+  <title>تم قبول وشحن طلبك #${order.number}</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #0c0c0c; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #e5e5e5; -webkit-font-smoothing: antialiased;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #0c0c0c; padding: 30px 15px;">
+<body style="margin: 0; padding: 0; background-color: #121212; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #d4d4d4; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #121212; padding: 28px 12px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="100%" style="max-width: 580px; background-color: #171717; border-radius: 12px; border: 1px solid #262626; overflow: hidden; text-align: right;" cellpadding="0" cellspacing="0">
-          
-          <!-- Logo & Header -->
+        <table role="presentation" width="100%" style="max-width: 520px; text-align: right;" cellpadding="0" cellspacing="0">
+
+          <!-- Centered Logo Card -->
           <tr>
-            <td style="padding: 36px 32px 24px; text-align: center; border-bottom: 1px solid #262626; background: linear-gradient(180deg, #1f1f1f 0%, #171717 100%);">
-              <div style="font-size: 32px; font-weight: 900; letter-spacing: 4px; color: #ffffff; font-family: sans-serif;">TERRA HOP</div>
-              <div style="font-size: 11px; letter-spacing: 3px; color: #e11d48; font-weight: 700; text-transform: uppercase; margin-top: 4px;">Streetwear Redefined</div>
-            </td>
-          </tr>
-
-          <!-- Main Acceptance Content -->
-          <tr>
-            <td style="padding: 32px 32px 28px;">
-              <div style="display: inline-block; background-color: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid #22c55e; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; margin-bottom: 14px;">
-                ✓ تم قبول الطلب رسمياً وجاري الشحن
-              </div>
-
-              <h1 style="color: #ffffff; font-size: 24px; font-weight: 800; margin: 0 0 12px; line-height: 1.4;">
-                خبر رائع، ${order.customer.name}! 🚀
-              </h1>
-
-              <p style="color: #d4d4d4; font-size: 15px; line-height: 1.7; margin: 0 0 24px;">
-                يسعدنا إبلاغك بأن إدارة <strong>TERRA HOP</strong> قامت بقبول وتجهيز طلبك رقم <strong style="color: #ffffff; font-family: monospace;">#${order.number}</strong> للتوصيل.
-              </p>
-
-              <!-- Delivery Timeframe Highlight Box -->
-              <div style="background: linear-gradient(135deg, #222222 0%, #1a1a1a 100%); border: 1px solid #333333; border-right: 4px solid #22c55e; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
-                <div style="font-size: 13px; color: #a3a3a3; font-weight: 600; margin-bottom: 4px;">موعد التوصيل المتوقع:</div>
-                <div style="font-size: 19px; color: #ffffff; font-weight: 800;">
-                  هيوصل لك في غضون ${deliveryDays}
-                </div>
-                <div style="font-size: 13px; color: #a3a3a3; margin-top: 6px; line-height: 1.6;">
-                  سيتواصل معك مندوب شركة الشحن هاتفياً أو عبر واتساب قبل الوصول لتسليم الشحنة.
-                </div>
-              </div>
-
-              <!-- Payment Reminder Box -->
-              <div style="background-color: #1f1f1f; border-radius: 8px; padding: 16px; font-size: 14px; line-height: 1.8; margin-bottom: 24px;">
-                <div style="color: #a3a3a3;">المبلغ المطلوب سداده عند الاستلام:</div>
-                <div style="color: #ffffff; font-size: 22px; font-weight: 900; margin: 4px 0;">${totalFormatted} ج.م</div>
-                <div style="color: #a3a3a3; font-size: 12px;">الدفع نقداً بعد المعاينة عند باب بيتك.</div>
-              </div>
-
-              <!-- Store Link -->
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <td align="center" style="padding: 16px 0 28px; text-align: center;">
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
                 <tr>
-                  <td align="center">
-                    <a href="${storeUrl}" style="background-color: #ffffff; color: #000000; display: inline-block; padding: 14px 32px; border-radius: 6px; font-size: 15px; font-weight: 700; text-decoration: none; text-align: center;">
-                      زيارة متجر TERRA HOP
-                    </a>
+                  <td style="background-color: #ffffff; padding: 12px 20px; border-radius: 6px; text-align: center; border: 1px solid #ffffff;">
+                    <img src="${storeUrl}/logo/terra-hop-logo-card.png" alt="TERRA HOP" width="130" style="display: block; width: 130px; height: auto;" />
                   </td>
                 </tr>
               </table>
             </td>
           </tr>
 
+          <!-- Acceptance Content -->
+          <tr>
+            <td style="padding: 0 4px 24px; text-align: right;">
+              <div style="color: #888888; font-size: 14px; margin-bottom: 6px;">
+                الطلب #${order.number}
+              </div>
+              <h1 style="color: #ffffff; font-size: 24px; font-weight: 700; margin: 0 0 12px; line-height: 1.3;">
+                تم قبول وتجهيز طلبك!
+              </h1>
+              <p style="color: #a3a3a3; font-size: 14px; line-height: 1.6; margin: 0 0 22px;">
+                يسعدنا إبلاغك بأن طلبك رقم #${order.number} تم تأكيده وتجهيزه للتسليم لشركة الشحن.
+              </p>
+
+              <!-- Delivery Timeframe -->
+              <div style="background-color: #1a1a1a; border: 1px solid #2e2e2e; border-right: 4px solid #22c55e; border-radius: 6px; padding: 18px; margin-bottom: 22px;">
+                <div style="font-size: 13px; color: #888888; font-weight: 600; margin-bottom: 4px;">موعد التوصيل المتوقع</div>
+                <div style="font-size: 18px; color: #ffffff; font-weight: 700;">
+                  خلال ${deliveryDays}
+                </div>
+                <div style="font-size: 13px; color: #a3a3a3; margin-top: 6px; line-height: 1.6;">
+                  سيتواصل معك مندوب شركة الشحن هاتفياً قبل الوصول لتسليم الشحنة.
+                </div>
+              </div>
+
+              <!-- Payment Box -->
+              <div style="background-color: #1a1a1a; border: 1px solid #2e2e2e; border-radius: 6px; padding: 18px; margin-bottom: 22px;">
+                <div style="color: #888888; font-size: 13px;">المبلغ المطلوب عند الاستلام:</div>
+                <div style="color: #ffffff; font-size: 20px; font-weight: 800; margin: 4px 0;" dir="ltr">EGP ${totalFormatted}</div>
+                <div style="color: #a3a3a3; font-size: 12px;">الدفع نقداً بعد المعاينة والقياس.</div>
+              </div>
+            </td>
+          </tr>
+
           <!-- Footer -->
           <tr>
-            <td style="padding: 24px 32px; background-color: #121212; border-top: 1px solid #262626; text-align: center; color: #737373; font-size: 12px; line-height: 1.7;">
-              شكراً لاختيارك TERRA HOP! 🖤<br>
-              إذا كانت لديك أي استفسارات، يمكنك الرد مباشرة على هذا البريد الإلكتروني.
+            <td style="padding: 24px 4px 12px; border-top: 1px solid #262626; text-align: center; color: #737373; font-size: 12px; line-height: 1.7;">
+              إذا كانت لديك أي أسئلة، رد على هذا البريد الإلكتروني أو تواصل معنا على<br>
+              <span style="color: #a3a3a3;">terr3hop@gmail.com</span>
             </td>
           </tr>
 
@@ -437,7 +492,7 @@ export async function sendOrderAcceptedEmail(
   const res = await sendBrevoEmail({
     to: order.customer.email,
     recipientName: order.customer.name,
-    subject: `تم قبول وتجهيز طلبك #${order.number} 🚀 | TERRA HOP`,
+    subject: `تم قبول وشحن طلبك #${order.number} | TERRA HOP`,
     html,
   });
 
@@ -469,65 +524,57 @@ export async function sendOrderRejectedEmail(
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>تحديث بخصوص طلبك #${order.number}</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #0c0c0c; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #e5e5e5; -webkit-font-smoothing: antialiased;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #0c0c0c; padding: 30px 15px;">
+<body style="margin: 0; padding: 0; background-color: #121212; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #d4d4d4; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #121212; padding: 28px 12px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="100%" style="max-width: 580px; background-color: #171717; border-radius: 12px; border: 1px solid #262626; overflow: hidden; text-align: right;" cellpadding="0" cellspacing="0">
-          
-          <!-- Logo & Header -->
+        <table role="presentation" width="100%" style="max-width: 520px; text-align: right;" cellpadding="0" cellspacing="0">
+
+          <!-- Centered Logo Card -->
           <tr>
-            <td style="padding: 36px 32px 24px; text-align: center; border-bottom: 1px solid #262626; background: linear-gradient(180deg, #1f1f1f 0%, #171717 100%);">
-              <div style="font-size: 32px; font-weight: 900; letter-spacing: 4px; color: #ffffff; font-family: sans-serif;">TERRA HOP</div>
-              <div style="font-size: 11px; letter-spacing: 3px; color: #e11d48; font-weight: 700; text-transform: uppercase; margin-top: 4px;">Streetwear Redefined</div>
-            </td>
-          </tr>
-
-          <!-- Main Content -->
-          <tr>
-            <td style="padding: 32px 32px 28px;">
-              <div style="display: inline-block; background-color: rgba(225, 29, 72, 0.15); color: #f43f5e; border: 1px solid #e11d48; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; margin-bottom: 14px;">
-                طلب ملغي
-              </div>
-
-              <h1 style="color: #ffffff; font-size: 24px; font-weight: 800; margin: 0 0 12px; line-height: 1.4;">
-                نعتذر منك، ${order.customer.name} 🖤
-              </h1>
-
-              <p style="color: #d4d4d4; font-size: 15px; line-height: 1.7; margin: 0 0 24px;">
-                نأسف لإبلاغك بأنه تعذر استكمال وتجهيز طلبك رقم <strong style="color: #ffffff; font-family: monospace;">#${order.number}</strong> وتم إلغاؤه من قِبل إدارة المتجر.
-              </p>
-
-              <!-- Reason Box -->
-              <div style="background: linear-gradient(135deg, #222222 0%, #1a1a1a 100%); border: 1px solid #333333; border-right: 4px solid #e11d48; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
-                <div style="font-size: 13px; color: #a3a3a3; font-weight: 600; margin-bottom: 4px;">سبب الإلغاء:</div>
-                <div style="font-size: 16px; color: #ffffff; font-weight: 700; line-height: 1.6;">
-                  ${reason}
-                </div>
-              </div>
-
-              <p style="color: #a3a3a3; font-size: 13px; line-height: 1.7; margin: 0 0 28px;">
-                نعتذر بشدة عن أي إزعاج قد سببه ذلك لك. يسعدنا دائماً زيارتك للمتجر مرة أخرى لاختيار أي قطع بديلة، أو التواصل مع فريق الدعم لمساعدتك في أي استفسار.
-              </p>
-
-              <!-- Store Link -->
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <td align="center" style="padding: 16px 0 28px; text-align: center;">
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
                 <tr>
-                  <td align="center">
-                    <a href="${storeUrl}" style="background-color: #ffffff; color: #000000; display: inline-block; padding: 14px 32px; border-radius: 6px; font-size: 15px; font-weight: 700; text-decoration: none; text-align: center;">
-                      تصفح متجر TERRA HOP
-                    </a>
+                  <td style="background-color: #ffffff; padding: 12px 20px; border-radius: 6px; text-align: center; border: 1px solid #ffffff;">
+                    <img src="${storeUrl}/logo/terra-hop-logo-card.png" alt="TERRA HOP" width="130" style="display: block; width: 130px; height: auto;" />
                   </td>
                 </tr>
               </table>
             </td>
           </tr>
 
+          <!-- Rejection Content -->
+          <tr>
+            <td style="padding: 0 4px 24px; text-align: right;">
+              <div style="color: #888888; font-size: 14px; margin-bottom: 6px;">
+                الطلب #${order.number}
+              </div>
+              <h1 style="color: #ffffff; font-size: 24px; font-weight: 700; margin: 0 0 12px; line-height: 1.3;">
+                نعتذر منك، ${order.customer.name}
+              </h1>
+              <p style="color: #a3a3a3; font-size: 14px; line-height: 1.6; margin: 0 0 22px;">
+                نأسف لإبلاغك بأنه تعذر استكمال وتجهيز طلبك رقم #${order.number} وتم إلغاؤه من قِبل إدارة المتجر.
+              </p>
+
+              <!-- Reason Box -->
+              <div style="background-color: #1a1a1a; border: 1px solid #2e2e2e; border-right: 4px solid #e11d48; border-radius: 6px; padding: 18px; margin-bottom: 22px;">
+                <div style="font-size: 13px; color: #888888; font-weight: 600; margin-bottom: 4px;">سبب الإلغاء</div>
+                <div style="font-size: 15px; color: #ffffff; font-weight: 600; line-height: 1.6;">
+                  ${reason}
+                </div>
+              </div>
+
+              <p style="color: #888888; font-size: 13px; line-height: 1.7; margin: 0;">
+                نعتذر بشدة عن أي إزعاج قد سببه ذلك لك، ويسعدنا دائماً زيارتك للمتجر مرة أخرى لاختيار أي قطع بديلة.
+              </p>
+            </td>
+          </tr>
+
           <!-- Footer -->
           <tr>
-            <td style="padding: 24px 32px; background-color: #121212; border-top: 1px solid #262626; text-align: center; color: #737373; font-size: 12px; line-height: 1.7;">
-              فريق TERRA HOP في خدمتك دائماً.<br>
-              إذا كانت لديك أي استفسارات، يمكنك الرد مباشرة على هذا البريد الإلكتروني.
+            <td style="padding: 24px 4px 12px; border-top: 1px solid #262626; text-align: center; color: #737373; font-size: 12px; line-height: 1.7;">
+              إذا كانت لديك أي أسئلة، رد على هذا البريد الإلكتروني أو تواصل معنا على<br>
+              <span style="color: #a3a3a3;">terr3hop@gmail.com</span>
             </td>
           </tr>
 
