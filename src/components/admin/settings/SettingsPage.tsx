@@ -18,6 +18,7 @@ import type { Settings } from "@/lib/admin/types";
 import { PageHeader } from "../PageHeader";
 import { useShortcutHelp } from "../ShortcutsDialog";
 import { AdminPushToggle } from "../ui/AdminPushToggle";
+import { EmailSettingsSection } from "../ui/EmailSettingsSection";
 import { Button, Checkbox, Dialog, NumberInput, Select, TextInput, useToast } from "../ui";
 
 const S = ADMIN_STRINGS.settings;
@@ -177,6 +178,10 @@ function SettingsEditor({ settings }: { settings: Settings }) {
 
         <Section id="push-notifications" title="إشعارات الطلبات الفورية (Web Push)">
           <AdminPushToggle />
+        </Section>
+
+        <Section id="email-system" title="نظام إرسال الإيميلات وفواتير الطلبات">
+          <EmailSettingsSection />
         </Section>
 
         <div className="adm-form-actions">
