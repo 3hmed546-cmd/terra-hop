@@ -119,59 +119,65 @@ async function ConfirmContent({ searchParams }: ConfirmPageProps) {
       <div className="w-full max-w-lg">
         {/* Brand Logo */}
         <div className="text-center mb-8">
-          <Link href="/" className="inline-block hover:opacity-80 transition-opacity">
-            <span className="text-3xl font-black tracking-widest text-off-white font-sans">TERRA HOP</span>
+          <Link href="/" className="inline-block hover:opacity-85 transition-opacity">
+            <img
+              src="/logo/terra-hop-logo-white.png"
+              alt="TERRA HOP"
+              className="h-10 mx-auto object-contain"
+              width={140}
+              height={54}
+            />
           </Link>
         </div>
 
         {/* Card */}
-        <div className="bg-[#171717] border border-[#2b2b2b] rounded-2xl p-6 sm:p-10 text-center shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-emerald-500 via-emerald-400 to-teal-500" />
-
+        <div className="bg-[#161616] border border-[#262626] rounded-2xl p-6 sm:p-10 text-center shadow-2xl relative">
           {/* Success Check Icon */}
-          <div className="w-20 h-20 flex items-center justify-center mx-auto mb-6">
+          <div className="w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center mx-auto mb-6">
             <img
               src="/order-success-check.png"
               alt="تم تأكيد طلبك بنجاح"
-              className="w-20 h-20 sm:w-24 sm:h-24 object-contain animate-in zoom-in-90 duration-300 drop-shadow-md"
+              className="w-full h-full object-contain animate-in zoom-in-90 duration-300 drop-shadow-md"
               width={96}
               height={96}
             />
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-black mb-3 text-off-white">
-            {isFirstConfirmation ? "تم تأكيد طلبك بنجاح! 🎉" : "طلبك مؤكد بالفعل! ✓"}
+          <h1 className="text-2xl sm:text-3xl font-black mb-4 text-white tracking-tight">
+            {isFirstConfirmation ? "تم تأكيد طلبك بنجاح" : "طلبك مؤكد بالفعل"}
           </h1>
 
-          <div className="inline-flex items-center gap-2 bg-[#222222] border border-[#333333] px-4 py-1.5 rounded-full text-xs font-mono text-emerald-400 mb-6">
-            <span>رقم الطلب: {order.number}</span>
+          {/* White Order Number Pill */}
+          <div className="inline-flex items-center gap-2 bg-[#222222] border border-[#333333] px-5 py-2 rounded-full mb-6">
+            <span className="text-xs text-[#888888]">رقم الطلب:</span>
+            <span className="font-mono text-sm font-bold text-white tracking-wider">{order.number}</span>
           </div>
 
-          <p className="text-graphite text-sm sm:text-base leading-relaxed mb-6">
-            شكراً لك يا <strong>{customerName}</strong>! تم تسجيل تأكيد رغبتك في شراء الطلب.
-            فريق عمل <strong>TERRA HOP</strong> يقوم الآن بمراجعة طلبك وتجهيزه للشحن، وسيتواصل معك مندوب شركة التوصيل قريباً.
+          <p className="text-[#a3a3a3] text-sm sm:text-base leading-relaxed mb-7 max-w-md mx-auto">
+            شكراً لك يا <strong className="text-white font-semibold">{customerName}</strong>. تم تسجيل تأكيد رغبتك في شراء الطلب بنجاح.
+            يقوم فريق عمل <strong className="text-white">TERRA HOP</strong> الآن بمراجعة طلبك وتجهيزه للشحن، وسيتواصل معك مندوب شركة التوصيل قريباً.
           </p>
 
           {/* Info Box */}
-          <div className="bg-[#1f1f1f] border border-[#2e2e2e] rounded-xl p-4 mb-8 text-right text-xs sm:text-sm space-y-2">
-            <div className="flex items-center justify-between text-graphite border-b border-[#2e2e2e] pb-2">
-              <span className="flex items-center gap-1.5 text-off-white font-medium">
+          <div className="bg-[#1c1c1c] border border-[#2b2b2b] rounded-xl p-5 mb-8 text-right text-xs sm:text-sm space-y-3">
+            <div className="flex items-center justify-between text-[#888888] border-b border-[#2b2b2b] pb-2.5">
+              <span className="flex items-center gap-2 text-white font-medium">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
                 طريقة الدفع
               </span>
-              <span>الدفع نقداً عند الاستلام والمعاينة</span>
+              <span className="text-[#cccccc]">الدفع نقداً عند الاستلام والمعاينة</span>
             </div>
-            <div className="flex items-center justify-between pt-1">
-              <span className="text-graphite">المبلغ المطلوب سداده عند الاستلام:</span>
-              <strong className="text-off-white text-base font-black">{totalFormatted} ج.م</strong>
+            <div className="flex items-center justify-between pt-0.5">
+              <span className="text-[#888888]">المبلغ المطلوب سداده عند الاستلام:</span>
+              <strong className="text-white text-base sm:text-lg font-black font-mono">{totalFormatted} ج.م</strong>
             </div>
           </div>
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-3">
             <Link
-              href="/"
-              className="flex-1 inline-flex items-center justify-center gap-2 bg-off-white text-obsidian px-6 py-3.5 rounded-xl font-bold text-sm hover:bg-white transition-all shadow-lg"
+              href="/shop"
+              className="flex-1 inline-flex items-center justify-center gap-2 bg-white text-black hover:bg-neutral-200 px-6 py-3.5 rounded-xl font-bold text-sm transition-all shadow-lg"
             >
               <ShoppingBag className="w-4 h-4" />
               <span>متابعة التسوق في المتجر</span>
@@ -180,7 +186,7 @@ async function ConfirmContent({ searchParams }: ConfirmPageProps) {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-xs text-graphite mt-6">
+        <p className="text-center text-xs text-[#666666] mt-6">
           TERRA HOP · Streetwear Redefined © 2026
         </p>
       </div>

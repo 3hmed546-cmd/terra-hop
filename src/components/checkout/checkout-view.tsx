@@ -256,7 +256,7 @@ export function CheckoutView({ products }: { products: Product[] }) {
           <Truck className="h-5 w-5 shrink-0 text-emerald-700 mt-0.5" />
           <div>
             <span className="font-bold block text-sm mb-0.5">
-              {locale === "ar" ? "تفقد بريدك الإلكتروني لتأكيد الأوردر ✉️" : "Check Your Email To Confirm Order"}
+              {locale === "ar" ? "تفقد بريدك الإلكتروني لتأكيد الأوردر" : "Check Your Email To Confirm Order"}
             </span>
             <p className="text-emerald-900 leading-normal">
               {locale === "ar"
