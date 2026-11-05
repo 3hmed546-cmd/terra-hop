@@ -7,6 +7,7 @@ import { countNeedsAction } from "@/lib/admin/inventory";
 import { ADMIN_BASE, adminHref, isNavActive, relativeAdminPath } from "@/lib/admin/paths";
 import { useAdminStore } from "@/lib/admin/store";
 import { isAuthenticated, logout } from "@/lib/admin-auth";
+import { registerPushServiceWorker } from "@/lib/push-client";
 import type { ShortcutAction } from "@/lib/admin/shortcuts";
 import { useShortcuts } from "@/lib/admin/use-shortcuts";
 import { ShortcutHelpProvider, ShortcutsDialog } from "./ShortcutsDialog";
@@ -84,6 +85,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
     setAuthed(isAuthed);
     if (!isAuthed) {
       router.replace(adminHref(""));
+    } else {
+      registerPushServiceWorker().catch(() => {});
     }
   }, [router]);
 

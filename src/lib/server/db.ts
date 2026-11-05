@@ -515,6 +515,17 @@ function initializeSchema(db: Database.Database): void {
       resolved_by TEXT,
       resolved_at TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS admin_push_subscriptions (
+      id TEXT PRIMARY KEY,
+      endpoint TEXT UNIQUE NOT NULL,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      user_agent TEXT,
+      created_at INTEGER NOT NULL,
+      last_used_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS ix_admin_push_endpoint ON admin_push_subscriptions(endpoint);
   `);
 
   const orderColumns = [

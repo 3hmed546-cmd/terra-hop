@@ -10,6 +10,7 @@ import { evaluatePromo } from "@/lib/server/promo";
 import { lookupAndValidateCode } from "@/lib/server/ambassadors/codes";
 import { normalizePhone, EGYPT_MOBILE } from "@/lib/server/phone";
 import { getPaymentHandler } from "@/lib/server/payment";
+import { notifyAdminsNewOrder } from "@/lib/server/push";
 import type Database from "better-sqlite3";
 
 const CHECKOUT_RATE_OPTIONS = { prefix: "store_checkout", max: 5, windowMs: 10 * 60 * 1000 };
@@ -319,6 +320,19 @@ export async function POST(request: NextRequest) {
     entityId: orderId,
     ip,
     after: { orderNumber, totalCents, itemsCount: verifiedItems.length },
+  });
+
+  // Notify admins via Web Push notification in background
+  notifyAdminsNewOrder({
+    orderId,
+    orderNumber,
+    customerName: name,
+    city: city || undefined,
+    totalCents,
+    itemsCount: verifiedItems.length,
+    firstItemName: verifiedItems[0]?.productName,
+  }).catch((err) => {
+    console.error("[PushNotification] Failed to notify admins:", err);
   });
 
   // الرد كامل لصفحة التأكيد

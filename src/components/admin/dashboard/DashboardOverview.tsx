@@ -14,6 +14,7 @@ import { formatMoney } from "@/lib/admin/format";
 import { deriveProductStatus, productTotalStock } from "@/lib/admin/inventory";
 import { adminHref } from "@/lib/admin/paths";
 import { useAdminStore } from "@/lib/admin/store";
+import { AdminPushToggle } from "@/components/admin/ui/AdminPushToggle";
 import type { Order } from "@/lib/admin/types";
 import { ADMIN_STRINGS } from "@/lib/admin/admin-strings";
 
@@ -128,6 +129,11 @@ export function DashboardOverview() {
           </div>
         }
       />
+
+      {/* Instant Push Notifications Banner */}
+      <div className="mt-6">
+        <AdminPushToggle />
+      </div>
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
