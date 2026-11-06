@@ -246,7 +246,14 @@ function initializeSchema(db: Database.Database): void {
       expires_at TEXT,
       max_uses INTEGER,
       used INTEGER DEFAULT 0,
-      min_subtotal_cents INTEGER DEFAULT 0
+      min_subtotal_cents INTEGER DEFAULT 0,
+      applies_to TEXT DEFAULT 'ALL_PRODUCTS'
+    );
+
+    CREATE TABLE IF NOT EXISTS promo_code_products (
+      promo_code TEXT NOT NULL REFERENCES promo_codes(code) ON DELETE CASCADE,
+      product_id TEXT NOT NULL,
+      PRIMARY KEY (promo_code, product_id)
     );
 
     CREATE TABLE IF NOT EXISTS change_log (
@@ -557,6 +564,24 @@ function initializeSchema(db: Database.Database): void {
     db.exec("ALTER TABLE product_colors ADD COLUMN image_url TEXT;");
   } catch {
     /* Column already exists */
+  }
+
+  try {
+    db.exec("ALTER TABLE promo_codes ADD COLUMN applies_to TEXT DEFAULT 'ALL_PRODUCTS';");
+  } catch {
+    /* Column already exists */
+  }
+
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS promo_code_products (
+        promo_code TEXT NOT NULL REFERENCES promo_codes(code) ON DELETE CASCADE,
+        product_id TEXT NOT NULL,
+        PRIMARY KEY (promo_code, product_id)
+      );
+    `);
+  } catch {
+    /* Table already exists */
   }
 
   // Seed default ambassador levels & rewards if missing

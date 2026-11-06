@@ -239,10 +239,49 @@ export function lookupAndValidateCode(
         return { ok: false, message: "قيمة الطلب أقل من الحد الأدنى لاستخدام هذا الكود.", status: 400 };
       }
 
+      // Product Scoping / Restrictions (نظام القيود والشروط على المنتجات)
+      let eligibleSubtotalCents = 0;
+      let eligibleProductIds: string[] = [];
+      const appliesTo = p.applies_to || "ALL_PRODUCTS";
+
+      if (appliesTo === "SELECTED") {
+        try {
+          const allowedRows = db
+            .prepare("SELECT product_id FROM promo_code_products WHERE promo_code = ?")
+            .all(p.code) as { product_id: string }[];
+          eligibleProductIds = allowedRows.map((r) => r.product_id);
+        } catch {}
+
+        for (const item of cartItems) {
+          const prod = db
+            .prepare("SELECT id, slug FROM products WHERE id = ? OR slug = ?")
+            .get(item.productId || item.productSlug, item.productSlug || item.productId) as any;
+          const matches =
+            (prod && (eligibleProductIds.includes(prod.id) || eligibleProductIds.includes(prod.slug))) ||
+            (item.productId && eligibleProductIds.includes(item.productId)) ||
+            (item.productSlug && eligibleProductIds.includes(item.productSlug));
+
+          if (matches) {
+            eligibleSubtotalCents += item.priceCents * item.qty;
+          }
+        }
+
+        if (cartItems.length > 0 && eligibleSubtotalCents === 0) {
+          return {
+            ok: false,
+            message: "هذا الكود غير مخصص للمنتجات الموجودة في سلتك.",
+            status: 400,
+          };
+        }
+      } else {
+        eligibleSubtotalCents = subtotalCents > 0 ? subtotalCents : cartItems.reduce((acc, it) => acc + it.priceCents * it.qty, 0);
+      }
+
+      const fixedCentsValue = p.value > 1000 ? p.value : p.value * 100;
       const discountCents =
         p.kind === "percent"
-          ? Math.round((subtotalCents * p.value) / 100)
-          : Math.min(subtotalCents > 0 ? subtotalCents : p.value, p.value);
+          ? Math.round((eligibleSubtotalCents * p.value) / 100)
+          : Math.min(eligibleSubtotalCents > 0 ? eligibleSubtotalCents : fixedCentsValue, fixedCentsValue);
 
       return {
         ok: true,
@@ -250,7 +289,12 @@ export function lookupAndValidateCode(
         code: p.code,
         discountCents,
         discountPercent: p.kind === "percent" ? p.value : undefined,
-        message: p.kind === "percent" ? `تم تطبيق خصم ${p.value}% بنجاح.` : `تم تطبيق خصم ${Math.round(discountCents / 100)} ج.م بنجاح.`,
+        appliesTo,
+        eligibleProductIds,
+        message:
+          p.kind === "percent"
+            ? `تم تطبيق خصم ${p.value}% بنجاح.`
+            : `تم تطبيق خصم ${Math.round(discountCents / 100)} ج.م بنجاح.`,
       };
     }
   }
