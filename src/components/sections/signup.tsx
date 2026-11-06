@@ -99,7 +99,7 @@ export function Signup({ signup }: { signup: typeof home.signup }) {
                   className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-graphite hover:text-obsidian transition-colors"
                 >
                   <InstagramIcon className="h-4 w-4" />
-                  <span>Instagram @terra_hop</span>
+                  <span>Instagram @terr3hop</span>
                 </a>
               </div>
             </div>

@@ -160,7 +160,7 @@ export function MobileMenu({ links, labels }: Props) {
                 <TikTokIcon className="h-5 w-5 fill-current" />
               </a>
               <a
-                href="https://instagram.com/terra_hop"
+                href="https://www.instagram.com/terr3hop/"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Instagram"
@@ -169,7 +169,7 @@ export function MobileMenu({ links, labels }: Props) {
                 <InstagramIcon className="h-5 w-5 fill-current" />
               </a>
               <a
-                href="https://facebook.com/"
+                href="https://www.facebook.com/terrahop.wear"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Facebook"

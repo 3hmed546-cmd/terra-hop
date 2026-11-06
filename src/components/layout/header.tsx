@@ -76,7 +76,7 @@ export function Header({ header, overlay = false }: Props) {
               // Social Media Icons in top header before scroll (Facebook, Instagram, TikTok)
               <div className="flex items-center gap-3.5 sm:gap-4 text-off-white">
                 <a
-                  href="https://facebook.com/"
+                  href="https://www.facebook.com/terrahop.wear"
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Facebook"
@@ -85,7 +85,7 @@ export function Header({ header, overlay = false }: Props) {
                   <FacebookIcon className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
                 </a>
                 <a
-                  href="https://instagram.com/terra_hop"
+                  href="https://www.instagram.com/terr3hop/"
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Instagram"
