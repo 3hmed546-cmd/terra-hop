@@ -637,6 +637,15 @@ function initializeSchema(db: Database.Database): void {
     /* Index already exists */
   }
 
+  // One-time cleanup to permanently remove all default pre-seeded demo promo codes
+  try {
+    const isCleaned = db.prepare("SELECT value FROM meta WHERE key = 'promos_cleaned_v2'").get();
+    if (!isCleaned) {
+      db.prepare("DELETE FROM promo_codes WHERE code IN ('708DDH', 'AHMED', 'AHMED10', 'DROP01', 'TERRA10', 'VIP20', 'WELCOME50', 'ONEUSE20', 'WELCOME10')").run();
+      db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('promos_cleaned_v2', '1')").run();
+    }
+  } catch {}
+
   // Seed default ambassador levels & rewards if missing
   try {
     const existingLevels = db.prepare("SELECT COUNT(*) as c FROM ambassador_levels").get() as { c: number };

@@ -8,7 +8,6 @@ export async function GET(request: NextRequest) {
   const auth = requireAdmin(request);
   if (!auth.authenticated) return auth.responseError!;
 
-  seedDatabaseIfNeeded();
   const db = getDb();
 
   const rows = db.prepare("SELECT * FROM promo_codes ORDER BY starts_at DESC").all() as any[];
@@ -93,7 +92,6 @@ export async function POST(request: NextRequest) {
     return apiError("VALIDATION", "يرجى اختيار منتج واحد على الأقل مشمول في كود الخصم.", 400);
   }
 
-  seedDatabaseIfNeeded();
   const db = getDb();
 
   const now = new Date().toISOString();

@@ -123,8 +123,9 @@ export function PromosManager() {
 
   const toggleStatus = async (item: PromoItem) => {
     const nextActive = !item.active;
+    setItems((prev) => prev.map((it) => (it.code === item.code ? { ...it, active: nextActive } : it)));
     try {
-      const res = await apiFetch(`/api/admin/promos/${item.code}`, {
+      const res = await apiFetch(`/api/admin/promos/${encodeURIComponent(item.code)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ active: nextActive }),
@@ -134,25 +135,37 @@ export function PromosManager() {
         toast.push(nextActive ? `تم تفعيل الكود ${item.code}.` : `تم إيقاف الكود ${item.code} مؤقتاً.`);
         load();
       } else {
+        setItems((prev) => prev.map((it) => (it.code === item.code ? { ...it, active: !nextActive } : it)));
         toast.push(json.message || "فشل تعديل حالة الكود.");
       }
     } catch {
+      setItems((prev) => prev.map((it) => (it.code === item.code ? { ...it, active: !nextActive } : it)));
       toast.push("حدث خطأ أثناء تعديل الحالة.");
     }
   };
 
   const submitDelete = async (item: PromoItem) => {
     try {
-      const res = await apiFetch(`/api/admin/promos/${item.code}`, {
+      const res = await apiFetch(`/api/admin/promos/${encodeURIComponent(item.code)}`, {
         method: "DELETE",
       });
       const json = await res.json();
       if (json.ok) {
         toast.push(`تم حذف كود الخصم ${item.code} بنجاح.`);
         setDeleteTarget(null);
+        setItems((prev) => prev.filter((it) => it.code !== item.code));
+        setOverview((prev) =>
+          prev
+            ? {
+                ...prev,
+                totalCodes: Math.max(0, prev.totalCodes - 1),
+                activeCodes: item.active ? Math.max(0, prev.activeCodes - 1) : prev.activeCodes,
+              }
+            : null
+        );
         load();
       } else {
-        toast.push(json.message || "فشل حذف كود الخصم.");
+        toast.push(json.message || json.error?.message || "فشل حذف كود الخصم.");
       }
     } catch {
       toast.push("حدث خطأ أثناء محاولة الحذف.");
@@ -206,17 +219,17 @@ export function PromosManager() {
   return (
     <div className="adm-page adm-ambassadors" style={{ gap: 24 }}>
       {/* 1. Header */}
-      <div className="adm-page-head">
-        <div>
+      <div className="adm-page-head" style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-start", gap: 14 }}>
+        <div style={{ flex: "1 1 280px" }}>
           <h1 className="adm-h1">أكواد الخصم والبرومو</h1>
-          <p className="adm-muted">
+          <p className="adm-muted" style={{ marginTop: 4 }}>
             إدارة وإنشاء أكواد الخصم وتطبيق نظام القيود والشروط (قيمة الخصم، حد الاستخدام، والمنتجات المشمولة).
           </p>
         </div>
         <Button
           variant="primary"
           onClick={openCreate}
-          style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 42 }}
         >
           <Plus style={{ width: 16, height: 16 }} />
           <span>إنشاء كود خصم جديد</span>
@@ -224,7 +237,7 @@ export function PromosManager() {
       </div>
 
       {/* 2. Top Stats KPIs */}
-      <div className="adm-grid-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatCard
           label="إجمالي الأكواد"
           value={String(overview?.totalCodes ?? 0)}
@@ -243,9 +256,9 @@ export function PromosManager() {
       </div>
 
       {/* 3. Search and Actions */}
-      <div className="adm-card" style={{ padding: 16 }}>
-        <div className="adm-toolbar">
-          <div className="adm-search" style={{ flex: 1, maxWidth: 360 }}>
+      <div className="adm-card" style={{ padding: 14 }}>
+        <div className="adm-toolbar" style={{ flexWrap: "wrap", gap: 10 }}>
+          <div className="adm-search" style={{ flex: "1 1 260px", maxWidth: "100%" }}>
             <Search className="adm-search-icon" aria-hidden="true" />
             <input
               type="search"
@@ -258,7 +271,7 @@ export function PromosManager() {
         </div>
       </div>
 
-      {/* 4. Promo Codes Table */}
+      {/* 4. Promo Codes List (Responsive: Mobile Cards + Desktop Table) */}
       <div className="adm-card" style={{ overflow: "hidden" }}>
         {loading ? (
           <div style={{ padding: 48, textAlign: "center" }} className="adm-muted">
@@ -286,141 +299,270 @@ export function PromosManager() {
             }
           />
         ) : (
-          <div className="adm-table-wrap">
-            <table className="adm-table">
-              <thead>
-                <tr>
-                  <th>كود الخصم</th>
-                  <th>قيمة الخصم</th>
-                  <th>نظام القيود والشروط (المنتجات)</th>
-                  <th>مرات الاستخدام</th>
-                  <th>الحد الأدنى</th>
-                  <th>الحالة</th>
-                  <th>إجراءات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((item) => {
-                  const isExpired = item.expiresAt && new Date(item.expiresAt) < new Date();
-                  const isMaxed = item.maxUses && item.used >= item.maxUses;
-                  const isAvailable = item.active && !isExpired && !isMaxed;
+          <>
+            {/* Mobile Card View (ظهور بطاقات واضحة ومنسقة بالكامل على شاشات الموبايل) */}
+            <div className="block md:hidden divide-y divide-stone-200">
+              {filtered.map((item) => {
+                const isExpired = item.expiresAt && new Date(item.expiresAt) < new Date();
+                const isMaxed = item.maxUses && item.used >= item.maxUses;
+                const isAvailable = item.active && !isExpired && !isMaxed;
 
-                  return (
-                    <tr key={item.code}>
-                      <td>
-                        <span className="adm-code">
-                          <strong style={{ fontFamily: "var(--font-mono)", fontSize: "0.95rem" }}>
-                            {item.code}
-                          </strong>
-                          <button
-                            type="button"
-                            className="adm-icon-btn"
-                            onClick={() => copy(item.code)}
-                            title="نسخ الكود"
-                          >
-                            {copiedCode === item.code ? <Check className="text-emerald-500" /> : <Copy />}
-                          </button>
-                        </span>
-                      </td>
+                return (
+                  <div key={item.code} className="p-4 space-y-3.5 bg-white">
+                    {/* السطر الأول: الكود مع زر النسخ + شارة الحالة */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 bg-stone-100/90 px-3 py-1.5 rounded-lg border border-stone-200">
+                        <strong className="font-mono text-sm tracking-wide text-obsidian">
+                          {item.code}
+                        </strong>
+                        <button
+                          type="button"
+                          className="text-stone-500 hover:text-stone-900 p-1 transition-colors"
+                          onClick={() => copy(item.code)}
+                          title="نسخ الكود"
+                        >
+                          {copiedCode === item.code ? (
+                            <Check className="w-4 h-4 text-emerald-600" />
+                          ) : (
+                            <Copy className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
 
-                      <td>
-                        <strong className="adm-num" style={{ color: "#c8102e", fontSize: "0.95rem" }}>
+                      <span
+                        className={`text-xs px-2.5 py-1 rounded-full font-bold border ${
+                          isAvailable
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            : "bg-rose-50 text-rose-700 border-rose-200"
+                        }`}
+                      >
+                        {isExpired
+                          ? "منتهي الصلاحية"
+                          : isMaxed
+                          ? "مستنفد"
+                          : item.active
+                          ? "نشط"
+                          : "متوقف"}
+                      </span>
+                    </div>
+
+                    {/* السطر الثاني: قيمة الخصم ونظام الشروط والمنتجات */}
+                    <div className="flex items-center justify-between gap-2 bg-stone-50/80 p-3 rounded-xl border border-stone-100">
+                      <div>
+                        <span className="text-[11px] text-stone-500 block mb-0.5">قيمة الخصم</span>
+                        <strong className="text-lg text-[#c8102e] font-black tracking-tight">
                           {item.kind === "percent" ? `${item.value}%` : `${item.value} ج.م`}
                         </strong>
-                        <span className="adm-muted" style={{ display: "block", fontSize: "0.75rem" }}>
-                          {item.kind === "percent" ? "خصم نسبي" : "خصم نقدي ثابت"}
+                        <span className="text-[11px] text-stone-500 block">
+                          {item.kind === "percent" ? "خصم نسبي مئوي" : "خصم نقدي ثابت"}
                         </span>
-                      </td>
+                      </div>
 
-                      <td>
+                      <div className="text-left">
+                        <span className="text-[11px] text-stone-500 block mb-1">المنتجات المشمولة</span>
                         {item.appliesTo === "ALL_PRODUCTS" ? (
-                          <span className="adm-badge adm-badge-available" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                            <Layers style={{ width: 12, height: 12 }} />
-                            كل منتجات المتجر
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
+                            <Layers className="w-3.5 h-3.5" />
+                            كل المنتجات
                           </span>
                         ) : (
                           <button
                             type="button"
-                            className="adm-badge"
-                            style={{
-                              cursor: "pointer",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 4,
-                              background: "rgba(168, 85, 247, 0.12)",
-                              border: "1px solid #a855f7",
-                              color: "#7e22ce",
-                              fontWeight: 700,
-                            }}
+                            className="inline-flex items-center gap-1 text-xs font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-md border border-purple-200"
                             onClick={() => setViewProductsTarget(item)}
-                            title="عرض المنتجات المشمولة"
                           >
-                            منتجات محددة ({item.selectedProductIds?.length || 0})
+                            محددة ({item.selectedProductIds?.length || 0})
                           </button>
                         )}
-                      </td>
+                      </div>
+                    </div>
 
-                      <td>
-                        <span className="adm-num">
-                          {item.used}
-                          {item.maxUses ? ` / ${item.maxUses}` : " (غير محدود)"}
+                    {/* السطر الثالث: تفاصيل الاستخدام والحد الأدنى */}
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="bg-stone-50 p-2.5 rounded-lg border border-stone-100">
+                        <span className="text-[11px] text-stone-400 block mb-0.5">مرات الاستخدام</span>
+                        <span className={`font-bold ${isMaxed ? "text-rose-600" : "text-stone-800"}`}>
+                          {item.used} {item.maxUses ? `/ ${item.maxUses}` : "(غير محدود)"}
                         </span>
-                        {isMaxed && (
-                          <span className="adm-muted" style={{ color: "#ef4444", display: "block", fontSize: "0.75rem" }}>
-                            تم استنفاد الحد
-                          </span>
-                        )}
-                      </td>
+                      </div>
 
-                      <td>
-                        <span className="adm-num">
+                      <div className="bg-stone-50 p-2.5 rounded-lg border border-stone-100">
+                        <span className="text-[11px] text-stone-400 block mb-0.5">الحد الأدنى للطلب</span>
+                        <span className="font-bold text-stone-800">
                           {item.minSubtotalCents > 0
                             ? `${Math.round(item.minSubtotalCents / 100)} ج.م`
                             : "لا يوجد"}
                         </span>
-                      </td>
+                      </div>
+                    </div>
 
-                      <td>
-                        <span
-                          className={`adm-badge ${isAvailable ? "adm-badge-available" : "adm-badge-cancelled"}`}
-                        >
-                          {isExpired
-                            ? "منتهي الصلاحية"
-                            : isMaxed
-                            ? "مستنفد"
-                            : item.active
-                            ? "نشط"
-                            : "متوقف"}
-                        </span>
-                      </td>
+                    {/* السطر الرابع: أزرار التحكم والإجراءات بحجم مريح للمس */}
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => toggleStatus(item)}
+                        className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 border transition-all ${
+                          item.active
+                            ? "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
+                            : "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
+                        }`}
+                      >
+                        <Power className="w-3.5 h-3.5" />
+                        <span>{item.active ? "إيقاف مؤقت" : "تفعيل الكود"}</span>
+                      </button>
 
-                      <td>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <Button
-                            variant="secondary"
-                            title={item.active ? "إيقاف الكود" : "تفعيل الكود"}
-                            onClick={() => toggleStatus(item)}
-                            style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 8px" }}
+                      <button
+                        type="button"
+                        onClick={() => setDeleteTarget(item)}
+                        className="py-2.5 px-4 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-all cursor-pointer"
+                        title="حذف الكود نهائياً"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>حذف</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop Table View (على الشاشات الكبيرة >= 768px) */}
+            <div className="adm-table-wrap hidden md:block" style={{ overflowX: "auto" }}>
+              <table className="adm-table" style={{ width: "100%", minWidth: 700 }}>
+                <thead>
+                  <tr>
+                    <th>كود الخصم</th>
+                    <th>قيمة الخصم</th>
+                    <th>نظام القيود والشروط (المنتجات)</th>
+                    <th>مرات الاستخدام</th>
+                    <th>الحد الأدنى</th>
+                    <th>الحالة</th>
+                    <th>إجراءات</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((item) => {
+                    const isExpired = item.expiresAt && new Date(item.expiresAt) < new Date();
+                    const isMaxed = item.maxUses && item.used >= item.maxUses;
+                    const isAvailable = item.active && !isExpired && !isMaxed;
+
+                    return (
+                      <tr key={item.code}>
+                        <td>
+                          <span className="adm-code">
+                            <strong style={{ fontFamily: "var(--font-mono)", fontSize: "0.95rem" }}>
+                              {item.code}
+                            </strong>
+                            <button
+                              type="button"
+                              className="adm-icon-btn"
+                              onClick={() => copy(item.code)}
+                              title="نسخ الكود"
+                            >
+                              {copiedCode === item.code ? <Check className="text-emerald-500" /> : <Copy />}
+                            </button>
+                          </span>
+                        </td>
+
+                        <td>
+                          <strong className="adm-num" style={{ color: "#c8102e", fontSize: "0.95rem" }}>
+                            {item.kind === "percent" ? `${item.value}%` : `${item.value} ج.م`}
+                          </strong>
+                          <span className="adm-muted" style={{ display: "block", fontSize: "0.75rem" }}>
+                            {item.kind === "percent" ? "خصم نسبي" : "خصم نقدي ثابت"}
+                          </span>
+                        </td>
+
+                        <td>
+                          {item.appliesTo === "ALL_PRODUCTS" ? (
+                            <span className="adm-badge adm-badge-available" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                              <Layers style={{ width: 12, height: 12 }} />
+                              كل منتجات المتجر
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              className="adm-badge"
+                              style={{
+                                cursor: "pointer",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 4,
+                                background: "rgba(168, 85, 247, 0.12)",
+                                border: "1px solid #a855f7",
+                                color: "#7e22ce",
+                                fontWeight: 700,
+                              }}
+                              onClick={() => setViewProductsTarget(item)}
+                              title="عرض المنتجات المشمولة"
+                            >
+                              منتجات محددة ({item.selectedProductIds?.length || 0})
+                            </button>
+                          )}
+                        </td>
+
+                        <td>
+                          <span className="adm-num">
+                            {item.used}
+                            {item.maxUses ? ` / ${item.maxUses}` : " (غير محدود)"}
+                          </span>
+                          {isMaxed && (
+                            <span className="adm-muted" style={{ color: "#ef4444", display: "block", fontSize: "0.75rem" }}>
+                              تم استنفاد الحد
+                            </span>
+                          )}
+                        </td>
+
+                        <td>
+                          <span className="adm-num">
+                            {item.minSubtotalCents > 0
+                              ? `${Math.round(item.minSubtotalCents / 100)} ج.م`
+                              : "لا يوجد"}
+                          </span>
+                        </td>
+
+                        <td>
+                          <span
+                            className={`adm-badge ${isAvailable ? "adm-badge-available" : "adm-badge-cancelled"}`}
                           >
-                            <Power style={{ width: 14, height: 14, color: item.active ? "#ef4444" : "#22c55e" }} />
-                            <span>{item.active ? "إيقاف" : "تفعيل"}</span>
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            title="حذف الكود"
-                            onClick={() => setDeleteTarget(item)}
-                            style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 8px" }}
-                          >
-                            <Trash2 style={{ width: 14, height: 14, color: "#dc2626" }} />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                            {isExpired
+                              ? "منتهي الصلاحية"
+                              : isMaxed
+                              ? "مستنفد"
+                              : item.active
+                              ? "نشط"
+                              : "متوقف"}
+                          </span>
+                        </td>
+
+                        <td>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <Button
+                              variant="secondary"
+                              title={item.active ? "إيقاف الكود" : "تفعيل الكود"}
+                              onClick={() => toggleStatus(item)}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 8px" }}
+                            >
+                              <Power style={{ width: 14, height: 14, color: item.active ? "#ef4444" : "#22c55e" }} />
+                              <span>{item.active ? "إيقاف" : "تفعيل"}</span>
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              title="حذف الكود"
+                              onClick={() => setDeleteTarget(item)}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 8px" }}
+                            >
+                              <Trash2 style={{ width: 14, height: 14, color: "#dc2626" }} />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 

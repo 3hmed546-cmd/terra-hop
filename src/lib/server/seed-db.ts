@@ -9,14 +9,6 @@ export function seedAmbassadorsIfNeeded(db: any, now = new Date().toISOString())
   try {
     const existingCount = db.prepare("SELECT COUNT(*) as c FROM referral_codes").get() as { c: number };
     if (existingCount && existingCount.c > 0) {
-      // Ensure AHMED10, AHMED, and 708DDH always exist in promo_codes table as backup
-      const insertPromo = db.prepare(`
-        INSERT OR IGNORE INTO promo_codes (code, kind, value, active, starts_at, expires_at, max_uses, used, min_subtotal_cents)
-        VALUES (?, 'percent', 10, 1, ?, NULL, 10000, 0, 0)
-      `);
-      insertPromo.run("AHMED10", now);
-      insertPromo.run("AHMED", now);
-      insertPromo.run("708DDH", now);
       return;
     }
 
@@ -76,11 +68,6 @@ export function seedAmbassadorsIfNeeded(db: any, now = new Date().toISOString())
       ) VALUES (?, 0, 0, 0, 0, 0, 0, 'lvl_starter', ?)
     `);
 
-    const insertPromo = db.prepare(`
-      INSERT OR REPLACE INTO promo_codes (code, kind, value, active, starts_at, expires_at, max_uses, used, min_subtotal_cents)
-      VALUES (?, 'percent', ?, 1, ?, NULL, 10000, 0, 0)
-    `);
-
     const insertDiscountProduct = db.prepare(`
       INSERT OR IGNORE INTO discount_code_products (code_id, product_id)
       VALUES (?, ?)
@@ -126,8 +113,6 @@ export function seedAmbassadorsIfNeeded(db: any, now = new Date().toISOString())
             insertDiscountProduct.run(refId, pid);
           }
         }
-
-        insertPromo.run(c, amb.discountPercent || 10, now);
       }
 
       insertAmbUser.run(
@@ -323,23 +308,6 @@ export function seedDatabaseIfNeeded(targetDb?: any, force = false): boolean {
       INSERT OR REPLACE INTO admin_users (id, email, password_hash, must_change_password, created_at)
       VALUES ('admin-root', ?, ?, ?, ?)
     `).run(adminEmail, passwordHash, rawPass === "admin123" ? 1 : 0, now);
-
-    // 5. Seed Promo Codes
-    const insertPromo = db.prepare(`
-      INSERT OR REPLACE INTO promo_codes (code, kind, value, active, starts_at, expires_at, max_uses, used, min_subtotal_cents)
-      VALUES (?, ?, ?, 1, ?, NULL, 1000, 0, 0)
-    `);
-
-    const promos = [
-      { code: "DROP01", kind: "percent", value: 15 },
-      { code: "TERRA10", kind: "percent", value: 10 },
-      { code: "VIP20", kind: "percent", value: 20 },
-      { code: "WELCOME50", kind: "fixed", value: 5000 }, // 50 EGP off
-    ];
-
-    for (const p of promos) {
-      insertPromo.run(p.code, p.kind, p.value, now);
-    }
 
     // Helper to insert or get asset
     const insertAsset = db.prepare(`

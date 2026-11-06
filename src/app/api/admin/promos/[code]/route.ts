@@ -14,7 +14,6 @@ export async function PATCH(
   const { code: rawCode } = await params;
   const code = decodeURIComponent(rawCode || "").trim().toUpperCase();
 
-  seedDatabaseIfNeeded();
   const db = getDb();
 
   const existing = db.prepare("SELECT * FROM promo_codes WHERE code = ?").get(code) as any;
@@ -54,7 +53,6 @@ export async function DELETE(
   const { code: rawCode } = await params;
   const code = decodeURIComponent(rawCode || "").trim().toUpperCase();
 
-  seedDatabaseIfNeeded();
   const db = getDb();
 
   const existing = db.prepare("SELECT * FROM promo_codes WHERE code = ?").get(code) as any;
@@ -66,8 +64,11 @@ export async function DELETE(
     try {
       db.prepare("DELETE FROM promo_code_products WHERE promo_code = ?").run(code);
     } catch {}
+    try {
+      db.prepare("DELETE FROM promo_redemptions WHERE code = ?").run(code);
+    } catch {}
     db.prepare("DELETE FROM promo_codes WHERE code = ?").run(code);
-  })();
+  }).immediate();
 
   recordAudit({
     actor: auth.user.email,
