@@ -326,9 +326,23 @@ function initializeSchema(db: Database.Database): void {
 
     CREATE TABLE IF NOT EXISTS idempotency_keys (
       key TEXT PRIMARY KEY,
+      order_id TEXT,
+      status TEXT NOT NULL DEFAULT 'processing',
       response TEXT,
-      created_at TEXT
+      status_code INTEGER DEFAULT 200,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS promo_redemptions (
+      id TEXT PRIMARY KEY,
+      code TEXT NOT NULL,
+      customer_phone TEXT,
+      customer_email TEXT,
+      order_id TEXT NOT NULL,
+      redeemed_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_promo_red_lookup ON promo_redemptions(code, customer_phone, customer_email);
 
     -- =======================================================================
     -- STREET AMBASSADOR PROGRAM TABLES
@@ -582,6 +596,45 @@ function initializeSchema(db: Database.Database): void {
     `);
   } catch {
     /* Table already exists */
+  }
+
+  // Idempotency and Race Condition Migration Columns
+  const idempColumns = [
+    "order_id TEXT",
+    "status TEXT NOT NULL DEFAULT 'completed'",
+    "status_code INTEGER DEFAULT 200",
+    "updated_at TEXT",
+  ];
+  for (const col of idempColumns) {
+    try {
+      db.exec(`ALTER TABLE idempotency_keys ADD COLUMN ${col};`);
+    } catch {
+      /* Column already exists */
+    }
+  }
+
+  try {
+    db.exec("ALTER TABLE promo_codes ADD COLUMN per_customer_limit INTEGER DEFAULT 1;");
+  } catch {
+    /* Column already exists */
+  }
+
+  try {
+    db.exec("ALTER TABLE orders ADD COLUMN idempotency_key TEXT;");
+  } catch {
+    /* Column already exists */
+  }
+
+  try {
+    db.exec("ALTER TABLE ambassador_sale_events ADD COLUMN idempotency_key TEXT;");
+  } catch {
+    /* Column already exists */
+  }
+
+  try {
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ix_amb_events_idemp ON ambassador_sale_events(idempotency_key);");
+  } catch {
+    /* Index already exists */
   }
 
   // Seed default ambassador levels & rewards if missing

@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { getDb, recordChange, recordAudit } from "@/lib/server/db";
@@ -13,6 +13,13 @@ import { getPaymentHandler } from "@/lib/server/payment";
 import { notifyAdminsNewOrder, notifyAdminsAmbassadorGoalReached } from "@/lib/server/push";
 import { decryptCode } from "@/lib/server/security";
 import { sendOrderInvoiceEmail } from "@/lib/server/mailer";
+import {
+  checkIdempotency,
+  acquireIdempotencyLock,
+  completeIdempotentOperation,
+  releaseIdempotencyLock,
+  computeCheckoutIdempotencyKey,
+} from "@/lib/server/idempotency";
 import type Database from "better-sqlite3";
 
 const CHECKOUT_RATE_OPTIONS = { prefix: "store_checkout", max: 5, windowMs: 10 * 60 * 1000 };
@@ -101,6 +108,38 @@ export async function POST(request: NextRequest) {
 
   if (!Array.isArray(body?.items) || body.items.length === 0) {
     return apiError("VALIDATION", "سلة المشتريات فارغة.", 400, "items");
+  }
+
+  // Idempotency check to prevent duplicate order submissions and race condition double bookings
+  const headerKey = request.headers.get("idempotency-key") || request.headers.get("x-idempotency-key");
+  const bodyKey = typeof body?.idempotencyKey === "string" ? cleanText(body.idempotencyKey, 128) : null;
+  const idempotencyKey =
+    headerKey || bodyKey || computeCheckoutIdempotencyKey(phone, email, body.items, body.promoCode);
+
+  const idempCheck = checkIdempotency(db, idempotencyKey);
+  if (idempCheck.hit) {
+    if (idempCheck.status === "completed") {
+      return NextResponse.json(idempCheck.response, {
+        status: idempCheck.statusCode,
+        headers: { "X-Idempotency-Replay": "true" },
+      });
+    }
+    if (idempCheck.status === "processing") {
+      return apiError(
+        "ORDER_IN_PROGRESS",
+        "طلبك قيد المعالجة بالفعل، يرجى الانتظار بضع ثوانٍ لتفادي تكرار الطلب.",
+        409,
+      );
+    }
+  }
+
+  const lockAcquired = acquireIdempotencyLock(db, idempotencyKey);
+  if (!lockAcquired) {
+    return apiError(
+      "ORDER_IN_PROGRESS",
+      "طلبك قيد المعالجة بالفعل، يرجى الانتظار بضع ثوانٍ لتفادي تكرار الطلب.",
+      409,
+    );
   }
 
   // 1) المنتجات والأسعار من قاعدة البيانات
@@ -239,24 +278,25 @@ export async function POST(request: NextRequest) {
 
   const totalCents = Math.max(0, subtotalCents - discountCents) + shippingCents;
 
-  // 3) الحفظ وخصم المخزون في transaction واحدة
+  // 3) الحفظ وخصم المخزون في transaction فورية مانعة للتسابق (BEGIN IMMEDIATE)
   const orderId = `ord_${crypto.randomUUID()}`;
   const now = new Date().toISOString();
   const customerEncrypted = encryptCustomer({ name, phone, email: email || undefined, city, address });
   let orderNumber = "";
 
   try {
-    db.transaction(() => {
+    const executeOrderTx = db.transaction(() => {
       orderNumber = nextOrderNumber(db);
 
-      // فحص المخزون والخصم في خطوة ذرية
+      // فحص المخزون والخصم في خطوة ذرية مشروطة: UPDATE ... WHERE stock >= qty
       const take = db.prepare("UPDATE variants SET stock = stock - ? WHERE id = ? AND stock >= ?");
       for (const it of verifiedItems) {
-        if (take.run(it.qty, it.variantId, it.qty).changes === 0) {
+        const takeResult = take.run(it.qty, it.variantId, it.qty);
+        if (takeResult.changes === 0) {
           const left = (db.prepare("SELECT stock FROM variants WHERE id = ?").get(it.variantId) as any)?.stock ?? 0;
           throw new CheckoutError(
             "STOCK_INSUFFICIENT",
-            `عذراً، الكمية المتاحة من ${it.productName} (مقاس ${it.size}) هي ${left} فقط.`,
+            `عذراً، نفذت الكمية المتاحة من ${it.productName} (مقاس ${it.size})، المتبقي في المخزن ${left} فقط.`,
             409,
             "items",
           );
@@ -265,7 +305,7 @@ export async function POST(request: NextRequest) {
 
       // معالجة كود الخصم ذرّياً حسب نوعه
       if (voucherId) {
-        // قفل واستهلاك كود المكافأة
+        // قفل واستهلاك كود المكافأة مع التأكد من أن التحديث نجح وأنه كان ACTIVE
         const vRes = db
           .prepare(
             "UPDATE reward_vouchers SET status = 'REDEEMED', redeemed_order_id = ?, redeemed_at = ? WHERE id = ? AND status = 'ACTIVE'"
@@ -278,18 +318,60 @@ export async function POST(request: NextRequest) {
 
         // تحديث حالة المكافأة التابعة
         db.prepare(
-          "UPDATE ambassador_rewards SET status = 'REDEEMED' WHERE id = (SELECT reward_id FROM reward_vouchers WHERE id = ?)"
+          "UPDATE ambassador_rewards SET status = 'REDEEMED' WHERE id = (SELECT reward_id FROM reward_vouchers WHERE id = ?) AND status != 'REDEEMED'"
         ).run(voucherId);
       } else if (referralCodeId) {
-        // تحديث عدد استخدامات كود السفير
-        db.prepare(
-          "UPDATE referral_codes SET used_count = used_count + 1 WHERE id = ?"
+        // تحديث عدد استخدامات كود السفير ذرّياً مع التحقق من عدم تخطي الحد الأقصى
+        const refRes = db.prepare(
+          "UPDATE referral_codes SET used_count = used_count + 1 WHERE id = ? AND is_active = 1 AND (max_uses IS NULL OR max_uses = 0 OR used_count < max_uses)"
         ).run(referralCodeId);
+
+        if (refRes.changes === 0) {
+          throw new CheckoutError("VALIDATION", "عذراً، وصل كود الإحالة للحد الأقصى من الاستخدام أو أصبح غير متاح.", 409, "promoCode");
+        }
       } else if (appliedPromo) {
-        // كود برومو تقليدي
-        db.prepare(
-          "UPDATE promo_codes SET used = used + 1 WHERE code = ? AND (max_uses IS NULL OR max_uses = 0 OR used < max_uses)"
-        ).run(appliedPromo);
+        // كود برومو تقليدي: فحص وتحديث ذرّي للحد الأقصى وتاريخ الصلاحية
+        const pRes = db.prepare(`
+          UPDATE promo_codes 
+          SET used = used + 1 
+          WHERE code = ? 
+            AND active = 1 
+            AND (max_uses IS NULL OR max_uses = 0 OR used < max_uses)
+            AND (starts_at IS NULL OR starts_at <= ?)
+            AND (expires_at IS NULL OR expires_at >= ?)
+        `).run(appliedPromo, now, now);
+
+        if (pRes.changes === 0) {
+          throw new CheckoutError("VALIDATION", "عذراً، وصل كود الخصم للحد الأقصى من الاستخدام أو انتهت صلاحيته.", 409, "promoCode");
+        }
+
+        // فحص الحد المسموح لكل عميل (Per-Customer Usage Limit Protection)
+        const promoRow = db.prepare("SELECT per_customer_limit FROM promo_codes WHERE code = ?").get(appliedPromo) as any;
+        const perCustLimit = promoRow?.per_customer_limit ?? 1;
+        if (perCustLimit > 0) {
+          const usedByCustomer = db.prepare(`
+            SELECT COUNT(*) as c FROM promo_redemptions
+            WHERE code = ? AND (
+              (customer_phone IS NOT NULL AND customer_phone != '' AND customer_phone = ?)
+              OR (customer_email IS NOT NULL AND customer_email != '' AND customer_email = ?)
+            )
+          `).get(appliedPromo, phone, email) as { c: number };
+
+          if ((usedByCustomer?.c ?? 0) >= perCustLimit) {
+            throw new CheckoutError(
+              "VALIDATION",
+              "عذراً، لقد استنفدت الحد المسموح لك لاستخدام هذا الكود مسبقاً.",
+              409,
+              "promoCode"
+            );
+          }
+        }
+
+        // تسجيل استخدام العميل لمنع التسابق
+        db.prepare(`
+          INSERT INTO promo_redemptions (id, code, customer_phone, customer_email, order_id, redeemed_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).run(`red_${crypto.randomUUID()}`, appliedPromo, phone, email, orderId, now);
       }
 
       db.prepare(
@@ -298,8 +380,8 @@ export async function POST(request: NextRequest) {
            subtotal_cents, shipping_cents, discount_cents, promo_code, total_cents,
            ambassador_id, ambassador_code, referral_code_id, attribution_locked_at,
            fulfilment_status, payment_status, code_discount_percent_applied, code_discount_cents,
-           created_at, revision
-         ) VALUES (?, ?, 'website', 'PENDING_EMAIL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NOT_SHIPPED', 'UNPAID', ?, ?, ?, 1)`,
+           idempotency_key, created_at, revision
+         ) VALUES (?, ?, 'website', 'PENDING_EMAIL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NOT_SHIPPED', 'UNPAID', ?, ?, ?, ?, 1)`,
       ).run(
         orderId,
         orderNumber,
@@ -316,6 +398,7 @@ export async function POST(request: NextRequest) {
         ambassadorId ? now : null,
         codeDiscountPercent,
         discountCents,
+        idempotencyKey,
         now,
       );
 
@@ -341,11 +424,48 @@ export async function POST(request: NextRequest) {
         );
         insertMovement.run(`mov_${crypto.randomUUID()}`, it.variantId, it.productId, -it.qty, orderId, now);
       }
-    })();
+    });
+
+    executeOrderTx.immediate();
   } catch (e) {
+    releaseIdempotencyLock(db, idempotencyKey);
     if (e instanceof CheckoutError) return apiError(e.code, e.message, e.status, e.field);
     throw e;
   }
+
+  const successPayload = {
+    id: orderId,
+    number: orderNumber,
+    status: "AWAITING_APPROVAL",
+    createdAt: now,
+    currency: "EGP",
+    paymentMethod,
+    subtotalCents,
+    subtotal: Math.round(subtotalCents / 100),
+    shippingCents,
+    shipping: Math.round(shippingCents / 100),
+    discountCents,
+    discount: Math.round(discountCents / 100),
+    totalCents,
+    total: Math.round(totalCents / 100),
+    promoCode: appliedPromo,
+    customer: { name, phone, email, city, address },
+    notes: notes || null,
+    items: verifiedItems.map((i) => ({
+      productId: i.productId,
+      productSlug: i.productSlug,
+      productName: i.productName,
+      colorName: i.colorName,
+      size: i.size,
+      qty: i.qty,
+      priceCents: i.priceCents,
+      priceCentsSnapshot: i.priceCents,
+      price: Math.round(i.priceCents / 100),
+    })),
+  };
+
+  // Complete idempotency record for instantaneous future replays
+  completeIdempotentOperation(db, idempotencyKey, orderId, { ok: true, data: successPayload }, 201);
 
   recordChange("orders", "orders", orderId, 1);
   recordChange("products", "variants", null, Date.now());
@@ -434,37 +554,5 @@ export async function POST(request: NextRequest) {
   }
 
   // الرد كامل لصفحة التأكيد
-  return apiSuccess(
-    {
-      id: orderId,
-      number: orderNumber,
-      status: "AWAITING_APPROVAL",
-      createdAt: now,
-      currency: "EGP",
-      paymentMethod,
-      subtotalCents,
-      subtotal: Math.round(subtotalCents / 100),
-      shippingCents,
-      shipping: Math.round(shippingCents / 100),
-      discountCents,
-      discount: Math.round(discountCents / 100),
-      totalCents,
-      total: Math.round(totalCents / 100),
-      promoCode: appliedPromo,
-      customer: { name, phone, email, city, address },
-      notes: notes || null,
-      items: verifiedItems.map((i) => ({
-        productId: i.productId,
-        productSlug: i.productSlug,
-        productName: i.productName,
-        colorName: i.colorName,
-        size: i.size,
-        qty: i.qty,
-        priceCents: i.priceCents,
-        priceCentsSnapshot: i.priceCents,
-        price: Math.round(i.priceCents / 100),
-      })),
-    },
-    { status: 201 },
-  );
+  return apiSuccess(successPayload, { status: 201 });
 }

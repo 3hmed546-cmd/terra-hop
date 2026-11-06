@@ -53,8 +53,8 @@ export function markOrderDeliveredAndPaid(
   let ambassadorCredited = false;
 
   const runTx = db.transaction(() => {
-    // 1. Update Order State
-    db.prepare(`
+    // 1. Update Order State atomically and conditionally
+    const orderUpdateRes = db.prepare(`
       UPDATE orders
       SET 
         fulfilment_status = 'DELIVERED',
@@ -65,7 +65,7 @@ export function markOrderDeliveredAndPaid(
         delivered_confirmed_by = ?,
         courier_reference = ?,
         sold_at = COALESCE(sold_at, ?)
-      WHERE id = ?
+      WHERE id = ? AND (fulfilment_status != 'DELIVERED' OR payment_status != 'PAID')
     `).run(
       now,
       now,
@@ -74,6 +74,11 @@ export function markOrderDeliveredAndPaid(
       now,
       order.id
     );
+
+    if (orderUpdateRes.changes === 0) {
+      // Order was already marked delivered and paid by a concurrent process
+      return;
+    }
 
     // 2. Record Delivery Stock Movement if not already recorded
     const items = db
@@ -159,7 +164,7 @@ export function markOrderDeliveredAndPaid(
     }
   });
 
-  runTx();
+  runTx.immediate();
 
   recordChange("orders", "orders", order.id, Date.now());
   recordChange("ambassadors", "ambassador_sales", order.ambassador_id, Date.now());
@@ -278,7 +283,7 @@ export function recordOrderReversal(
     );
   });
 
-  runTx();
+  runTx.immediate();
 
   recordChange("orders", "orders", order.id, Date.now());
   recordAudit({

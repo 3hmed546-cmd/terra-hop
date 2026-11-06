@@ -84,16 +84,16 @@ async function ConfirmContent({ searchParams }: ConfirmPageProps) {
     customerName = cust.name;
   } catch {}
 
-  const isFirstConfirmation = order.status === "PENDING_EMAIL";
+  // Atomic conditional transition: only transition and notify if status is strictly 'PENDING_EMAIL'
+  const updateRes = db.prepare(`
+    UPDATE orders
+    SET status = 'AWAITING_APPROVAL', revision = revision + 1
+    WHERE id = ? AND status = 'PENDING_EMAIL'
+  `).run(order.id);
+
+  const isFirstConfirmation = updateRes.changes > 0;
 
   if (isFirstConfirmation) {
-    // Transition to AWAITING_APPROVAL (ready for admin acceptance & dispatch)
-    db.prepare(`
-      UPDATE orders
-      SET status = 'AWAITING_APPROVAL', revision = revision + 1
-      WHERE id = ?
-    `).run(order.id);
-
     recordChange("orders", "orders", order.id, Date.now());
     recordAudit({
       actor: "customer",

@@ -240,56 +240,66 @@ export async function PATCH(request: NextRequest) {
       } catch {}
     }
   } else {
-    db.transaction(() => {
-      db.prepare(`
-        UPDATE orders
-        SET status = ?, sold_at = ?, cancelled_at = ?, cancel_reason = ?, revision = revision + 1
-        WHERE id = ?
-      `).run(status, soldAt, cancelledAt, cancelReason, orderId);
+    const runUpdateTx = db.transaction(() => {
+      if (status === "CANCELLED") {
+        // فحص وتحديث شرطي ذري: لا يتم إلغاء الطلب واسترجاع المخزون إلا إذا لم يكن ملغياً أو مبيعاً بالفعل
+        const cancelRes = db.prepare(`
+          UPDATE orders
+          SET status = 'CANCELLED', cancelled_at = ?, cancel_reason = ?, revision = revision + 1
+          WHERE id = ? AND status NOT IN ('CANCELLED', 'SOLD')
+        `).run(cancelledAt, cancelReason, orderId);
 
-      // If cancelled, restore variant stock if was previously reserved or sold
-      if (status === "CANCELLED" && order.status !== "CANCELLED") {
-        const items = db.prepare("SELECT * FROM order_items WHERE order_id = ?").all(orderId) as any[];
-        const restoreStock = db.prepare("UPDATE variants SET stock = stock + ? WHERE id = ?");
-        const insertMovement = db.prepare(`
-          INSERT INTO stock_movements (id, variant_id, product_id, kind, delta, note, order_id, at, by)
-          VALUES (?, ?, ?, 'order_cancel_restock', ?, 'استرجاع مخزون بعد إلغاء الطلب', ?, ?, ?)
-        `);
+        if (cancelRes.changes > 0) {
+          const items = db.prepare("SELECT * FROM order_items WHERE order_id = ?").all(orderId) as any[];
+          const restoreStock = db.prepare("UPDATE variants SET stock = stock + ? WHERE id = ?");
+          const insertMovement = db.prepare(`
+            INSERT INTO stock_movements (id, variant_id, product_id, kind, delta, note, order_id, at, by)
+            VALUES (?, ?, ?, 'order_cancel_restock', ?, 'استرجاع مخزون بعد إلغاء الطلب', ?, ?, ?)
+          `);
 
-        for (const item of items) {
-          if (item.variant_id) {
-            restoreStock.run(item.qty, item.variant_id);
-            insertMovement.run(
-              `mov_${crypto.randomUUID()}`,
-              item.variant_id,
-              item.product_id,
-              item.qty,
-              orderId,
-              now,
-              auth.user!.email
-            );
+          for (const item of items) {
+            if (item.variant_id) {
+              restoreStock.run(item.qty, item.variant_id);
+              insertMovement.run(
+                `mov_${crypto.randomUUID()}`,
+                item.variant_id,
+                item.product_id,
+                item.qty,
+                orderId,
+                now,
+                auth.user!.email
+              );
+            }
+          }
+
+          // Send Order Rejection Email with cancellation reason
+          try {
+            const cust = decryptCustomer(order.customer_enc);
+            if (cust?.email) {
+              sendOrderRejectedEmail(
+                {
+                  number: order.number,
+                  customer: cust,
+                },
+                cancelReason || "تعذر تأكيد أو شحن الطلب في الوقت الحالي"
+              ).catch((err) => {
+                console.error("[Mailer] Failed to send order rejected email:", err);
+              });
+            }
+          } catch (e) {
+            console.error("[Mailer] Decrypt customer failed for rejected email:", e);
           }
         }
-
-        // Send Order Rejection Email with cancellation reason
-        try {
-          const cust = decryptCustomer(order.customer_enc);
-          if (cust?.email) {
-            sendOrderRejectedEmail(
-              {
-                number: order.number,
-                customer: cust,
-              },
-              cancelReason || "تعذر تأكيد أو شحن الطلب في الوقت الحالي"
-            ).catch((err) => {
-              console.error("[Mailer] Failed to send order rejected email:", err);
-            });
-          }
-        } catch (e) {
-          console.error("[Mailer] Decrypt customer failed for rejected email:", e);
-        }
+      } else {
+        db.prepare(`
+          UPDATE orders
+          SET status = ?, sold_at = ?, cancelled_at = ?, cancel_reason = ?, revision = revision + 1
+          WHERE id = ?
+        `).run(status, soldAt, cancelledAt, cancelReason, orderId);
       }
-    })();
+    });
+
+    runUpdateTx.immediate();
   }
 
   recordChange("orders", "orders", orderId, (order.revision || 1) + 1);

@@ -11,6 +11,9 @@ export type ApiErrorCode =
   | "UPLOAD_REJECTED"
   | "WRITE_NOT_VERIFIED"
   | "RATE_LIMITED"
+  | "ORDER_IN_PROGRESS"
+  | "COUPON_USAGE_LIMIT_REACHED"
+  | "IDEMPOTENCY_CONFLICT"
   | "INTERNAL_ERROR";
 
 export interface ApiSuccessPayload<T> {
