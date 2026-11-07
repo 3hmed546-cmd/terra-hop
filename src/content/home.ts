@@ -177,17 +177,6 @@ export const home = {
     ],
     link: { label: "Shop all pieces", href: "/shop" },
   },
-  lookbook: {
-    demo: true,
-    heading: "Lookbook",
-    items: [
-      { image: "look-1" as ImageSlot, href: "/shop/midnight-navy-raw-edge-hoodie" },
-      { image: "look-2" as ImageSlot, href: "/shop/charcoal-acid-hoodie" },
-      { image: "look-3" as ImageSlot, href: "/shop/emerald-forest-heavyweight-hoodie" },
-      { image: "look-4" as ImageSlot, href: "/shop/mocha-brown-acid-wash-hoodie" },
-      { image: "look-5" as ImageSlot, href: "/shop/obsidian-puff-print-hoodie" },
-    ] as { image: ImageSlot; href?: string }[],
-  },
   signup: {
     demo: true,
     whatsappGroupUrl: "https://chat.whatsapp.com/EWcBrybFmbr7jbMJUJGSUk?s=cl&p=a&iam=2",

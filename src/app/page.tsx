@@ -4,7 +4,6 @@ import { OffersTicker } from "@/components/sections/offers-ticker";
 import { Drop } from "@/components/sections/drop";
 import { BrandStory } from "@/components/sections/brand-story";
 import { Quality } from "@/components/sections/quality";
-import { Lookbook } from "@/components/sections/lookbook";
 import { Signup } from "@/components/sections/signup";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
@@ -12,7 +11,7 @@ import { home } from "@/content/home";
 
 export const metadata: Metadata = { title: { absolute: home.meta.title }, description: home.meta.description };
 
-// Homepage: Header, Hero, The Drop, Brand Story, Details, Lookbook, Signup, Footer, all from home.ts.
+// Homepage: Header, Hero, The Drop, Brand Story, Details, Signup, Footer, all from home.ts.
 // The header sits outside <main> (banner landmark) and is laid over the hero.
 export default function Page() {
   return (
@@ -25,7 +24,6 @@ export default function Page() {
           <Drop drop={home.drop} />
           <BrandStory story={home.brandStory} />
           <Quality quality={home.quality} />
-          <Lookbook lookbook={home.lookbook} />
           <Signup signup={home.signup} />
         </main>
       </div>

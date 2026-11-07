@@ -158,7 +158,6 @@ export function seedDatabaseIfNeeded(targetDb?: any, force = false): boolean {
       { key: "hero_banner_mobile", label_ar: "بانر الهيدر (موبايل)", kind: "single", min: 0, max: 1, aspect: "4:5", req: 0 },
       { key: "login_showcase", label_ar: "عرض صفحة تسجيل الدخول", kind: "list", min: 0, max: 20, aspect: "4:5", req: 0 },
       { key: "brand_story", label_ar: "صورة قصة البراند (About)", kind: "single", min: 0, max: 1, aspect: "16:9", req: 0 },
-      { key: "lookbook", label_ar: "صور اللوك بوك (Lookbook)", kind: "list", min: 0, max: 12, aspect: "3:4", req: 0 },
       { key: "product", label_ar: "صور المنتجات", kind: "list", min: 0, max: 10, aspect: "1:1", req: 0 },
       { key: "logo", label_ar: "شعار المتجر (اللوجو)", kind: "single", min: 1, max: 1, aspect: "auto", req: 1 },
       { key: "favicon", label_ar: "أيقونة المتصفح (Favicon)", kind: "single", min: 0, max: 1, aspect: "1:1", req: 0 },

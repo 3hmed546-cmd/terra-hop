@@ -62,9 +62,6 @@ export interface Translations {
     steps: { title: string; text: string }[];
     link: string;
   };
-  lookbook: {
-    heading: string;
-  };
   signup: {
     badge: string;
     heading: string;
@@ -358,9 +355,6 @@ export const translations: Record<Locale, Translations> = {
         { title: "٣. المعاينة والاستلام", text: "يصلك الأوردر حتى باب بيتك مع إمكانية المعاينة قبل الدفع عند الاستلام." },
       ],
       link: "تصفح جميع القطع",
-    },
-    lookbook: {
-      heading: "لوك بوك الإطلالات",
     },
     signup: {
       badge: "مجتمع TERRA HOP VIP",
@@ -697,9 +691,6 @@ export const translations: Record<Locale, Translations> = {
         { title: "3. Delivery & Inspection", text: "Your order is delivered with full right to inspect and try on before paying COD." },
       ],
       link: "Shop all pieces",
-    },
-    lookbook: {
-      heading: "Lookbook",
     },
     signup: {
       badge: "TERRA HOP VIP COMMUNITY",
