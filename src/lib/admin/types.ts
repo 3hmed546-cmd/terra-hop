@@ -26,11 +26,20 @@ export interface ProductImage {
   alt: string;
 }
 
+export interface ProductLookConfig {
+  enabled: boolean;
+  title?: string;
+  subtitle?: string;
+  discountPercent?: number;
+  productIds: string[];
+}
+
 export interface ProductDetails {
   material: string;
   weight: string;
   care: string;
   sizeChart: string;
+  look?: ProductLookConfig;
 }
 
 export interface Product {

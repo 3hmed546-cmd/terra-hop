@@ -15,6 +15,9 @@ export type Product = {
   images: readonly (ImageSlot | string)[];
   href: string;
   demo?: boolean;
+  details?: any;
+  colors?: any[];
+  variants?: any[];
 };
 
 const STANDIN = "/not-in-preview";

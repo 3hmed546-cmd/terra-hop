@@ -17,6 +17,7 @@ import { ImagesField } from "./ImagesField";
 import { RestockDialog } from "./RestockDialog";
 import { StockLog } from "./StockLog";
 import { VariantsField } from "./VariantsField";
+import { LookField } from "./LookField";
 
 const F = ADMIN_STRINGS.productForm;
 
@@ -218,6 +219,15 @@ function Editor({ initial, existing, isNew, tab, onTab, focusLogRef }: EditorPro
           </div>
           <TextInput label={F.details.care} value={form.details.care} maxLength={200} onChange={(e) => setDetails({ care: e.target.value })} />
           <Textarea label={F.details.sizeChart} hint={F.details.sizeChartHint} value={form.details.sizeChart} maxLength={1000} onChange={(e) => setDetails({ sizeChart: e.target.value })} />
+        </Section>
+
+        <Section id="look" title="الإطلالة المتكاملة (Complete Look)">
+          <LookField
+            look={form.details.look}
+            currentProductId={form.productId}
+            allProducts={data?.products ?? []}
+            onChange={(look) => setDetails({ look })}
+          />
         </Section>
 
         <div className="adm-form-actions">

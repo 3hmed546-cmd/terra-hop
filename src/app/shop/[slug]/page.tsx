@@ -40,7 +40,13 @@ function getCatalogProducts(): Product[] {
 
       return rows.map((p: any) => {
         const imgs = imagesByProd.get(p.id) || [];
+        let details = {};
+        try {
+          details = typeof p.details === "string" ? JSON.parse(p.details) : (p.details || {});
+        } catch {}
+
         return {
+          id: p.id,
           slug: p.slug,
           name: p.name_ar || p.name_en || p.slug,
           category: (p.category === "tshirt" || p.category === "T-shirts") ? "T-shirts" : "Hoodies",
@@ -52,6 +58,7 @@ function getCatalogProducts(): Product[] {
           images: imgs.length > 0 ? imgs : ["/preview-images/hero.jpg"],
           colors: [],
           variants: [],
+          details,
           href: `/shop/${p.slug}`,
           demo: false,
         };
@@ -74,6 +81,7 @@ function getCatalogProducts(): Product[] {
         images: (p.images || []).map((i: any) => (typeof i === "object" ? i.url : i)),
         colors: p.colors || [],
         variants: p.variants || [],
+        details: p.details || {},
         href: `/shop/${p.slug}`,
         demo: false,
       }));

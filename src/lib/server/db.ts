@@ -646,6 +646,29 @@ function initializeSchema(db: Database.Database): void {
     }
   } catch {}
 
+  // Seed default Complete Look on Burgundy Hoodie if not yet configured
+  try {
+    const isLookSeeded = db.prepare("SELECT value FROM meta WHERE key = 'look_seeded_v1'").get();
+    if (!isLookSeeded) {
+      const prod = db.prepare("SELECT id, details FROM products WHERE slug = 'oversized-burgundy-hoodie'").get() as any;
+      if (prod) {
+        let det: any = {};
+        try { det = JSON.parse(prod.details || "{}"); } catch {}
+        if (!det.look) {
+          det.look = {
+            enabled: true,
+            title: "إطلالة متكاملة",
+            subtitle: "نسق هذا المنتج مع قطع مختارة للحصول على ستايل متكامل.",
+            discountPercent: 10,
+            productIds: ["obsidian-puff-print-hoodie", "midnight-navy-raw-edge-hoodie"],
+          };
+          db.prepare("UPDATE products SET details = ? WHERE id = ?").run(JSON.stringify(det), prod.id);
+        }
+      }
+      db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('look_seeded_v1', '1')").run();
+    }
+  } catch {}
+
   // Seed default ambassador levels & rewards if missing
   try {
     const existingLevels = db.prepare("SELECT COUNT(*) as c FROM ambassador_levels").get() as { c: number };
