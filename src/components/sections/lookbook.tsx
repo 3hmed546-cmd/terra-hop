@@ -30,7 +30,12 @@ export function Lookbook({ lookbook }: { lookbook: typeof home.lookbook }) {
         </Reveal>
         <ul className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-6 lg:grid-cols-12 lg:items-start">
           {lookbook.items.map((item, i) => {
-            const img = images[item.image];
+            const img = images[item.image] || {
+              src: "/preview-images/hero.jpg",
+              alt: "TERRA HOP Lookbook",
+              width: 900,
+              height: 1100,
+            };
             const frame = pattern[i % pattern.length];
             const picture = (
               <Image
@@ -39,7 +44,7 @@ export function Lookbook({ lookbook }: { lookbook: typeof home.lookbook }) {
                 width={img.width}
                 height={img.height}
                 sizes="(min-width: 1024px) 40vw, (min-width: 768px) 33vw, 50vw"
-                className="h-full w-full object-cover"
+                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
             );
             return (
@@ -58,7 +63,7 @@ export function Lookbook({ lookbook }: { lookbook: typeof home.lookbook }) {
                     .join(" ")}`}
                 >
                   {item.href ? (
-                    <Link href={item.href} className="block h-full w-full">
+                    <Link href={item.href} className="group block h-full w-full cursor-pointer">
                       {picture}
                     </Link>
                   ) : (

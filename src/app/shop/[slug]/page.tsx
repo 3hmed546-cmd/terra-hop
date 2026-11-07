@@ -100,9 +100,40 @@ function getCatalogProducts(): Product[] {
   return [...home.drop.products];
 }
 
+const SLUG_ALIASES: Record<string, string> = {
+  "charcoal-acid-hoodie": "charcoal-acid-hoodie",
+  "dusty-cobalt-hoodie": "midnight-navy-raw-edge-hoodie",
+  "alpine-forest-hoodie": "emerald-forest-heavyweight-hoodie",
+  "vintage-mocha-hoodie": "mocha-brown-acid-wash-hoodie",
+  "phantom-obsidian-hoodie": "obsidian-puff-print-hoodie",
+};
+
 const findProduct = (slug: string) => {
   const all = getCatalogProducts();
-  return all.find((p) => p.slug === slug || (p as any).id === slug);
+  const cleanSlug = decodeURIComponent(slug).trim().toLowerCase();
+
+  // 1. Direct match by slug or id
+  let match = all.find((p) => p.slug?.toLowerCase() === cleanSlug || (p as any).id?.toLowerCase() === cleanSlug);
+  if (match) return match;
+
+  // 2. Alias match
+  const aliasTarget = SLUG_ALIASES[cleanSlug];
+  if (aliasTarget) {
+    match = all.find((p) => p.slug?.toLowerCase() === aliasTarget || (p as any).id?.toLowerCase() === aliasTarget);
+    if (match) return match;
+  }
+
+  // 3. Fallback search by keywords in slug
+  const keywords = ["charcoal", "cobalt", "navy", "forest", "emerald", "mocha", "brown", "obsidian", "black", "burgundy", "cream"];
+  for (const kw of keywords) {
+    if (cleanSlug.includes(kw)) {
+      match = all.find((p) => (p.slug || "").toLowerCase().includes(kw) || (p.name || "").toLowerCase().includes(kw));
+      if (match) return match;
+    }
+  }
+
+  // 4. Default to first product if catalog is not empty instead of throwing 404
+  return all.length > 0 ? all[0] : null;
 };
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
