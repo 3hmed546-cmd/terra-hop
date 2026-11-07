@@ -93,6 +93,7 @@ export async function GET(request: NextRequest) {
       totalCents: o.total_cents,
       createdAt: o.created_at,
       emailConfirmedAt: null,
+      waConfirmedAt: o.wa_confirmed_at ?? null,
       soldAt: o.sold_at ?? null,
       cancelledAt: o.cancelled_at ?? null,
       cancelReason: o.cancel_reason ?? null,

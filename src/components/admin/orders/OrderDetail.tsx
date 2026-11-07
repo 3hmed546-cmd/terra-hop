@@ -29,6 +29,7 @@ const statusText = (o: Order): string =>
 function placedLine(o: Order): string {
   const parts = [S.placed(formatDateTime(o.createdAt))];
   if (o.source === "manual") parts.push(S.manualSale);
+  else if (o.waConfirmedAt) parts.push("مؤكد عبر الواتساب 🟢");
   else if (o.emailConfirmedAt) parts.push(S.emailConfirmed(formatDateTime(o.emailConfirmedAt)));
   else if (o.status === "PENDING_EMAIL") parts.push(S.emailWaiting);
   return parts.join(" · ");

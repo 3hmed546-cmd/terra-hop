@@ -564,6 +564,9 @@ function initializeSchema(db: Database.Database): void {
     "courier_reference TEXT",
     "code_discount_percent_applied INTEGER",
     "code_discount_cents INTEGER",
+    "wa_message_id TEXT",
+    "wa_confirmed_at TEXT",
+    "customer_phone TEXT",
   ];
 
   for (const col of orderColumns) {

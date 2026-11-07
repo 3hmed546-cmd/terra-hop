@@ -13,6 +13,7 @@ import { getPaymentHandler } from "@/lib/server/payment";
 import { notifyAdminsNewOrder, notifyAdminsAmbassadorGoalReached } from "@/lib/server/push";
 import { decryptCode } from "@/lib/server/security";
 import { sendOrderInvoiceEmail } from "@/lib/server/mailer";
+import { sendOrderWhatsAppNotification } from "@/lib/server/services/whatsapp-bot";
 import {
   checkIdempotency,
   acquireIdempotencyLock,
@@ -376,16 +377,17 @@ export async function POST(request: NextRequest) {
 
       db.prepare(
         `INSERT INTO orders (
-           id, number, source, status, customer_enc, notes,
+           id, number, source, status, customer_enc, customer_phone, notes,
            subtotal_cents, shipping_cents, discount_cents, promo_code, total_cents,
            ambassador_id, ambassador_code, referral_code_id, attribution_locked_at,
            fulfilment_status, payment_status, code_discount_percent_applied, code_discount_cents,
            idempotency_key, created_at, revision
-         ) VALUES (?, ?, 'website', 'PENDING_EMAIL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NOT_SHIPPED', 'UNPAID', ?, ?, ?, ?, 1)`,
+         ) VALUES (?, ?, 'website', 'PENDING_EMAIL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NOT_SHIPPED', 'UNPAID', ?, ?, ?, ?, 1)`,
       ).run(
         orderId,
         orderNumber,
         customerEncrypted,
+        phone,
         notes || null,
         subtotalCents,
         shippingCents,
@@ -517,6 +519,21 @@ export async function POST(request: NextRequest) {
     totalCents,
   }).catch((err) => {
     console.error("[Mailer] Failed to send order invoice email:", err);
+  });
+
+  // Send Automated WhatsApp Message with Hoodie Image & interactive confirmation
+  sendOrderWhatsAppNotification({
+    orderId,
+    orderNumber,
+    customerName: name,
+    customerPhone: phone,
+    city: city || undefined,
+    address: address || undefined,
+    notes: notes || null,
+    totalCents,
+    items: verifiedItems,
+  }).catch((err) => {
+    console.error("[WhatsAppBot] Failed to send order notification:", err);
   });
 
   // Check if ambassador reached their max uses goal

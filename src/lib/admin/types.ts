@@ -121,6 +121,7 @@ export interface Order {
   totalCents: number;
   createdAt: string;
   emailConfirmedAt: string | null;
+  waConfirmedAt?: string | null;
   soldAt: string | null;
   cancelledAt: string | null;
   cancelReason: string | null;
