@@ -22,7 +22,6 @@ import {
   Sparkles,
   ShieldCheck,
   Phone,
-  Heart,
 } from "lucide-react";
 import { CompleteLook } from "./complete-look";
 import { PageShell } from "@/components/layout/page-shell";
@@ -121,20 +120,6 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
   const [actionStatus, setActionStatus] = useState<"idle" | "error" | "added" | "copied">("idle");
   const [showSizeGuide, setShowSizeGuide] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
-  const relatedScrollRef = useRef<HTMLDivElement>(null);
-  const [favorites, setFavorites] = useState<Record<string, boolean>>({});
-
-  const scrollRelated = (direction: "left" | "right") => {
-    if (!relatedScrollRef.current) return;
-    const offset = direction === "left" ? -320 : 320;
-    relatedScrollRef.current.scrollBy({ left: offset, behavior: "smooth" });
-  };
-
-  const toggleFavorite = (slug: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setFavorites((prev) => ({ ...prev, [slug]: !prev[slug] }));
-  };
 
   // Sizes to display: from admin product configuration or defaults
   const displaySizes = useMemo<string[]>(() => {
@@ -943,52 +928,26 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
         </div>
       </div>
 
-      {/* 3. "قد يعجبك أيضًا" & "إطلالة متكاملة" (Matching Reference Image) */}
-      {relatedProducts.length > 0 && (
-        <section className="mt-20 border-t border-line-light pt-12 sm:pt-16" aria-label="قد يعجبك أيضًا">
-          <div className="flex flex-row-reverse items-center justify-between gap-4 mb-6 sm:mb-8">
-            {/* Right (RTL): Title & Subtitle */}
-            <div className="text-right">
-              <span className="text-[10px] sm:text-xs font-mono font-bold tracking-widest text-stone-500 uppercase block mb-1">
-                TERRA HOP®
-              </span>
-              <div className="flex items-center gap-2.5">
-                <span className="w-8 sm:w-12 h-[2px] bg-stone-900 inline-block shrink-0" />
-                <h2 className="text-2xl sm:text-3xl font-black text-obsidian tracking-tight">
-                  {t.productPage.relatedHeading}
-                </h2>
-              </div>
-              <p className="text-xs sm:text-sm text-graphite mt-1">
-                {t.productPage.relatedSubtitle}
-              </p>
-            </div>
+      {/* 3. Complete Look Banner (الإطلالة المتكاملة) */}
+      <CompleteLook
+        mainProduct={product}
+        lookConfig={matchedAdmin?.details?.look || (product as any).details?.look}
+        allProducts={effectiveAllProducts}
+      />
 
-            {/* Left: Scroll arrows */}
-            <div className="flex items-center gap-1.5 shrink-0" dir="ltr">
-              <button
-                type="button"
-                onClick={() => scrollRelated("left")}
-                className="w-9 h-9 rounded-xl border border-stone-200 bg-white hover:bg-stone-100 flex items-center justify-center text-obsidian transition-colors shadow-2xs cursor-pointer"
-                aria-label="Previous"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => scrollRelated("right")}
-                className="w-9 h-9 rounded-xl border border-stone-200 bg-white hover:bg-stone-100 flex items-center justify-center text-obsidian transition-colors shadow-2xs cursor-pointer"
-                aria-label="Next"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+      {/* 4. "تحب تشوف حاجة تانية ؟" (Related Products Section - Shows all platform products, no 'تشكيلة مختارة' badge) */}
+      {relatedProducts.length > 0 && (
+        <section className="mt-20 border-t border-line-light pt-12 sm:pt-16">
+          <div className="text-center max-w-xl mx-auto mb-8 sm:mb-10">
+            <h2 className="text-2xl sm:text-3xl font-black text-obsidian tracking-tight">
+              {t.productPage.relatedHeading}
+            </h2>
+            <p className="text-xs sm:text-sm text-graphite mt-1.5">
+              {t.productPage.relatedSubtitle}
+            </p>
           </div>
 
-          {/* Horizontal scrollable / grid container */}
-          <div
-            ref={relatedScrollRef}
-            className="flex sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 overflow-x-auto pb-4 sm:pb-0 scrollbar-none snap-x snap-mandatory"
-          >
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
             {relatedProducts.map((rel) => {
               const rawImg =
                 rel.images && rel.images.length > 0
@@ -1008,94 +967,54 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
                 : 0;
 
               return (
-                <div
+                <Link
                   key={rel.slug}
-                  className="group relative flex flex-col rounded-2xl overflow-hidden bg-white border border-stone-200/90 hover:border-stone-900 hover:shadow-lg transition-all duration-300 min-w-[240px] sm:min-w-0 snap-start"
+                  href={rel.href}
+                  className="group block rounded-2xl overflow-hidden bg-white border border-stone-200/80 hover:border-red-500 hover:shadow-xl transition-all duration-300"
                 >
-                  <Link href={rel.href} className="relative aspect-[4/5] overflow-hidden bg-stone-100 block">
+                  <div className="relative aspect-[4/5] overflow-hidden bg-charcoal">
                     <Image
                       src={relImg.src}
                       alt={relImg.alt || relName}
                       fill
                       sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw"
                       unoptimized={typeof relImg.src === "string" && (relImg.src.startsWith("data:") || relImg.src.startsWith("http"))}
-                      className="object-cover transition-transform duration-500 group-hover:scale-105"
+                      className="object-cover transition-transform duration-300 group-hover:scale-105"
                     />
-
-                    {/* Wishlist Heart Icon */}
-                    <button
-                      type="button"
-                      onClick={(e) => toggleFavorite(rel.slug, e)}
-                      className="absolute top-2.5 left-2.5 w-8 h-8 rounded-full bg-white/85 backdrop-blur-xs flex items-center justify-center text-stone-700 hover:text-red-600 transition-colors z-10 shadow-2xs cursor-pointer"
-                      title="إضافة للمفضلة"
-                    >
-                      <Heart
-                        className={`w-4 h-4 transition-transform active:scale-125 ${
-                          favorites[rel.slug] ? "fill-red-600 text-red-600" : ""
-                        }`}
-                      />
-                    </button>
-
-                    {/* Discount badge */}
                     {relHasDiscount && (
                       <span
-                        className="absolute bottom-2.5 right-2.5 rounded-lg px-2 py-0.5 text-xs font-black uppercase shadow-md z-10 tracking-wider"
+                        className="absolute bottom-2.5 right-2.5 rounded-lg px-2.5 py-1 text-xs font-black uppercase shadow-md z-10 tracking-wider"
                         style={{ backgroundColor: "#c8102e", color: "#ffffff" }}
                       >
                         -{relDiscountPercent}%
                       </span>
                     )}
-                  </Link>
-
-                  <div className="p-3.5 flex items-end justify-between gap-2 mt-auto">
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <Link href={rel.href} className="block">
-                        <h3 className="text-xs sm:text-sm font-bold text-obsidian truncate group-hover:text-red-700 transition-colors">
-                          {relName}
-                        </h3>
-                      </Link>
-                      <span className="text-[11px] text-graphite block truncate">
-                        Oversized · {locale === "ar" ? "قطن مصري" : "Egyptian Cotton"}
-                      </span>
-                      <div className="mt-1 flex flex-wrap items-baseline gap-1.5">
-                        <span
-                          className="font-mono text-sm sm:text-base font-black"
-                          style={{ color: "#c8102e" }}
-                        >
-                          {formatPrice(rel.price)}
-                        </span>
-                        {relHasDiscount && (
-                          <span
-                            className="text-xs font-mono line-through font-semibold"
-                            style={{ color: "#78716c" }}
-                          >
-                            {formatPrice(rel.originalPrice!)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Shopping Bag Quick Action */}
-                    <button
-                      type="button"
-                      onClick={() => add(rel.slug, rel.sizes?.[0] || "L")}
-                      className="w-9 h-9 rounded-xl bg-stone-900 text-white flex items-center justify-center hover:bg-black active:scale-95 transition-all shrink-0 shadow-xs cursor-pointer"
-                      title="أضف للسلة"
-                    >
-                      <ShoppingBag className="w-4 h-4" />
-                    </button>
                   </div>
-                </div>
+                  <div className="p-3.5 space-y-1">
+                    <h3 className="text-xs sm:text-sm font-bold text-obsidian truncate group-hover:underline transition-colors">
+                      {relName}
+                    </h3>
+                    <div className="mt-1.5 flex flex-wrap items-baseline gap-2">
+                      <span
+                        className="font-mono text-sm sm:text-base font-black"
+                        style={{ color: "#c8102e" }}
+                      >
+                        {formatPrice(rel.price)}
+                      </span>
+                      {relHasDiscount && (
+                        <span
+                          className="text-xs font-mono line-through font-semibold"
+                          style={{ color: "#78716c" }}
+                        >
+                          {formatPrice(rel.originalPrice!)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </Link>
               );
             })}
           </div>
-
-          {/* 4. Complete Look Banner (Directly under Related Products, Matching Reference Image) */}
-          <CompleteLook
-            mainProduct={product}
-            lookConfig={matchedAdmin?.details?.look || (product as any).details?.look}
-            allProducts={effectiveAllProducts}
-          />
         </section>
       )}
 

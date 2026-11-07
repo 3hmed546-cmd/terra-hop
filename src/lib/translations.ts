@@ -565,8 +565,8 @@ export const translations: Record<Locale, Translations> = {
         returnsTitle: "سياسة الاستبدال والإرجاع",
         returnsBody: "لك كامل الحق في فحص وتجربة الشحنة عند الاستلام مع المندوب. كما نوفر خدمة استبدال المقاس خلال 14 يوماً من تاريخ الاستلام بكل سهولة وبدون أي تعقيد عبر التواصل مع خدمة العملاء.",
       },
-      relatedHeading: "قد يعجبك أيضًا",
-      relatedSubtitle: "مختارات متناسقة مع هذا المنتج.",
+      relatedHeading: "تحب تشوف حاجة تانية ؟",
+      relatedSubtitle: "استكشف باقي تشكيلة منتجات TERRA HOP الحصرية",
       stickyBuyNow: "شراء الآن",
       detailsHeading: "تفاصيل القطعة",
       details: [
