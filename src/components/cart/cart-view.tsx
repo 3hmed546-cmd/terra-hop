@@ -27,12 +27,18 @@ export function CartView({ products }: Props) {
     return liveProducts.map((product: any) => ({
       slug: product.slug || product.id,
       name: product.name || product.nameAr,
-      category: product.category === "tshirt" || product.category === "T-shirts" ? "T-shirts" : "Hoodies",
+      category: product.category === "tshirt" || product.category === "T-shirts"
+        ? "T-shirts"
+        : product.category === "pants" || product.category === "Pants"
+        ? "Pants"
+        : "Hoodies",
       price: (product.priceCents || 0) / 100,
       originalPrice: product.compareAtCents ? product.compareAtCents / 100 : undefined,
       status: product.forceSoldOut || product.status === "sold_out" ? "Sold out" : "Preorder",
       description: product.description || product.descriptionAr || "",
-      sizes: product.sizes || (product.variants || []).map((variant: any) => variant.size).filter(Boolean),
+      sizes: Array.isArray(product.sizes) && product.sizes.length > 0
+        ? Array.from(new Set(product.sizes))
+        : Array.from(new Set((product.variants || []).map((variant: any) => variant.size).filter(Boolean))),
       images: (product.images || []).map((image: any) => typeof image === "object" ? image.url : image),
       colors: product.colors || [],
       variants: product.variants || [],

@@ -296,7 +296,11 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
         return {
           slug: p.slug || p.id,
           name: p.name || p.nameAr || p.nameEn || p.slug,
-          category: (p.category === "tshirt" || p.category === "T-shirts") ? "T-shirts" : "Hoodies",
+          category: (p.category === "tshirt" || p.category === "T-shirts")
+            ? "T-shirts"
+            : (p.category === "pants" || p.category === "Pants")
+            ? "Pants"
+            : "Hoodies",
           price: typeof p.price === "number" ? p.price : (p.priceCents || 0) / 100,
           originalPrice:
             typeof p.compareAtPrice === "number"
@@ -306,7 +310,9 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
               : undefined,
           status: isSoldOut ? "Sold out" : "Preorder",
           description: p.description || p.descriptionAr || "",
-          sizes: p.sizes || (p.variants || []).map((v: any) => v.size).filter(Boolean),
+          sizes: Array.isArray(p.sizes) && p.sizes.length > 0
+            ? Array.from(new Set(p.sizes))
+            : Array.from(new Set((p.variants || []).map((v: any) => v.size).filter(Boolean))),
           images:
             imagesList.length > 0
               ? imagesList
@@ -961,6 +967,12 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
                   ? t.products[rel.slug].name
                   : rel.name;
 
+              const relIsSoldOut =
+                rel.status === "Sold out" ||
+                rel.status === "sold_out" ||
+                (rel as any).isSoldOut === true ||
+                (rel as any).forceSoldOut === true;
+
               const relHasDiscount = !!rel.originalPrice && rel.originalPrice > rel.price;
               const relDiscountPercent = relHasDiscount
                 ? Math.round(((rel.originalPrice! - rel.price) / rel.originalPrice!) * 100)
@@ -979,9 +991,14 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
                       fill
                       sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw"
                       unoptimized={typeof relImg.src === "string" && (relImg.src.startsWith("data:") || relImg.src.startsWith("http"))}
-                      className="object-cover transition-transform duration-300 group-hover:scale-105"
+                      className={`object-cover transition-transform duration-300 group-hover:scale-105 ${relIsSoldOut ? "opacity-75" : ""}`}
                     />
-                    {relHasDiscount && (
+                    {relIsSoldOut && (
+                      <span className="absolute top-2.5 right-2.5 z-10 rounded-md bg-stone-900/95 px-2.5 py-1 text-xs font-bold text-white shadow-md border border-stone-700">
+                        {locale === "ar" ? "نفذ من المخزون" : "Sold Out"}
+                      </span>
+                    )}
+                    {relHasDiscount && !relIsSoldOut && (
                       <span
                         className="absolute bottom-2.5 right-2.5 rounded-lg px-2.5 py-1 text-xs font-black uppercase shadow-md z-10 tracking-wider"
                         style={{ backgroundColor: "#c8102e", color: "#ffffff" }}
@@ -1010,6 +1027,11 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
                         </span>
                       )}
                     </div>
+                    {relIsSoldOut && (
+                      <span className="inline-block text-[11px] font-bold text-red-600">
+                        {locale === "ar" ? "نفذ من المخزون" : "Out of Stock"}
+                      </span>
+                    )}
                   </div>
                 </Link>
               );

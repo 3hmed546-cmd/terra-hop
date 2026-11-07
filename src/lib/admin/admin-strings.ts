@@ -66,7 +66,7 @@ export const ADMIN_STRINGS = {
       price_desc: "السعر: من الأعلى للأقل",
       stock_asc: "المخزون: من الأقل للأعلى",
     },
-    category: { tshirt: "تيشيرت", hoodie: "هودي", other: "أخرى" },
+    category: { tshirt: "تيشيرت", hoodie: "هودي", pants: "بنطال", other: "أخرى" },
     tableCaption: "المنتجات",
     columns: { product: "المنتج", price: "السعر", stock: "المخزون", status: "الحالة", actions: "إجراءات" },
     updated: (date: string) => `تم التحديث ${date}`,

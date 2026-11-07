@@ -39,6 +39,7 @@ export interface Translations {
       all: string;
       tshirts: string;
       hoodies: string;
+      pants: string;
     };
     preorderBadge: string;
     empty: string;
@@ -294,6 +295,7 @@ export const translations: Record<Locale, Translations> = {
         all: "الكل",
         tshirts: "تيشيرتات",
         hoodies: "هوديز",
+        pants: "بناطيل",
       },
       preorderBadge: "حجز مسبق",
       empty: "الكولكشن القادم سيتوفر قريباً.",
@@ -632,6 +634,7 @@ export const translations: Record<Locale, Translations> = {
         all: "All",
         tshirts: "T-shirts",
         hoodies: "Hoodies",
+        pants: "Pants",
       },
       preorderBadge: "PREORDER",
       empty: "The next drop is coming soon.",

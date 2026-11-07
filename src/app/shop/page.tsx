@@ -46,7 +46,11 @@ function getCatalogProducts(): Product[] {
         return {
           slug: p.slug,
           name: p.name_ar || p.name_en || p.slug,
-          category: (p.category === "tshirt" || p.category === "T-shirts") ? "T-shirts" : "Hoodies",
+          category: (p.category === "tshirt" || p.category === "T-shirts")
+            ? "T-shirts"
+            : (p.category === "pants" || p.category === "Pants")
+            ? "Pants"
+            : "Hoodies",
           price: (p.price_cents || 0) / 100,
           originalPrice: p.compare_at_cents ? p.compare_at_cents / 100 : undefined,
           status: p.force_sold_out === 1 ? "Sold out" : "Preorder",
@@ -68,12 +72,18 @@ function getCatalogProducts(): Product[] {
       return raw.map((p: any) => ({
         slug: p.slug,
         name: p.name || p.nameAr,
-        category: (p.category === "tshirt" || p.category === "T-shirts") ? "T-shirts" : "Hoodies",
+        category: (p.category === "tshirt" || p.category === "T-shirts")
+          ? "T-shirts"
+          : (p.category === "pants" || p.category === "Pants")
+          ? "Pants"
+          : "Hoodies",
         price: (p.priceCents || 0) / 100,
         originalPrice: p.compareAtCents ? p.compareAtCents / 100 : undefined,
         status: p.forceSoldOut ? "Sold out" : "Preorder",
         description: p.description || p.descriptionAr || "",
-        sizes: p.sizes || (p.variants || []).map((v: any) => v.size).filter(Boolean),
+        sizes: Array.isArray(p.sizes) && p.sizes.length > 0
+          ? Array.from(new Set(p.sizes))
+          : Array.from(new Set((p.variants || []).map((v: any) => v.size).filter(Boolean))),
         images: (p.images || []).map((i: any) => (typeof i === "object" ? i.url : i)),
         colors: p.colors || [],
         variants: p.variants || [],

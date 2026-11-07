@@ -2,7 +2,7 @@ import type { ImageSlot } from "./images";
 
 // All homepage content lives here. Shapes mirror the future home_sections config. Every demo value carries demo: true.
 export type NavLink = { label: string; href: string };
-export type Category = "T-shirts" | "Hoodies";
+export type Category = "T-shirts" | "Hoodies" | "Pants";
 export type Product = {
   slug: string;
   name: string;

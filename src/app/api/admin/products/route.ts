@@ -176,11 +176,11 @@ export async function POST(request: NextRequest) {
       : [{ id: "default", name: "اللون الافتراضي", hex: "#000000" }];
 
     const insertColor = db.prepare(`
-      INSERT INTO product_colors (id, product_id, name, hex, position)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO product_colors (id, product_id, name, hex, position, image_url)
+      VALUES (?, ?, ?, ?, ?, ?)
     `);
     colors.forEach((c: any, idx: number) => {
-      insertColor.run(c.id, prodId, c.name, c.hex, idx + 1);
+      insertColor.run(c.id, prodId, c.name, c.hex, idx + 1, c.image || c.imageUrl || c.image_url || null);
     });
 
     // Default sizes & variants

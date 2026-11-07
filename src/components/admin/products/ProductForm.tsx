@@ -164,7 +164,7 @@ function Editor({ initial, existing, isNew, tab, onTab, focusLogRef }: EditorPro
             label={F.category}
             value={form.category}
             onChange={(e) => patch({ category: e.target.value as ProductCategory })}
-            options={(["tshirt", "hoodie", "other"] as const).map((c) => ({ value: c, label: ADMIN_STRINGS.products.category[c] }))}
+            options={(["tshirt", "hoodie", "pants", "other"] as const).map((c) => ({ value: c, label: ADMIN_STRINGS.products.category[c] }))}
           />
         </Section>
 

@@ -1,6 +1,6 @@
 /** Admin domain types. Money is always an integer number of piastres (cents). */
 
-export type ProductCategory = "tshirt" | "hoodie" | "other";
+export type ProductCategory = "tshirt" | "hoodie" | "pants" | "other";
 /** Stored status. "Sold out" is derived (see inventory.deriveProductStatus). */
 export type ProductStatus = "active" | "draft";
 export type DerivedProductStatus = "available" | "low" | "sold_out" | "draft";

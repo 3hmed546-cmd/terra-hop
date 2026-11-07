@@ -10,18 +10,20 @@ type Props = { products: Product[] };
 
 export function ProductGrid({ products }: Props) {
   const { t } = useLocale();
-  const [filterKey, setFilterKey] = useState<"all" | "tshirts" | "hoodies">("all");
+  const [filterKey, setFilterKey] = useState<"all" | "tshirts" | "hoodies" | "pants">("all");
 
   const filterTabs = [
     { key: "all" as const, label: t.drop.categories.all },
     { key: "tshirts" as const, label: t.drop.categories.tshirts },
     { key: "hoodies" as const, label: t.drop.categories.hoodies },
+    { key: "pants" as const, label: t.drop.categories.pants },
   ];
 
   const visible = products.filter((p) => {
     if (filterKey === "all") return true;
     if (filterKey === "tshirts") return p.category === "T-shirts";
     if (filterKey === "hoodies") return p.category === "Hoodies";
+    if (filterKey === "pants") return p.category === "Pants";
     return true;
   });
 
