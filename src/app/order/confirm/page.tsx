@@ -4,7 +4,7 @@ import Link from "next/link";
 import { CheckCircle2, AlertCircle, ShoppingBag, ShieldCheck } from "lucide-react";
 import { getDb, recordChange, recordAudit } from "@/lib/server/db";
 import { decryptCustomer } from "@/lib/server/vault";
-import { verifyOrderConfirmationToken } from "@/lib/server/mailer";
+import { decryptOrderConfirmationToken, verifyOrderConfirmationToken } from "@/lib/server/mailer";
 import { notifyAdminsOrderConfirmedByCustomer } from "@/lib/server/push";
 
 export const metadata: Metadata = {
@@ -21,16 +21,38 @@ interface ConfirmPageProps {
 
 async function ConfirmContent({ searchParams }: ConfirmPageProps) {
   const params = await searchParams;
-  const orderId = params?.id;
-  const token = params?.token;
+  const rawToken = params?.token;
+  const rawId = params?.id;
 
-  if (!orderId || !token) {
+  let resolvedOrderId = rawId || "";
+  let isTokenValid = false;
+
+  // 1. Try decrypting as AES-256-GCM encrypted confirmation token (tamper-proof, time-bound)
+  if (rawToken) {
+    const dec = decryptOrderConfirmationToken(rawToken);
+    if (dec.valid && dec.orderId) {
+      resolvedOrderId = dec.orderId;
+      isTokenValid = true;
+    }
+  }
+
+  // 2. Fallback to legacy HMAC token verification if id and token are provided
+  if (!isTokenValid && rawId && rawToken) {
+    const db = getDb();
+    const orderCheck = db.prepare("SELECT id, created_at FROM orders WHERE id = ?").get(rawId) as any;
+    if (orderCheck && verifyOrderConfirmationToken(orderCheck.id, orderCheck.created_at, rawToken)) {
+      resolvedOrderId = orderCheck.id;
+      isTokenValid = true;
+    }
+  }
+
+  if (!isTokenValid || !resolvedOrderId) {
     return (
       <main dir="rtl" className="min-h-dvh bg-obsidian text-off-white flex flex-col items-center justify-center p-6">
         <div className="w-full max-w-md bg-[#171717] border border-[#2b2b2b] rounded-2xl p-8 text-center">
           <AlertCircle className="w-16 h-16 text-rose-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-black mb-2">رابط غير صالح</h1>
-          <p className="text-graphite text-sm mb-6">رابط التأكيد مفقود أو غير مكتمل. يرجى مراجعة الرابط المرسل في بريدك الإلكتروني.</p>
+          <h1 className="text-2xl font-black mb-2">رابط مشفر أو غير صالح</h1>
+          <p className="text-graphite text-sm mb-6">رمز التحقق الأمني غير متطابق أو منتهي الصلاحية. يرجى فتح الرابط الأصلي من رسالة البريد الإلكتروني.</p>
           <Link href="/" className="inline-flex items-center gap-2 bg-off-white text-obsidian px-6 py-3 rounded-xl font-bold text-sm">
             <ShoppingBag className="w-4 h-4" />
             <span>العودة إلى المتجر</span>
@@ -45,7 +67,7 @@ async function ConfirmContent({ searchParams }: ConfirmPageProps) {
     SELECT id, number, status, created_at, customer_enc, total_cents
     FROM orders
     WHERE id = ?
-  `).get(orderId) as any;
+  `).get(resolvedOrderId) as any;
 
   if (!order) {
     return (
@@ -54,22 +76,6 @@ async function ConfirmContent({ searchParams }: ConfirmPageProps) {
           <AlertCircle className="w-16 h-16 text-rose-500 mx-auto mb-4" />
           <h1 className="text-2xl font-black mb-2">الطلب غير موجود</h1>
           <p className="text-graphite text-sm mb-6">لم يتم العثور على هذا الطلب في قاعدة البيانات.</p>
-          <Link href="/" className="inline-flex items-center gap-2 bg-off-white text-obsidian px-6 py-3 rounded-xl font-bold text-sm">
-            <span>العودة إلى المتجر</span>
-          </Link>
-        </div>
-      </main>
-    );
-  }
-
-  const isValidToken = verifyOrderConfirmationToken(order.id, order.created_at, token);
-  if (!isValidToken) {
-    return (
-      <main dir="rtl" className="min-h-dvh bg-obsidian text-off-white flex flex-col items-center justify-center p-6">
-        <div className="w-full max-w-md bg-[#171717] border border-[#2b2b2b] rounded-2xl p-8 text-center">
-          <AlertCircle className="w-16 h-16 text-rose-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-black mb-2">رمز التأكيد غير صحيح</h1>
-          <p className="text-graphite text-sm mb-6">رمز التحقق الأمني غير متطابق. تأكد من فتح الرابط الأصلي من رسالة البريد الإلكتروني.</p>
           <Link href="/" className="inline-flex items-center gap-2 bg-off-white text-obsidian px-6 py-3 rounded-xl font-bold text-sm">
             <span>العودة إلى المتجر</span>
           </Link>

@@ -147,6 +147,73 @@ export async function sendBrevoEmail({
 }
 
 /**
+ * Create a fully encrypted, tamper-proof, time-bound AES-256-GCM confirmation token.
+ * Contains orderId, createdAt, and an expiration timestamp (e.g. 7 days).
+ * Completely obscures the orderId and any internal IDs from the URL.
+ */
+export function createEncryptedOrderConfirmationToken(orderId: string, createdAt: string): string {
+  const secret = process.env.SESSION_SECRET || "terra-hop-secure-order-token-2026";
+  const key = crypto.createHash("sha256").update(secret).digest();
+  const iv = crypto.randomBytes(12); // 12-byte IV for GCM
+
+  const payload = JSON.stringify({
+    orderId,
+    createdAt,
+    exp: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days expiration
+  });
+
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const ciphertext = Buffer.concat([cipher.update(payload, "utf8"), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+
+  // Combine: [12 bytes IV][16 bytes AuthTag][Ciphertext] and Base64URL encode
+  const combined = Buffer.concat([iv, authTag, ciphertext]);
+  return combined.toString("base64url");
+}
+
+/**
+ * Decrypts and verifies the AES-256-GCM confirmation token.
+ * Guarantees cryptographic authenticity (tamper-proof) and checks expiry.
+ */
+export function decryptOrderConfirmationToken(tokenStr: string): {
+  valid: boolean;
+  orderId?: string;
+  createdAt?: string;
+  error?: string;
+} {
+  try {
+    if (!tokenStr) return { valid: false, error: "Token missing" };
+    const buffer = Buffer.from(tokenStr, "base64url");
+    if (buffer.length < 28) return { valid: false, error: "Invalid token format" };
+
+    const secret = process.env.SESSION_SECRET || "terra-hop-secure-order-token-2026";
+    const key = crypto.createHash("sha256").update(secret).digest();
+
+    const iv = buffer.subarray(0, 12);
+    const authTag = buffer.subarray(12, 28);
+    const ciphertext = buffer.subarray(28);
+
+    const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+    decipher.setAuthTag(authTag);
+
+    const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    const data = JSON.parse(decrypted.toString("utf8"));
+
+    if (!data.orderId || !data.createdAt) {
+      return { valid: false, error: "Malformed token data" };
+    }
+
+    if (data.exp && Date.now() > data.exp) {
+      return { valid: false, error: "Token expired" };
+    }
+
+    return { valid: true, orderId: data.orderId, createdAt: data.createdAt };
+  } catch {
+    return { valid: false, error: "Authentication failed / Token tampered" };
+  }
+}
+
+/**
  * Generate a tamper-proof HMAC confirmation token for an order.
  */
 export function generateOrderConfirmationToken(orderId: string, createdAt: string): string {
@@ -167,7 +234,10 @@ export function verifyOrderConfirmationToken(
 ): boolean {
   if (!orderId || !createdAt || !token) return false;
   const expected = generateOrderConfirmationToken(orderId, createdAt);
-  return crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expected));
+  const tokenBuf = Buffer.from(token);
+  const expectedBuf = Buffer.from(expected);
+  if (tokenBuf.length !== expectedBuf.length) return false;
+  return crypto.timingSafeEqual(tokenBuf, expectedBuf);
 }
 
 export interface EmailOrderData {
@@ -228,8 +298,9 @@ function getItemImageUrl(item: { name: string; color?: string; image?: string; i
 export async function sendOrderInvoiceEmail(order: EmailOrderData): Promise<boolean> {
   if (!order.customer.email) return false;
 
-  const confirmToken = generateOrderConfirmationToken(order.id, order.createdAt);
-  const confirmUrl = `${APP_BASE_URL}/order/confirm?id=${encodeURIComponent(order.id)}&token=${encodeURIComponent(confirmToken)}`;
+  // Fully encrypted AES-256-GCM token (no plain-text orderId in URL)
+  const encryptedToken = createEncryptedOrderConfirmationToken(order.id, order.createdAt);
+  const confirmUrl = `${APP_BASE_URL}/order/confirm?token=${encodeURIComponent(encryptedToken)}`;
   const storeUrl = APP_BASE_URL;
 
   const subtotalFormatted = formatEgp(order.subtotalCents);
