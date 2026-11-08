@@ -294,6 +294,18 @@ export function OrderDetail({ orderId }: { orderId: string }) {
                 </div>
                 {blocked ? <p id="sell-blocked" className="adm-warn">{S.decision.blocked}</p> : null}
               </>
+            ) : order.status === "PENDING_EMAIL" ? (
+              <div className="adm-decision">
+                <Button
+                  style={{ backgroundColor: "#0284c7", color: "#ffffff" }}
+                  onClick={() => simulate("confirm")}
+                >
+                  اعتماد وتأكيد الطلب يدوياً (نقل إلى يتطلب قراراً)
+                </Button>
+                <Button variant="secondary" onClick={() => setDialog("cancel")}>
+                  {S.decision.cancel}
+                </Button>
+              </div>
             ) : processing ? (
               <div className="adm-decision">
                 <Button

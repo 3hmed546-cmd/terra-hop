@@ -85,11 +85,12 @@ async function ConfirmContent({ searchParams }: ConfirmPageProps) {
   } catch {}
 
   // Atomic conditional transition: only transition and notify if status is strictly 'PENDING_EMAIL'
+  const now = new Date().toISOString();
   const updateRes = db.prepare(`
     UPDATE orders
-    SET status = 'AWAITING_APPROVAL', revision = revision + 1
+    SET status = 'AWAITING_APPROVAL', email_confirmed_at = ?, revision = revision + 1
     WHERE id = ? AND status = 'PENDING_EMAIL'
-  `).run(order.id);
+  `).run(now, order.id);
 
   const isFirstConfirmation = updateRes.changes > 0;
 

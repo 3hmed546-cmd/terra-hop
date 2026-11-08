@@ -241,33 +241,46 @@ export async function DELETE(
 
   try {
     db.transaction(() => {
+      const safeRun = (sql: string, ...args: any[]) => {
+        try {
+          db.prepare(sql).run(...args);
+        } catch (e: any) {
+          console.warn(`[DELETE_AMBASSADOR:SAFE_RUN] ${sql}: ${e?.message}`);
+        }
+      };
+
       // 1. Delete associated discount code products
-      const codes = db.prepare("SELECT id FROM referral_codes WHERE ambassador_id = ?").all(id) as any[];
-      for (const c of codes) {
-        db.prepare("DELETE FROM discount_code_products WHERE code_id = ?").run(c.id);
-      }
+      try {
+        const codes = db.prepare("SELECT id FROM referral_codes WHERE ambassador_id = ?").all(id) as any[];
+        for (const c of codes) {
+          safeRun("DELETE FROM discount_code_products WHERE code_id = ?", c.id);
+        }
+      } catch {}
 
       // 2. Unlink any orders so order history remains intact
-      db.prepare(
-        "UPDATE orders SET referral_code_id = NULL WHERE referral_code_id IN (SELECT id FROM referral_codes WHERE ambassador_id = ?)"
-      ).run(id);
-      db.prepare("UPDATE orders SET ambassador_id = NULL WHERE ambassador_id = ?").run(id);
+      safeRun(
+        "UPDATE orders SET referral_code_id = NULL WHERE referral_code_id IN (SELECT id FROM referral_codes WHERE ambassador_id = ?)",
+        id
+      );
+      safeRun("UPDATE orders SET ambassador_id = NULL WHERE ambassador_id = ?", id);
 
       // 3. Delete referral codes
-      db.prepare("DELETE FROM referral_codes WHERE ambassador_id = ?").run(id);
+      safeRun("DELETE FROM referral_codes WHERE ambassador_id = ?", id);
 
       // 4. Delete progress, milestones, rewards, vouchers, sale events, fraud flags
-      db.prepare("DELETE FROM ambassador_progress WHERE ambassador_id = ?").run(id);
-      db.prepare("DELETE FROM ambassador_milestones WHERE ambassador_id = ?").run(id);
-      db.prepare("DELETE FROM ambassador_sale_events WHERE ambassador_id = ?").run(id);
-      db.prepare("UPDATE fraud_flags SET ambassador_id = NULL WHERE ambassador_id = ?").run(id);
+      safeRun("DELETE FROM ambassador_progress WHERE ambassador_id = ?", id);
+      safeRun("DELETE FROM ambassador_milestones WHERE ambassador_id = ?", id);
+      safeRun("DELETE FROM ambassador_sale_events WHERE ambassador_id = ?", id);
+      safeRun("UPDATE fraud_flags SET ambassador_id = NULL WHERE ambassador_id = ?", id);
 
-      db.prepare("DELETE FROM reward_vouchers WHERE ambassador_id = ?").run(id);
-      db.prepare("DELETE FROM ambassador_rewards WHERE ambassador_id = ?").run(id);
+      safeRun("DELETE FROM reward_vouchers WHERE ambassador_id = ?", id);
+      safeRun("DELETE FROM ambassador_rewards WHERE ambassador_id = ?", id);
 
-      // 5. Delete portal users and sessions
-      db.prepare("DELETE FROM ambassador_sessions WHERE ambassador_id = ?").run(id);
-      db.prepare("DELETE FROM ambassador_users WHERE ambassador_id = ?").run(id);
+      // 5. Delete portal users and sessions (both current and legacy table names)
+      safeRun("DELETE FROM ambassador_sessions WHERE ambassador_id = ?", id);
+      safeRun("DELETE FROM ambassador_users WHERE ambassador_id = ?", id);
+      safeRun("DELETE FROM ambassador_portal_users WHERE ambassador_id = ?", id);
+      safeRun("DELETE FROM ambassador_portal_sessions WHERE ambassador_id = ?", id);
 
       // 6. Delete the ambassador
       db.prepare("DELETE FROM ambassadors WHERE id = ?").run(id);

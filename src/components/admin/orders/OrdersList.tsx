@@ -34,11 +34,20 @@ function CustomerCell({ order }: { order: Order }) {
     <div>
       <div>{order.customer.name}</div>
       {order.customer.phone ? <div className="adm-muted adm-small adm-num">{order.customer.phone}</div> : null}
-      {order.ambassadorCode ? (
-        <div style={{ marginTop: 4 }}>
+      <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: 4 }}>
+        {order.waConfirmedAt ? (
+          <span className="adm-badge" style={{ backgroundColor: "#15803d", color: "#fff", fontSize: "10px" }}>
+            مؤكد واتساب 🟢
+          </span>
+        ) : order.emailConfirmedAt ? (
+          <span className="adm-badge" style={{ backgroundColor: "#0284c7", color: "#fff", fontSize: "10px" }}>
+            مؤكد إيميل 📧
+          </span>
+        ) : null}
+        {order.ambassadorCode ? (
           <span className="adm-badge adm-badge-amb">سفير: <span dir="ltr">{order.ambassadorCode}</span></span>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </div>
   );
 }

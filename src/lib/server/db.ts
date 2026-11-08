@@ -567,6 +567,7 @@ function initializeSchema(db: Database.Database): void {
     "wa_message_id TEXT",
     "wa_confirmed_at TEXT",
     "customer_phone TEXT",
+    "email_confirmed_at TEXT",
   ];
 
   for (const col of orderColumns) {

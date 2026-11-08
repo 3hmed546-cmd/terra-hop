@@ -440,7 +440,14 @@ export const adminActions = {
     return { ok: true, number: `TH-${Math.floor(100000 + Math.random() * 900000)}` };
   },
 
-  confirmOrderEmail: (orderId: string): ActionResult => ({ ok: true }),
+  confirmOrderEmail: (orderId: string): ActionResult => {
+    apiFetch("/api/admin/orders", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderId, status: "AWAITING_APPROVAL" }),
+    }).then(() => reloadAdminData()).catch(() => {});
+    return { ok: true };
+  },
   expireOrder: (orderId: string): ActionResult => ({ ok: true }),
   resetDemo: (): ActionResult => ({ ok: true }),
   checkoutWebsiteOrder: (input: any) => ({ ok: true as const, order: null }),

@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
       promoCode: o.promo_code,
       totalCents: o.total_cents,
       createdAt: o.created_at,
-      emailConfirmedAt: null,
+      emailConfirmedAt: o.email_confirmed_at ?? null,
       waConfirmedAt: o.wa_confirmed_at ?? null,
       soldAt: o.sold_at ?? null,
       cancelledAt: o.cancelled_at ?? null,

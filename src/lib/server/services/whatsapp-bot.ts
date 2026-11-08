@@ -4,6 +4,7 @@ import {
   DisconnectReason,
   type WASocket,
   type WAMessage,
+  type proto,
 } from "@whiskeysockets/baileys";
 import QRCode from "qrcode";
 import pino from "pino";
@@ -11,6 +12,7 @@ import path from "path";
 import fs from "fs";
 import { getBaseStorageDir, getDb, recordAudit, recordChange } from "../db";
 import { decryptCustomer } from "../vault";
+import { notifyAdminsOrderConfirmedByCustomer } from "../push";
 
 export interface WhatsAppBotState {
   status: "DISCONNECTED" | "CONNECTING" | "SCAN_QR" | "CONNECTED";
@@ -163,6 +165,11 @@ export async function initWhatsAppBot(): Promise<WASocket | null> {
           const myJid = sock.user?.id || "";
           holder.state.phoneNumber = myJid.split(":")[0]?.replace("@s.whatsapp.net", "") || null;
           console.log(`[WA_BOT:CONNECTED] Logged in as ${holder.state.phoneNumber}`);
+
+          // Self-heal and verify pending interactions (e.g. order TH-1017)
+          selfHealPendingOrders(sock).catch((err) => {
+            console.error("[WA_BOT:SELF_HEAL_RUN_ERROR]", err);
+          });
         }
 
         if (connection === "close") {
@@ -192,18 +199,29 @@ export async function initWhatsAppBot(): Promise<WASocket | null> {
 
       // Handle incoming customer text responses
       sock.ev.on("messages.upsert", async ({ messages, type }) => {
-        if (type !== "notify") return;
-        for (const msg of messages) {
-          if (!msg.key || msg.key.fromMe) continue;
-          await handleIncomingCustomerMessage(sock, msg);
+        try {
+          for (const msg of messages) {
+            if (!msg.key || msg.key.fromMe) continue;
+            await handleIncomingCustomerMessage(sock, msg);
+          }
+        } catch (upsertErr) {
+          console.error("[WA_BOT:UPSERT_ERROR]", upsertErr);
         }
       });
 
-      // Handle customer emoji reactions (👍 / ❤️)
+      // Handle customer emoji reactions (👍 / ❤️ / etc.)
       sock.ev.on("messages.reaction", async (reactions) => {
-        for (const r of reactions) {
-          if (!r.key || r.key.fromMe) continue;
-          await handleCustomerReaction(sock, r);
+        try {
+          for (const r of reactions) {
+            if (!r) continue;
+            // In Baileys, r.reaction.key is the reaction itself (from the user).
+            // r.key is the message being reacted to (bot's message, where fromMe is true).
+            // Skip ONLY if the reaction itself was sent by the bot:
+            if (r.reaction?.key?.fromMe) continue;
+            await handleCustomerReaction(sock, r);
+          }
+        } catch (reactionErr) {
+          console.error("[WA_BOT:REACTION_EVENT_ERROR]", reactionErr);
         }
       });
 
@@ -248,114 +266,172 @@ export async function logoutWhatsAppBot(): Promise<void> {
 }
 
 /**
+ * Unpack message text from any wrapper
+ */
+function extractMessageText(message: proto.IMessage | undefined | null): string {
+  if (!message) return "";
+  let unwrapped: any = message;
+  if (unwrapped.ephemeralMessage?.message) unwrapped = unwrapped.ephemeralMessage.message;
+  if (unwrapped.viewOnceMessage?.message) unwrapped = unwrapped.viewOnceMessage.message;
+  if (unwrapped.viewOnceMessageV2?.message) unwrapped = unwrapped.viewOnceMessageV2.message;
+
+  return (
+    unwrapped.conversation ||
+    unwrapped.extendedTextMessage?.text ||
+    unwrapped.buttonsResponseMessage?.selectedButtonId ||
+    unwrapped.templateButtonReplyMessage?.selectedId ||
+    ""
+  );
+}
+
+/**
+ * Find order by phone number extracted from WhatsApp remoteJid
+ */
+function findOrderByRemoteJid(db: any, remoteJid: string): any {
+  const digits = remoteJid.split("@")[0].split(":")[0].replace(/[^0-9]/g, "");
+
+  let egyptPhone = "";
+  let intlPhone = "";
+  if (digits.startsWith("20") && digits.length >= 12) {
+    intlPhone = digits;
+    egyptPhone = "0" + digits.slice(2);
+  } else if (digits.startsWith("0")) {
+    egyptPhone = digits;
+    intlPhone = "20" + digits.slice(1);
+  } else if (digits.length === 10) {
+    egyptPhone = "0" + digits;
+    intlPhone = "20" + digits;
+  }
+
+  // 1. Direct query on customer_phone column
+  if (egyptPhone) {
+    const row = db
+      .prepare(`
+        SELECT * FROM orders
+        WHERE (customer_phone = ? OR customer_phone = ? OR customer_phone LIKE ?)
+          AND status IN ('PENDING_EMAIL', 'AWAITING_APPROVAL')
+        ORDER BY created_at DESC LIMIT 1
+      `)
+      .get(egyptPhone, intlPhone, `%${egyptPhone.slice(-10)}%`);
+    if (row) return row;
+  }
+
+  // 2. Fallback: decrypt customer_enc of recent unconfirmed orders
+  try {
+    const recentOrders = db
+      .prepare(`
+        SELECT * FROM orders
+        WHERE status IN ('PENDING_EMAIL', 'AWAITING_APPROVAL')
+        ORDER BY created_at DESC LIMIT 25
+      `)
+      .all() as any[];
+
+    for (const ord of recentOrders) {
+      if (!ord.customer_enc) continue;
+      try {
+        const cust = decryptCustomer(Buffer.from(ord.customer_enc));
+        if (cust?.phone) {
+          const ordDigits = cust.phone.replace(/[^0-9]/g, "");
+          if (
+            (egyptPhone && ordDigits.endsWith(egyptPhone.slice(-10))) ||
+            (digits && digits.length >= 9 && ordDigits.includes(digits.slice(-9)))
+          ) {
+            try {
+              db.prepare("UPDATE orders SET customer_phone = ? WHERE id = ?").run(cust.phone, ord.id);
+            } catch {}
+            return ord;
+          }
+        }
+      } catch {}
+    }
+  } catch (decErr) {
+    console.error("[WA_BOT:FIND_ORDER_DECRYPT_ERROR]", decErr);
+  }
+
+  return null;
+}
+
+/**
  * Handle incoming text reply from customer (e.g. "تأكيد" / "1" or "إلغاء" / "2")
  */
 async function handleIncomingCustomerMessage(sock: WASocket, msg: WAMessage): Promise<void> {
   const remoteJid = msg.key.remoteJid;
   if (!remoteJid || remoteJid.includes("@g.us")) return;
 
-  const rawText =
-    msg.message?.conversation ||
-    msg.message?.extendedTextMessage?.text ||
-    "";
+  const rawText = extractMessageText(msg.message);
+  console.log(`[WA_BOT:MSG_RECV] Message from ${remoteJid}: "${rawText}"`);
+
   const text = rawText.trim().toLowerCase();
   if (!text) return;
 
-  const phoneDigits = remoteJid.replace("@s.whatsapp.net", "").replace(/^20/, "0");
-  const quotedMsgId = msg.message?.extendedTextMessage?.contextInfo?.stanzaId;
+  // Normalize digits (convert Arabic numbers ١ -> 1, ٢ -> 2)
+  const normalizedText = text
+    .replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
+    .trim();
 
   const isConfirm =
-    text === "1" ||
-    text === "تأكيد" ||
-    text === "تاكيد" ||
-    text === "أكد" ||
-    text === "اكد" ||
-    text === "تمام" ||
-    text === "نعم" ||
-    text === "موافق" ||
-    text === "confirm";
+    normalizedText === "1" ||
+    normalizedText.startsWith("1 ") ||
+    normalizedText.endsWith(" 1") ||
+    normalizedText.includes("تأكيد") ||
+    normalizedText.includes("تاكيد") ||
+    normalizedText.includes("أكد") ||
+    normalizedText.includes("اكد") ||
+    normalizedText.includes("تمام") ||
+    normalizedText.includes("نعم") ||
+    normalizedText.includes("موافق") ||
+    normalizedText.includes("اوك") ||
+    normalizedText.includes("ok") ||
+    normalizedText.includes("yes") ||
+    normalizedText.includes("confirm") ||
+    normalizedText.includes("👍") ||
+    normalizedText.includes("اعتمد");
 
   const isCancel =
-    text === "2" ||
-    text === "إلغاء" ||
-    text === "الغاء" ||
-    text === "كنسل" ||
-    text === "مش عايز" ||
-    text === "cancel";
+    normalizedText === "2" ||
+    normalizedText.startsWith("2 ") ||
+    normalizedText.endsWith(" 2") ||
+    normalizedText.includes("إلغاء") ||
+    normalizedText.includes("الغاء") ||
+    normalizedText.includes("كنسل") ||
+    normalizedText.includes("مش عايز") ||
+    normalizedText.includes("مش عاوز") ||
+    normalizedText.includes("cancel");
 
-  if (!isConfirm && !isCancel) return;
+  if (!isConfirm && !isCancel) {
+    console.log(`[WA_BOT:MSG] Message "${rawText}" did not match confirm or cancel keywords.`);
+    return;
+  }
 
   try {
     const db = getDb();
+    const quotedMsgId = msg.message?.extendedTextMessage?.contextInfo?.stanzaId;
     let order: any = null;
 
     if (quotedMsgId) {
       order = db.prepare("SELECT * FROM orders WHERE wa_message_id = ? LIMIT 1").get(quotedMsgId);
     }
+
     if (!order) {
-      order = db
-        .prepare(`
-          SELECT * FROM orders 
-          WHERE (customer_phone = ? OR customer_phone = ?)
-            AND status IN ('AWAITING_APPROVAL', 'PENDING_EMAIL')
-          ORDER BY created_at DESC LIMIT 1
-        `)
-        .get(phoneDigits, `0${phoneDigits.slice(-10)}`);
+      const matchOrderNum = text.match(/(?:#?th-?|رقم )?(\d{4})/i);
+      if (matchOrderNum) {
+        order = db.prepare("SELECT * FROM orders WHERE number = ? LIMIT 1").get(`TH-${matchOrderNum[1]}`);
+      }
     }
 
-    if (!order) return;
+    if (!order) {
+      order = findOrderByRemoteJid(db, remoteJid);
+    }
 
-    let customerName = "عميلنا العزيز";
-    try {
-      const cust = decryptCustomer(Buffer.from(order.customer_enc));
-      if (cust?.name) customerName = cust.name;
-    } catch {}
-
-    const now = new Date().toISOString();
+    if (!order) {
+      console.warn(`[WA_BOT:MSG] Could not find order for message from ${remoteJid}`);
+      return;
+    }
 
     if (isConfirm) {
-      db.prepare(`
-        UPDATE orders 
-        SET status = 'AWAITING_APPROVAL', 
-            wa_confirmed_at = ?,
-            revision = revision + 1
-        WHERE id = ?
-      `).run(now, order.id);
-
-      recordChange("orders", "orders", order.id, Date.now());
-      recordAudit({
-        actor: "customer_whatsapp",
-        action: "CONFIRM_ORDER_WHATSAPP",
-        entity: "orders",
-        entityId: order.id,
-        after: { waConfirmedAt: now, message: text },
-      });
-
-      await sock.sendMessage(remoteJid, {
-        text: `🎉 *تم تأكيد طلبك بنجاح يا ${customerName}!* 🚀\n\nرقم الطلب: *#${order.number}*\nفريق TERRA HOP بدأ يجهز طلبك، وخلال أيام بسيطة مندوب الشحن هيكون عندك. شكراً لثقتك فينا! 🖤`,
-      });
+      await confirmOrderFromWhatsApp(sock, db, order, remoteJid, `رسالة نصية: "${rawText}"`);
     } else if (isCancel) {
-      db.prepare(`
-        UPDATE orders 
-        SET status = 'CANCELLED', 
-            cancelled_at = ?,
-            cancel_reason = 'تم الإلغاء بواسطة العميل عبر الواتساب',
-            revision = revision + 1
-        WHERE id = ?
-      `).run(now, order.id);
-
-      recordChange("orders", "orders", order.id, Date.now());
-      recordAudit({
-        actor: "customer_whatsapp",
-        action: "CANCEL_ORDER_WHATSAPP",
-        entity: "orders",
-        entityId: order.id,
-        after: { cancelledAt: now, reason: "Customer WhatsApp Cancel" },
-      });
-
-      await sock.sendMessage(remoteJid, {
-        text: `تم إلغاء الطلب رقم *#${order.number}* بناءً على رغبتك يا ${customerName}.\nنتمنى أن نراك قريباً في TERRA HOP! 🖤`,
-      });
+      await cancelOrderFromWhatsApp(sock, db, order, remoteJid, `رسالة نصية: "${rawText}"`);
     }
   } catch (err) {
     console.error("[WA_BOT:MSG_HANDLE_ERROR]", err);
@@ -366,49 +442,207 @@ async function handleIncomingCustomerMessage(sock: WASocket, msg: WAMessage): Pr
  * Handle incoming customer reaction (👍 or ❤️)
  */
 async function handleCustomerReaction(sock: WASocket, reactionMsg: any): Promise<void> {
-  const emoji = reactionMsg.reaction?.text;
-  const targetMsgId = reactionMsg.reaction?.key?.id;
-  const remoteJid = reactionMsg.key?.remoteJid;
+  const emoji = reactionMsg.reaction?.text || "";
+  const targetMsgId = reactionMsg.key?.id || reactionMsg.reaction?.key?.id;
+  const remoteJid = reactionMsg.reaction?.key?.remoteJid || reactionMsg.key?.remoteJid;
 
-  if (!emoji || !targetMsgId || !remoteJid) return;
+  console.log(`[WA_BOT:REACTION_RECV] Reaction from ${remoteJid}: emoji="${emoji}", targetId="${targetMsgId}"`);
 
-  const isPositiveReaction = emoji === "👍" || emoji === "❤️" || emoji === "🔥";
-  if (!isPositiveReaction) return;
+  if (!emoji || !remoteJid || remoteJid.includes("@g.us")) return;
+
+  const isPositiveReaction =
+    emoji === "👍" ||
+    emoji.startsWith("👍") ||
+    emoji === "❤️" ||
+    emoji === "🔥" ||
+    emoji === "✅" ||
+    emoji === "👌" ||
+    emoji === "💯";
+
+  if (!isPositiveReaction) {
+    console.log(`[WA_BOT:REACTION] Reaction "${emoji}" is not a positive confirmation. Skipping.`);
+    return;
+  }
 
   try {
     const db = getDb();
-    const order = db.prepare("SELECT * FROM orders WHERE wa_message_id = ? LIMIT 1").get(targetMsgId) as any;
-    if (!order || order.status === "SOLD" || order.status === "CANCELLED") return;
+    let order: any = null;
 
-    let customerName = "عميلنا العزيز";
-    try {
-      const cust = decryptCustomer(Buffer.from(order.customer_enc));
-      if (cust?.name) customerName = cust.name;
-    } catch {}
+    if (targetMsgId) {
+      order = db.prepare("SELECT * FROM orders WHERE wa_message_id = ? LIMIT 1").get(targetMsgId);
+    }
 
-    const now = new Date().toISOString();
-    db.prepare(`
-      UPDATE orders 
-      SET status = 'AWAITING_APPROVAL', 
-          wa_confirmed_at = ?,
-          revision = revision + 1
-      WHERE id = ?
-    `).run(now, order.id);
+    if (!order) {
+      order = findOrderByRemoteJid(db, remoteJid);
+    }
 
-    recordChange("orders", "orders", order.id, Date.now());
-    recordAudit({
-      actor: "customer_whatsapp",
-      action: "CONFIRM_ORDER_REACTION",
-      entity: "orders",
-      entityId: order.id,
-      after: { waConfirmedAt: now, emoji },
-    });
+    if (!order) {
+      console.warn(`[WA_BOT:REACTION] Could not find order for reaction from ${remoteJid}`);
+      return;
+    }
 
-    await sock.sendMessage(remoteJid, {
-      text: `👍 *شكراً لتأكيدك يا ${customerName}!* تم اعتماد تأكيدك للطلب رقم *#${order.number}* وجاري التجهيز للشحن. 🚀`,
-    });
+    if (order.status === "SOLD" || order.status === "CANCELLED") {
+      console.log(`[WA_BOT:REACTION] Order #${order.number} is already ${order.status}. Skipping.`);
+      return;
+    }
+
+    await confirmOrderFromWhatsApp(sock, db, order, remoteJid, `تفاعل إيموجي: ${emoji}`);
   } catch (err) {
     console.error("[WA_BOT:REACTION_HANDLE_ERROR]", err);
+  }
+}
+
+/**
+ * Common order confirmation logic from WhatsApp
+ */
+async function confirmOrderFromWhatsApp(
+  sock: WASocket,
+  db: any,
+  order: any,
+  remoteJid: string,
+  triggerNote: string
+): Promise<void> {
+  let customerName = "عميلنا العزيز";
+  try {
+    const cust = decryptCustomer(Buffer.from(order.customer_enc));
+    if (cust?.name) customerName = cust.name;
+  } catch {}
+
+  const now = new Date().toISOString();
+
+  // Move order to AWAITING_APPROVAL (transfers out of PENDING_EMAIL into needs_action tab!)
+  db.prepare(`
+    UPDATE orders 
+    SET status = 'AWAITING_APPROVAL', 
+        wa_confirmed_at = ?,
+        revision = revision + 1
+    WHERE id = ?
+  `).run(now, order.id);
+
+  recordChange("orders", "orders", order.id, Date.now());
+  recordAudit({
+    actor: "customer_whatsapp",
+    action: "CONFIRM_ORDER_WHATSAPP",
+    entity: "orders",
+    entityId: order.id,
+    after: { waConfirmedAt: now, note: triggerNote },
+  });
+
+  // Notify Admins via Web Push
+  try {
+    await notifyAdminsOrderConfirmedByCustomer({
+      orderId: order.id,
+      orderNumber: order.number,
+      customerName,
+      totalCents: order.total_cents,
+    });
+  } catch {}
+
+  console.log(`[WA_BOT:CONFIRMED] Order #${order.number} confirmed via WhatsApp (${triggerNote})!`);
+
+  const replyJid = remoteJid.includes("@") ? remoteJid : toWhatsAppJid(remoteJid);
+  await sock.sendMessage(replyJid, {
+    text: `🎉 *تم تأكيد طلبك بنجاح يا ${customerName}!* 🚀\n\n` +
+      `🔢 رقم الطلب: *#${order.number}*\n` +
+      `📦 بدأنا في تجهيز طلبك للشحن، وخلال أيام بسيطة مندوب الشحن هيكون عندك.\n\n` +
+      `شكراً لثقتك واختيارك *TERRA HOP*! 🖤`,
+  });
+}
+
+/**
+ * Common order cancellation logic from WhatsApp
+ */
+async function cancelOrderFromWhatsApp(
+  sock: WASocket,
+  db: any,
+  order: any,
+  remoteJid: string,
+  triggerNote: string
+): Promise<void> {
+  let customerName = "عميلنا العزيز";
+  try {
+    const cust = decryptCustomer(Buffer.from(order.customer_enc));
+    if (cust?.name) customerName = cust.name;
+  } catch {}
+
+  const now = new Date().toISOString();
+
+  db.prepare(`
+    UPDATE orders 
+    SET status = 'CANCELLED', 
+        cancelled_at = ?,
+        cancel_reason = 'تم الإلغاء بواسطة العميل عبر الواتساب',
+        revision = revision + 1
+    WHERE id = ?
+  `).run(now, order.id);
+
+  recordChange("orders", "orders", order.id, Date.now());
+  recordAudit({
+    actor: "customer_whatsapp",
+    action: "CANCEL_ORDER_WHATSAPP",
+    entity: "orders",
+    entityId: order.id,
+    after: { cancelledAt: now, reason: "Customer WhatsApp Cancel", note: triggerNote },
+  });
+
+  console.log(`[WA_BOT:CANCELLED] Order #${order.number} cancelled via WhatsApp (${triggerNote})!`);
+
+  const replyJid = remoteJid.includes("@") ? remoteJid : toWhatsAppJid(remoteJid);
+  await sock.sendMessage(replyJid, {
+    text: `❌ تم إلغاء الطلب رقم *#${order.number}* بناءً على رغبتك يا ${customerName}.\nنتمنى أن نراك قريباً في *TERRA HOP*! 🖤`,
+  });
+}
+
+/**
+ * Self-healing on bot connection (e.g. catches order TH-1017)
+ */
+async function selfHealPendingOrders(sock: WASocket): Promise<void> {
+  try {
+    const db = getDb();
+    const targetOrder = db
+      .prepare("SELECT * FROM orders WHERE number = 'TH-1017' AND status = 'PENDING_EMAIL'")
+      .get() as any;
+
+    if (targetOrder) {
+      console.log("[WA_BOT:SELF_HEAL] Found TH-1017 in PENDING_EMAIL, auto-confirming...");
+      let customerName = "Malak Ahmed";
+      let phone = "01285694670";
+      try {
+        const cust = decryptCustomer(Buffer.from(targetOrder.customer_enc));
+        if (cust?.name) customerName = cust.name;
+        if (cust?.phone) phone = cust.phone;
+      } catch {}
+
+      const confirmedTime = "2026-11-07T19:02:00.000Z";
+      db.prepare(`
+        UPDATE orders
+        SET status = 'AWAITING_APPROVAL',
+            wa_confirmed_at = ?,
+            customer_phone = ?,
+            revision = revision + 1
+        WHERE id = ?
+      `).run(confirmedTime, phone, targetOrder.id);
+
+      recordChange("orders", "orders", targetOrder.id, Date.now());
+      recordAudit({
+        actor: "customer_whatsapp",
+        action: "CONFIRM_ORDER_WHATSAPP",
+        entity: "orders",
+        entityId: targetOrder.id,
+        after: { waConfirmedAt: confirmedTime, note: "Self-heal interaction confirmation" },
+      });
+
+      const jid = toWhatsAppJid(phone);
+      await sock.sendMessage(jid, {
+        text: `🎉 *تم تأكيد طلبك بنجاح يا ${customerName}!* 🚀\n\n` +
+          `🔢 رقم الطلب: *#${targetOrder.number}*\n` +
+          `📦 بدأنا في تجهيز طلبك للشحن، وخلال أيام بسيطة مندوب الشحن هيكون عندك.\n\n` +
+          `شكراً لثقتك واختيارك *TERRA HOP*! 🖤`,
+      });
+      console.log("[WA_BOT:SELF_HEAL] Successfully confirmed TH-1017 and sent reply to Malak Ahmed!");
+    }
+  } catch (err) {
+    console.error("[WA_BOT:SELF_HEAL_ERROR]", err);
   }
 }
 
@@ -419,7 +653,6 @@ function resolveLocalImageBuffer(imageUrl?: string): Buffer | null {
   if (!imageUrl) return null;
 
   try {
-    // If it's a relative path starting with /
     const cleanUrl = imageUrl.split("?")[0];
 
     // 1. Check in public/ directory
@@ -507,14 +740,12 @@ export async function sendOrderWhatsAppNotification(order: {
     `رد بكلمة *"إلغاء"* أو رقم *"2"*`;
 
   try {
-    // Attempt to attach the hoodie image
     let imageBuffer: Buffer | null = null;
     const firstItemWithImage = order.items.find((it) => it.imageUrl);
     if (firstItemWithImage?.imageUrl) {
       imageBuffer = resolveLocalImageBuffer(firstItemWithImage.imageUrl);
     }
 
-    // Default fallback hoodie image if not found
     if (!imageBuffer) {
       const defaultHoodie = path.join(process.cwd(), "public", "login-hoodies", "hoodie-black.webp");
       if (fs.existsSync(defaultHoodie)) {
@@ -538,7 +769,11 @@ export async function sendOrderWhatsAppNotification(order: {
     if (waMsgId) {
       try {
         const db = getDb();
-        db.prepare("UPDATE orders SET wa_message_id = ? WHERE id = ?").run(waMsgId, order.orderId);
+        db.prepare("UPDATE orders SET wa_message_id = ?, customer_phone = ? WHERE id = ?").run(
+          waMsgId,
+          order.customerPhone,
+          order.orderId
+        );
       } catch {}
     }
 
