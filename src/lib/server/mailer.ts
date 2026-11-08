@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import nodemailer from "nodemailer";
 import { getDb } from "./db";
 
 const DEFAULT_SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL || process.env.GMAIL_USER || "terr3hop@gmail.com";
@@ -38,8 +39,50 @@ export function getBrevoConfig(): {
 }
 
 /**
- * Send email via Brevo REST API over HTTPS Port 443.
- * Completely immune to cloud firewall / SMTP port blocking.
+ * Fallback to Gmail SMTP via Nodemailer if Brevo fails or is unconfigured.
+ */
+async function sendGmailFallback({
+  to,
+  subject,
+  html,
+  recipientName,
+}: {
+  to: string;
+  subject: string;
+  html: string;
+  recipientName?: string;
+}): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+  const user = process.env.GMAIL_USER || "terr3hop@gmail.com";
+  const pass = process.env.GMAIL_APP_PASSWORD;
+
+  if (!user || !pass) {
+    console.warn("[GMAIL_FALLBACK:SKIPPED] GMAIL_USER or GMAIL_APP_PASSWORD not set.");
+    return { ok: false, error: "GMAIL_USER or GMAIL_APP_PASSWORD is not configured." };
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: { user, pass },
+    });
+
+    const info = await transporter.sendMail({
+      from: `"TERRA HOP" <${user}>`,
+      to: recipientName ? `"${recipientName}" <${to}>` : to,
+      subject,
+      html,
+    });
+
+    console.log(`[GMAIL_FALLBACK:SUCCESS] Sent email to ${to} via Gmail SMTP. MessageId: ${info.messageId}`);
+    return { ok: true, messageId: info.messageId };
+  } catch (err: any) {
+    console.error(`[GMAIL_FALLBACK:ERROR] Failed to send email via Gmail SMTP:`, err);
+    return { ok: false, error: err?.message || "Failed to send email via Gmail" };
+  }
+}
+
+/**
+ * Send email via Brevo REST API over HTTPS Port 443 with automatic Gmail fallback.
  */
 export async function sendBrevoEmail({
   to,
@@ -55,9 +98,8 @@ export async function sendBrevoEmail({
   const config = getBrevoConfig();
 
   if (!config.apiKey) {
-    const msg = "لم يتم إدخال مفتاح Brevo API Key بعد. يرجى إضافة المفتاح في لوحة التحكم لتفعيل إرسال الإيميلات للعملاء.";
-    console.warn(`[BREVO:WAITING_KEY] ${msg}`);
-    return { ok: false, error: msg };
+    console.warn(`[BREVO:WAITING_KEY] No Brevo API Key found. Falling back to Gmail SMTP...`);
+    return sendGmailFallback({ to, subject, html, recipientName });
   }
 
   try {
@@ -92,10 +134,14 @@ export async function sendBrevoEmail({
     }
 
     const errDesc = data?.message || `Brevo API error (${res.status})`;
-    console.error(`[BREVO:ERROR] Failed to send email to ${to}:`, errDesc);
+    console.warn(`[BREVO:FAILED] ${errDesc}. Falling back to Gmail SMTP...`);
+    const fallbackRes = await sendGmailFallback({ to, subject, html, recipientName });
+    if (fallbackRes.ok) return fallbackRes;
     return { ok: false, error: errDesc };
   } catch (err: any) {
-    console.error(`[BREVO:NETWORK_ERROR] Network request failed to Brevo API:`, err);
+    console.warn(`[BREVO:NETWORK_ERROR] ${err?.message}. Falling back to Gmail SMTP...`);
+    const fallbackRes = await sendGmailFallback({ to, subject, html, recipientName });
+    if (fallbackRes.ok) return fallbackRes;
     return { ok: false, error: err?.message || "فشل الاتصال بخدمة Brevo." };
   }
 }

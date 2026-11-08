@@ -798,45 +798,6 @@ function resolveLocalImageBuffer(imageUrl?: string): Buffer | null {
   return null;
 }
 
-// Outgoing Message FIFO Queue to pace messages and prevent Meta rate limiting on high load
-type QueuedWaTask = () => Promise<void>;
-const waSendQueue: QueuedWaTask[] = [];
-let isQueueProcessing = false;
-
-async function processWaQueue(): Promise<void> {
-  if (isQueueProcessing) return;
-  isQueueProcessing = true;
-
-  while (waSendQueue.length > 0) {
-    const task = waSendQueue.shift();
-    if (task) {
-      try {
-        await task();
-      } catch (err) {
-        console.error("[WA_BOT:QUEUE_TASK_ERROR]", err);
-      }
-      // 1200ms pause between outgoing messages under load
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-    }
-  }
-
-  isQueueProcessing = false;
-}
-
-export function enqueueWhatsAppMessage(task: QueuedWaTask): Promise<void> {
-  return new Promise((resolve, reject) => {
-    waSendQueue.push(async () => {
-      try {
-        await task();
-        resolve();
-      } catch (e) {
-        reject(e);
-      }
-    });
-    processWaQueue().catch(() => {});
-  });
-}
-
 /**
  * Send Automated Order Confirmation WhatsApp message with Hoodie Image
  */
@@ -863,91 +824,97 @@ export async function sendOrderWhatsAppNotification(order: {
     return false;
   }
 
-  return new Promise<boolean>((resolve) => {
-    enqueueWhatsAppMessage(async () => {
-      try {
-        const sock = await initWhatsAppBot();
-        if (!sock || getHolder().state.status !== "CONNECTED") {
-          console.warn("[WA_BOT] WhatsApp bot is not connected. Skipping message.");
-          resolve(false);
-          return;
-        }
+  try {
+    let sock = await initWhatsAppBot();
+    let holder = getHolder();
 
-        const jid = toWhatsAppJid(order.customerPhone);
-        const totalEgp = Math.round(order.totalCents / 100);
+    // If socket is booting/reconnecting, wait up to 8 seconds for the open connection
+    let waitCount = 0;
+    while ((!sock || holder.state.status !== "CONNECTED") && waitCount < 16) {
+      await new Promise((r) => setTimeout(r, 500));
+      sock = holder.sock || (await initWhatsAppBot());
+      holder = getHolder();
+      waitCount++;
+    }
 
-        const itemsText = order.items
-          .map(
-            (it, idx) =>
-              `  ${idx + 1}. *${it.productName}* (${it.colorName || "اللون الأصلي"} - مقاس *${it.size || "Free"}*) × ${it.qty}`
-          )
-          .join("\n");
+    if (!sock || holder.state.status !== "CONNECTED") {
+      console.warn(`[WA_BOT:SKIPPED] WhatsApp bot is not connected (current status: ${holder.state.status}). Skipping order #${order.orderNumber}`);
+      return false;
+    }
 
-        const messageText =
-          `🛍️ *طلب جديد من TERRA HOP*\n\n` +
-          `أهلاً يا *${order.customerName}* 👋\n` +
-          `شكراً لطلبك من TERRA HOP! طلبك اتسجّل عندنا بنجاح.\n\n` +
-          `📦 *تفاصيل طلبك:*\n` +
-          `🧥 *المنتجات:*\n${itemsText}\n` +
-          `🔢 *رقم الطلب:* #${order.orderNumber}\n` +
-          `💰 *المبلغ المطلوب:* ${totalEgp} ج.م (الدفع عند الاستلام)\n` +
-          (order.city || order.address ? `📍 *عنوان التوصيل:* ${[order.city, order.address].filter(Boolean).join(" - ")}\n` : "") +
-          (order.notes ? `📝 *ملاحظاتك:* ${order.notes}\n` : "") +
-          `\n-----------------------------------\n` +
-          `💬 *لتأكيد الأوردر:*\n` +
-          `اضغط تفاعل لايك (👍) على الرسالة دي، أو رد بكلمة *"تأكيد"* أو رقم *"1"*\n\n` +
-          `❌ *لإلغاء الأوردر:*\n` +
-          `رد بكلمة *"إلغاء"* أو رقم *"2"*`;
+    const jid = toWhatsAppJid(order.customerPhone);
+    const totalEgp = Math.round(order.totalCents / 100);
 
-        let imageBuffer: Buffer | null = null;
-        const firstItemWithImage = order.items.find((it) => it.imageUrl);
-        if (firstItemWithImage?.imageUrl) {
-          imageBuffer = resolveLocalImageBuffer(firstItemWithImage.imageUrl);
-        }
+    const itemsText = order.items
+      .map(
+        (it, idx) =>
+          `  ${idx + 1}. *${it.productName}* (${it.colorName || "اللون الأصلي"} - مقاس *${it.size || "Free"}*) × ${it.qty}`
+      )
+      .join("\n");
 
-        if (!imageBuffer) {
-          const defaultHoodie = path.join(process.cwd(), "public", "login-hoodies", "hoodie-black.webp");
-          if (fs.existsSync(defaultHoodie)) {
-            imageBuffer = fs.readFileSync(defaultHoodie);
-          }
-        }
+    const messageText =
+      `🛍️ *طلب جديد من TERRA HOP*\n\n` +
+      `أهلاً يا *${order.customerName}* 👋\n` +
+      `شكراً لطلبك من TERRA HOP! طلبك اتسجّل عندنا بنجاح.\n\n` +
+      `📦 *تفاصيل طلبك:*\n` +
+      `🧥 *المنتجات:*\n${itemsText}\n` +
+      `🔢 *رقم الطلب:* #${order.orderNumber}\n` +
+      `💰 *المبلغ المطلوب:* ${totalEgp} ج.م (الدفع عند الاستلام)\n` +
+      (order.city || order.address ? `📍 *عنوان التوصيل:* ${[order.city, order.address].filter(Boolean).join(" - ")}\n` : "") +
+      (order.notes ? `📝 *ملاحظاتك:* ${order.notes}\n` : "") +
+      `\n-----------------------------------\n` +
+      `💬 *لتأكيد الأوردر:*\n` +
+      `اضغط تفاعل لايك (👍) على الرسالة دي، أو رد بكلمة *"تأكيد"* أو رقم *"1"*\n\n` +
+      `❌ *لإلغاء الأوردر:*\n` +
+      `رد بكلمة *"إلغاء"* أو رقم *"2"*`;
 
-        let sentMsg: any = null;
-        if (imageBuffer) {
-          sentMsg = await sock.sendMessage(jid, {
-            image: imageBuffer,
-            caption: messageText,
-          });
-        } else {
-          sentMsg = await sock.sendMessage(jid, {
-            text: messageText,
-          });
-        }
+    let imageBuffer: Buffer | null = null;
+    const firstItemWithImage = order.items.find((it) => it.imageUrl);
+    if (firstItemWithImage?.imageUrl) {
+      imageBuffer = resolveLocalImageBuffer(firstItemWithImage.imageUrl);
+    }
 
-        const waMsgId = sentMsg?.key?.id;
-        let lidToSave: string | null = null;
-        try {
-          const lidResult = await (sock as any).signalRepository?.lidMapping?.getLIDForPN(jid);
-          if (lidResult) {
-            lidToSave = lidResult.split("@")[0].split(":")[0];
-          }
-        } catch {}
-
-        try {
-          const db = getDb();
-          db.prepare(`
-            UPDATE orders 
-            SET wa_message_id = ?, customer_phone = ?, wa_lid = COALESCE(?, wa_lid)
-            WHERE id = ?
-          `).run(waMsgId, order.customerPhone, lidToSave, order.orderId);
-        } catch {}
-
-        console.log(`[WA_BOT:SENT] Sent order confirmation to ${order.customerPhone} (Order #${order.orderNumber})`);
-        resolve(true);
-      } catch (err) {
-        console.error(`[WA_BOT:SEND_FAILED] Could not send to ${order.customerPhone}:`, err);
-        resolve(false);
+    if (!imageBuffer) {
+      const defaultHoodie = path.join(process.cwd(), "public", "login-hoodies", "hoodie-black.webp");
+      if (fs.existsSync(defaultHoodie)) {
+        imageBuffer = fs.readFileSync(defaultHoodie);
       }
-    });
-  });
+    }
+
+    let sentMsg: any = null;
+    if (imageBuffer) {
+      sentMsg = await sock.sendMessage(jid, {
+        image: imageBuffer,
+        caption: messageText,
+      });
+    } else {
+      sentMsg = await sock.sendMessage(jid, {
+        text: messageText,
+      });
+    }
+
+    const waMsgId = sentMsg?.key?.id;
+    let lidToSave: string | null = null;
+    try {
+      const lidResult = await (sock as any).signalRepository?.lidMapping?.getLIDForPN(jid);
+      if (lidResult) {
+        lidToSave = lidResult.split("@")[0].split(":")[0];
+      }
+    } catch {}
+
+    try {
+      const db = getDb();
+      db.prepare(`
+        UPDATE orders 
+        SET wa_message_id = ?, customer_phone = ?, wa_lid = COALESCE(?, wa_lid)
+        WHERE id = ?
+      `).run(waMsgId, order.customerPhone, lidToSave, order.orderId);
+    } catch {}
+
+    console.log(`[WA_BOT:SENT] Sent order confirmation to ${order.customerPhone} (Order #${order.orderNumber})`);
+    return true;
+  } catch (err) {
+    console.error(`[WA_BOT:SEND_FAILED] Could not send to ${order.customerPhone}:`, err);
+    return false;
+  }
 }

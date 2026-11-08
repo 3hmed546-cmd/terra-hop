@@ -493,48 +493,57 @@ export async function POST(request: NextRequest) {
     console.error("[PushNotification] Failed to notify admins:", err);
   });
 
-  // Send Order Invoice & Confirmation Email to customer in background
-  sendOrderInvoiceEmail({
-    id: orderId,
-    number: orderNumber,
-    createdAt: now,
-    customer: {
-      name,
-      phone,
-      email,
-      city,
-      address,
-    },
-    items: verifiedItems.map((it) => ({
-      name: it.productName,
-      color: it.colorName,
-      size: it.size,
-      qty: it.qty,
-      priceCents: it.priceCents,
-      imageUrl: it.imageUrl,
-    })),
-    subtotalCents,
-    shippingCents,
-    discountCents,
-    totalCents,
-  }).catch((err) => {
-    console.error("[Mailer] Failed to send order invoice email:", err);
-  });
+  // Dispatch customer Email and WhatsApp confirmation notifications in parallel and wait for delivery
+  await Promise.allSettled([
+    sendOrderInvoiceEmail({
+      id: orderId,
+      number: orderNumber,
+      createdAt: now,
+      customer: {
+        name,
+        phone,
+        email,
+        city,
+        address,
+      },
+      items: verifiedItems.map((it) => ({
+        name: it.productName,
+        color: it.colorName,
+        size: it.size,
+        qty: it.qty,
+        priceCents: it.priceCents,
+        imageUrl: it.imageUrl,
+      })),
+      subtotalCents,
+      shippingCents,
+      discountCents,
+      totalCents,
+    })
+      .then((ok) => {
+        console.log(`[Checkout:Email] Order #${orderNumber} invoice email sent: ${ok}`);
+      })
+      .catch((err) => {
+        console.error(`[Checkout:Email] Error sending invoice email for Order #${orderNumber}:`, err);
+      }),
 
-  // Send Automated WhatsApp Message with Hoodie Image & interactive confirmation
-  sendOrderWhatsAppNotification({
-    orderId,
-    orderNumber,
-    customerName: name,
-    customerPhone: phone,
-    city: city || undefined,
-    address: address || undefined,
-    notes: notes || null,
-    totalCents,
-    items: verifiedItems,
-  }).catch((err) => {
-    console.error("[WhatsAppBot] Failed to send order notification:", err);
-  });
+    sendOrderWhatsAppNotification({
+      orderId,
+      orderNumber,
+      customerName: name,
+      customerPhone: phone,
+      city: city || undefined,
+      address: address || undefined,
+      notes: notes || null,
+      totalCents,
+      items: verifiedItems,
+    })
+      .then((ok) => {
+        console.log(`[Checkout:WhatsApp] Order #${orderNumber} notification sent: ${ok}`);
+      })
+      .catch((err) => {
+        console.error(`[Checkout:WhatsApp] Error sending WhatsApp notification for Order #${orderNumber}:`, err);
+      }),
+  ]);
 
   // Check if ambassador reached their max uses goal
   if (referralCodeId) {
