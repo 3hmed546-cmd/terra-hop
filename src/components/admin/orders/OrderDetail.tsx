@@ -149,17 +149,10 @@ export function OrderDetail({ orderId }: { orderId: string }) {
     refocus.current = true;
   };
 
-  const simulate = (kind: "confirm" | "expire") => {
-    const result = kind === "confirm" ? actions.confirmOrderEmail(order.id) : actions.expireOrder(order.id);
-    toast.push(
-      result.ok
-        ? kind === "confirm"
-          ? S.previewBox.confirmed(order.number)
-          : S.previewBox.expired(order.number)
-        : ADMIN_STRINGS.errors[result.error],
-    );
+  const handleManualConfirm = () => {
+    actions.confirmOrderEmail(order.id);
+    toast.push(`تم اعتماد وتأكيد الطلب #${order.number} ونقله إلى يتطلب قراراً.`);
     refocus.current = true;
-    setDialog(null);
   };
 
   const itemColumns: Column<OrderItem>[] = [
@@ -298,7 +291,7 @@ export function OrderDetail({ orderId }: { orderId: string }) {
               <div className="adm-decision">
                 <Button
                   style={{ backgroundColor: "#0284c7", color: "#ffffff" }}
-                  onClick={() => simulate("confirm")}
+                  onClick={handleManualConfirm}
                 >
                   اعتماد وتأكيد الطلب يدوياً (نقل إلى يتطلب قراراً)
                 </Button>
@@ -363,7 +356,6 @@ export function OrderDetail({ orderId }: { orderId: string }) {
                 <Button variant="secondary" disabled={resending} onClick={() => handleResendEmail(order.id)}>
                   {resending ? "جاري الإرسال…" : "إعادة إرسال إيميل الفاتورة والتأكيد"}
                 </Button>
-                <Button variant="secondary" onClick={() => simulate("confirm")}>{S.previewBox.confirm}</Button>
               </div>
             </section>
           ) : null}

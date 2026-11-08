@@ -436,10 +436,6 @@ export const adminActions = {
     }
   },
 
-  simulateOrder: (kind: string): { ok: true; number: string } | { ok: false; error: ErrorCode } => {
-    return { ok: true, number: `TH-${Math.floor(100000 + Math.random() * 900000)}` };
-  },
-
   confirmOrderEmail: (orderId: string): ActionResult => {
     apiFetch("/api/admin/orders", {
       method: "PATCH",

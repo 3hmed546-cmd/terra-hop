@@ -23,7 +23,7 @@ import {
 } from "@/lib/server/idempotency";
 import type Database from "better-sqlite3";
 
-const CHECKOUT_RATE_OPTIONS = { prefix: "store_checkout", max: 5, windowMs: 10 * 60 * 1000 };
+const CHECKOUT_RATE_OPTIONS = { prefix: "store_checkout", max: 30, windowMs: 10 * 60 * 1000 };
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 // نص خام نظيف: إزالة الحروف الخفية وقص الطول فقط لمنع التشويه

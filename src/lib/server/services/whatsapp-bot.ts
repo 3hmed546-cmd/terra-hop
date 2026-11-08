@@ -197,11 +197,23 @@ export async function initWhatsAppBot(): Promise<WASocket | null> {
         }
       });
 
-      // Handle incoming customer text responses
+      // Handle incoming customer text responses & upsert-level reactions
       sock.ev.on("messages.upsert", async ({ messages, type }) => {
         try {
           for (const msg of messages) {
-            if (!msg.key || msg.key.fromMe) continue;
+            if (!msg.key) continue;
+            // Handle reactions delivered directly inside messages.upsert
+            if (msg.message?.reactionMessage) {
+              await handleCustomerReaction(sock, {
+                key: msg.message.reactionMessage.key,
+                reaction: {
+                  text: msg.message.reactionMessage.text,
+                  key: msg.key,
+                },
+              });
+              continue;
+            }
+            if (msg.key.fromMe) continue;
             await handleIncomingCustomerMessage(sock, msg);
           }
         } catch (upsertErr) {
@@ -214,9 +226,7 @@ export async function initWhatsAppBot(): Promise<WASocket | null> {
         try {
           for (const r of reactions) {
             if (!r) continue;
-            // In Baileys, r.reaction.key is the reaction itself (from the user).
-            // r.key is the message being reacted to (bot's message, where fromMe is true).
-            // Skip ONLY if the reaction itself was sent by the bot:
+            // Skip only if the reaction was initiated by the bot itself
             if (r.reaction?.key?.fromMe) continue;
             await handleCustomerReaction(sock, r);
           }
@@ -274,36 +284,76 @@ function extractMessageText(message: proto.IMessage | undefined | null): string 
   if (unwrapped.ephemeralMessage?.message) unwrapped = unwrapped.ephemeralMessage.message;
   if (unwrapped.viewOnceMessage?.message) unwrapped = unwrapped.viewOnceMessage.message;
   if (unwrapped.viewOnceMessageV2?.message) unwrapped = unwrapped.viewOnceMessageV2.message;
+  if (unwrapped.documentWithCaptionMessage?.message) unwrapped = unwrapped.documentWithCaptionMessage.message;
 
   return (
     unwrapped.conversation ||
     unwrapped.extendedTextMessage?.text ||
     unwrapped.buttonsResponseMessage?.selectedButtonId ||
     unwrapped.templateButtonReplyMessage?.selectedId ||
+    unwrapped.reactionMessage?.text ||
     ""
   );
 }
 
 /**
- * Find order by phone number extracted from WhatsApp remoteJid
+ * Find order by phone number or WhatsApp LID extracted from WhatsApp remoteJid
  */
-function findOrderByRemoteJid(db: any, remoteJid: string): any {
-  const digits = remoteJid.split("@")[0].split(":")[0].replace(/[^0-9]/g, "");
+async function findOrderByRemoteJid(db: any, remoteJid: string, sock?: WASocket | null): Promise<any> {
+  const isLid = remoteJid.includes("@lid");
+  const rawId = remoteJid.split("@")[0].split(":")[0];
+  const digits = rawId.replace(/[^0-9]/g, "");
 
-  let egyptPhone = "";
-  let intlPhone = "";
-  if (digits.startsWith("20") && digits.length >= 12) {
-    intlPhone = digits;
-    egyptPhone = "0" + digits.slice(2);
-  } else if (digits.startsWith("0")) {
-    egyptPhone = digits;
-    intlPhone = "20" + digits.slice(1);
-  } else if (digits.length === 10) {
-    egyptPhone = "0" + digits;
-    intlPhone = "20" + digits;
+  // 1. If LID, try matching wa_lid directly in orders
+  if (isLid && rawId) {
+    const rowByLid = db
+      .prepare(`
+        SELECT * FROM orders
+        WHERE (wa_lid = ? OR wa_lid = ?)
+          AND status IN ('PENDING_EMAIL', 'AWAITING_APPROVAL')
+        ORDER BY created_at DESC LIMIT 1
+      `)
+      .get(rawId, digits);
+    if (rowByLid) return rowByLid;
   }
 
-  // 1. Direct query on customer_phone column
+  // 2. If LID and sock has signalRepository, resolve to phone number
+  let egyptPhone = "";
+  let intlPhone = "";
+
+  if (isLid && sock) {
+    try {
+      const pn = await (sock as any).signalRepository?.lidMapping?.getPNForLID(remoteJid);
+      if (pn) {
+        const pnDigits = pn.split("@")[0].split(":")[0].replace(/[^0-9]/g, "");
+        if (pnDigits.startsWith("20") && pnDigits.length >= 12) {
+          intlPhone = pnDigits;
+          egyptPhone = "0" + pnDigits.slice(2);
+        } else if (pnDigits.startsWith("0")) {
+          egyptPhone = pnDigits;
+          intlPhone = "20" + pnDigits.slice(1);
+        } else if (pnDigits.length === 10) {
+          egyptPhone = "0" + pnDigits;
+          intlPhone = "20" + pnDigits;
+        }
+      }
+    } catch {}
+  }
+
+  if (!egyptPhone && !isLid) {
+    if (digits.startsWith("20") && digits.length >= 12) {
+      intlPhone = digits;
+      egyptPhone = "0" + digits.slice(2);
+    } else if (digits.startsWith("0")) {
+      egyptPhone = digits;
+      intlPhone = "20" + digits.slice(1);
+    } else if (digits.length === 10) {
+      egyptPhone = "0" + digits;
+      intlPhone = "20" + digits;
+    }
+  }
+
+  // 3. Direct query on customer_phone column
   if (egyptPhone) {
     const row = db
       .prepare(`
@@ -313,10 +363,17 @@ function findOrderByRemoteJid(db: any, remoteJid: string): any {
         ORDER BY created_at DESC LIMIT 1
       `)
       .get(egyptPhone, intlPhone, `%${egyptPhone.slice(-10)}%`);
-    if (row) return row;
+    if (row) {
+      if (isLid && rawId) {
+        try {
+          db.prepare("UPDATE orders SET wa_lid = ? WHERE id = ?").run(rawId, row.id);
+        } catch {}
+      }
+      return row;
+    }
   }
 
-  // 2. Fallback: decrypt customer_enc of recent unconfirmed orders
+  // 4. Fallback: decrypt customer_enc of recent unconfirmed orders
   try {
     const recentOrders = db
       .prepare(`
@@ -334,10 +391,14 @@ function findOrderByRemoteJid(db: any, remoteJid: string): any {
           const ordDigits = cust.phone.replace(/[^0-9]/g, "");
           if (
             (egyptPhone && ordDigits.endsWith(egyptPhone.slice(-10))) ||
-            (digits && digits.length >= 9 && ordDigits.includes(digits.slice(-9)))
+            (!isLid && digits && digits.length >= 9 && ordDigits.includes(digits.slice(-9)))
           ) {
             try {
-              db.prepare("UPDATE orders SET customer_phone = ? WHERE id = ?").run(cust.phone, ord.id);
+              db.prepare("UPDATE orders SET customer_phone = ?, wa_lid = COALESCE(wa_lid, ?) WHERE id = ?").run(
+                cust.phone,
+                isLid ? rawId : null,
+                ord.id
+              );
             } catch {}
             return ord;
           }
@@ -347,6 +408,27 @@ function findOrderByRemoteJid(db: any, remoteJid: string): any {
   } catch (decErr) {
     console.error("[WA_BOT:FIND_ORDER_DECRYPT_ERROR]", decErr);
   }
+
+  // 5. Fallback: If only 1 order is waiting confirmation from WhatsApp in the last 24 hours:
+  try {
+    const pendingOrders = db
+      .prepare(`
+        SELECT * FROM orders
+        WHERE status = 'PENDING_EMAIL' AND wa_message_id IS NOT NULL
+        ORDER BY created_at DESC LIMIT 5
+      `)
+      .all() as any[];
+
+    if (pendingOrders.length === 1) {
+      const singlePending = pendingOrders[0];
+      if (isLid && rawId) {
+        try {
+          db.prepare("UPDATE orders SET wa_lid = ? WHERE id = ?").run(rawId, singlePending.id);
+        } catch {}
+      }
+      return singlePending;
+    }
+  } catch {}
 
   return null;
 }
@@ -420,7 +502,7 @@ async function handleIncomingCustomerMessage(sock: WASocket, msg: WAMessage): Pr
     }
 
     if (!order) {
-      order = findOrderByRemoteJid(db, remoteJid);
+      order = await findOrderByRemoteJid(db, remoteJid, sock);
     }
 
     if (!order) {
@@ -472,8 +554,8 @@ async function handleCustomerReaction(sock: WASocket, reactionMsg: any): Promise
       order = db.prepare("SELECT * FROM orders WHERE wa_message_id = ? LIMIT 1").get(targetMsgId);
     }
 
-    if (!order) {
-      order = findOrderByRemoteJid(db, remoteJid);
+    if (!order && remoteJid) {
+      order = await findOrderByRemoteJid(db, remoteJid, sock);
     }
 
     if (!order) {
@@ -716,6 +798,45 @@ function resolveLocalImageBuffer(imageUrl?: string): Buffer | null {
   return null;
 }
 
+// Outgoing Message FIFO Queue to pace messages and prevent Meta rate limiting on high load
+type QueuedWaTask = () => Promise<void>;
+const waSendQueue: QueuedWaTask[] = [];
+let isQueueProcessing = false;
+
+async function processWaQueue(): Promise<void> {
+  if (isQueueProcessing) return;
+  isQueueProcessing = true;
+
+  while (waSendQueue.length > 0) {
+    const task = waSendQueue.shift();
+    if (task) {
+      try {
+        await task();
+      } catch (err) {
+        console.error("[WA_BOT:QUEUE_TASK_ERROR]", err);
+      }
+      // 1200ms pause between outgoing messages under load
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+    }
+  }
+
+  isQueueProcessing = false;
+}
+
+export function enqueueWhatsAppMessage(task: QueuedWaTask): Promise<void> {
+  return new Promise((resolve, reject) => {
+    waSendQueue.push(async () => {
+      try {
+        await task();
+        resolve();
+      } catch (e) {
+        reject(e);
+      }
+    });
+    processWaQueue().catch(() => {});
+  });
+}
+
 /**
  * Send Automated Order Confirmation WhatsApp message with Hoodie Image
  */
@@ -742,80 +863,91 @@ export async function sendOrderWhatsAppNotification(order: {
     return false;
   }
 
-  const sock = await initWhatsAppBot();
-  if (!sock || getHolder().state.status !== "CONNECTED") {
-    console.warn("[WA_BOT] WhatsApp bot is not connected. Skipping message.");
-    return false;
-  }
-
-  const jid = toWhatsAppJid(order.customerPhone);
-  const totalEgp = Math.round(order.totalCents / 100);
-
-  const itemsText = order.items
-    .map(
-      (it, idx) =>
-        `  ${idx + 1}. *${it.productName}* (${it.colorName || "اللون الأصلي"} - مقاس *${it.size || "Free"}*) × ${it.qty}`
-    )
-    .join("\n");
-
-  const messageText =
-    `🛍️ *طلب جديد من TERRA HOP*\n\n` +
-    `أهلاً يا *${order.customerName}* 👋\n` +
-    `شكراً لطلبك من TERRA HOP! طلبك اتسجّل عندنا بنجاح.\n\n` +
-    `📦 *تفاصيل طلبك:*\n` +
-    `🧥 *المنتجات:*\n${itemsText}\n` +
-    `🔢 *رقم الطلب:* #${order.orderNumber}\n` +
-    `💰 *المبلغ المطلوب:* ${totalEgp} ج.م (الدفع عند الاستلام)\n` +
-    (order.city || order.address ? `📍 *عنوان التوصيل:* ${[order.city, order.address].filter(Boolean).join(" - ")}\n` : "") +
-    (order.notes ? `📝 *ملاحظاتك:* ${order.notes}\n` : "") +
-    `\n-----------------------------------\n` +
-    `💬 *لتأكيد الأوردر:*\n` +
-    `اضغط تفاعل لايك (👍) على الرسالة دي، أو رد بكلمة *"تأكيد"* أو رقم *"1"*\n\n` +
-    `❌ *لإلغاء الأوردر:*\n` +
-    `رد بكلمة *"إلغاء"* أو رقم *"2"*`;
-
-  try {
-    let imageBuffer: Buffer | null = null;
-    const firstItemWithImage = order.items.find((it) => it.imageUrl);
-    if (firstItemWithImage?.imageUrl) {
-      imageBuffer = resolveLocalImageBuffer(firstItemWithImage.imageUrl);
-    }
-
-    if (!imageBuffer) {
-      const defaultHoodie = path.join(process.cwd(), "public", "login-hoodies", "hoodie-black.webp");
-      if (fs.existsSync(defaultHoodie)) {
-        imageBuffer = fs.readFileSync(defaultHoodie);
-      }
-    }
-
-    let sentMsg: any = null;
-    if (imageBuffer) {
-      sentMsg = await sock.sendMessage(jid, {
-        image: imageBuffer,
-        caption: messageText,
-      });
-    } else {
-      sentMsg = await sock.sendMessage(jid, {
-        text: messageText,
-      });
-    }
-
-    const waMsgId = sentMsg?.key?.id;
-    if (waMsgId) {
+  return new Promise<boolean>((resolve) => {
+    enqueueWhatsAppMessage(async () => {
       try {
-        const db = getDb();
-        db.prepare("UPDATE orders SET wa_message_id = ?, customer_phone = ? WHERE id = ?").run(
-          waMsgId,
-          order.customerPhone,
-          order.orderId
-        );
-      } catch {}
-    }
+        const sock = await initWhatsAppBot();
+        if (!sock || getHolder().state.status !== "CONNECTED") {
+          console.warn("[WA_BOT] WhatsApp bot is not connected. Skipping message.");
+          resolve(false);
+          return;
+        }
 
-    console.log(`[WA_BOT:SENT] Sent order confirmation to ${order.customerPhone} (Order #${order.orderNumber})`);
-    return true;
-  } catch (err) {
-    console.error(`[WA_BOT:SEND_FAILED] Could not send to ${order.customerPhone}:`, err);
-    return false;
-  }
+        const jid = toWhatsAppJid(order.customerPhone);
+        const totalEgp = Math.round(order.totalCents / 100);
+
+        const itemsText = order.items
+          .map(
+            (it, idx) =>
+              `  ${idx + 1}. *${it.productName}* (${it.colorName || "اللون الأصلي"} - مقاس *${it.size || "Free"}*) × ${it.qty}`
+          )
+          .join("\n");
+
+        const messageText =
+          `🛍️ *طلب جديد من TERRA HOP*\n\n` +
+          `أهلاً يا *${order.customerName}* 👋\n` +
+          `شكراً لطلبك من TERRA HOP! طلبك اتسجّل عندنا بنجاح.\n\n` +
+          `📦 *تفاصيل طلبك:*\n` +
+          `🧥 *المنتجات:*\n${itemsText}\n` +
+          `🔢 *رقم الطلب:* #${order.orderNumber}\n` +
+          `💰 *المبلغ المطلوب:* ${totalEgp} ج.م (الدفع عند الاستلام)\n` +
+          (order.city || order.address ? `📍 *عنوان التوصيل:* ${[order.city, order.address].filter(Boolean).join(" - ")}\n` : "") +
+          (order.notes ? `📝 *ملاحظاتك:* ${order.notes}\n` : "") +
+          `\n-----------------------------------\n` +
+          `💬 *لتأكيد الأوردر:*\n` +
+          `اضغط تفاعل لايك (👍) على الرسالة دي، أو رد بكلمة *"تأكيد"* أو رقم *"1"*\n\n` +
+          `❌ *لإلغاء الأوردر:*\n` +
+          `رد بكلمة *"إلغاء"* أو رقم *"2"*`;
+
+        let imageBuffer: Buffer | null = null;
+        const firstItemWithImage = order.items.find((it) => it.imageUrl);
+        if (firstItemWithImage?.imageUrl) {
+          imageBuffer = resolveLocalImageBuffer(firstItemWithImage.imageUrl);
+        }
+
+        if (!imageBuffer) {
+          const defaultHoodie = path.join(process.cwd(), "public", "login-hoodies", "hoodie-black.webp");
+          if (fs.existsSync(defaultHoodie)) {
+            imageBuffer = fs.readFileSync(defaultHoodie);
+          }
+        }
+
+        let sentMsg: any = null;
+        if (imageBuffer) {
+          sentMsg = await sock.sendMessage(jid, {
+            image: imageBuffer,
+            caption: messageText,
+          });
+        } else {
+          sentMsg = await sock.sendMessage(jid, {
+            text: messageText,
+          });
+        }
+
+        const waMsgId = sentMsg?.key?.id;
+        let lidToSave: string | null = null;
+        try {
+          const lidResult = await (sock as any).signalRepository?.lidMapping?.getLIDForPN(jid);
+          if (lidResult) {
+            lidToSave = lidResult.split("@")[0].split(":")[0];
+          }
+        } catch {}
+
+        try {
+          const db = getDb();
+          db.prepare(`
+            UPDATE orders 
+            SET wa_message_id = ?, customer_phone = ?, wa_lid = COALESCE(?, wa_lid)
+            WHERE id = ?
+          `).run(waMsgId, order.customerPhone, lidToSave, order.orderId);
+        } catch {}
+
+        console.log(`[WA_BOT:SENT] Sent order confirmation to ${order.customerPhone} (Order #${order.orderNumber})`);
+        resolve(true);
+      } catch (err) {
+        console.error(`[WA_BOT:SEND_FAILED] Could not send to ${order.customerPhone}:`, err);
+        resolve(false);
+      }
+    });
+  });
 }

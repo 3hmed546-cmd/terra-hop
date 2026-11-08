@@ -11,7 +11,6 @@ import {
   ORDER_TABS,
   queryOrders,
   type OrderTab,
-  type SimulatedKind,
 } from "@/lib/admin/orders";
 import { adminHref } from "@/lib/admin/paths";
 import { useAdminStore } from "@/lib/admin/store";
@@ -79,31 +78,10 @@ export function OrdersList() {
     [orders, tab, debouncedSearch],
   );
 
-  const simulate = (kind: SimulatedKind) => {
-    const result = actions.simulateOrder(kind);
-    if (!result.ok) {
-      toast.push(ADMIN_STRINGS.errors[result.error]);
-      return;
-    }
-    setSearch("");
-    setTab(kind === "awaiting" ? "needs_action" : "pending_email");
-    toast.push(kind === "awaiting" ? S.preview.createdAwaiting(result.number) : S.preview.createdPending(result.number));
-  };
-
   const header = (
     <PageHeader
       title={ADMIN_STRINGS.pages.orders.title}
       description={ADMIN_STRINGS.pages.orders.summary}
-      actions={
-        <div className="adm-row" role="group" aria-label={S.preview.legend}>
-          <Button variant="secondary" onClick={() => simulate("awaiting")}>
-            {S.preview.awaiting}
-          </Button>
-          <Button variant="secondary" onClick={() => simulate("pending")}>
-            {S.preview.pending}
-          </Button>
-        </div>
-      }
     />
   );
 
@@ -165,7 +143,6 @@ export function OrdersList() {
   return (
     <>
       {header}
-      <p className="adm-muted adm-small">{S.preview.note}</p>
 
       <div className="adm-toolbar adm-toolbar-single">
         <TextInput

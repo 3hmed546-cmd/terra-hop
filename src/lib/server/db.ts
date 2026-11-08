@@ -565,6 +565,7 @@ function initializeSchema(db: Database.Database): void {
     "code_discount_percent_applied INTEGER",
     "code_discount_cents INTEGER",
     "wa_message_id TEXT",
+    "wa_lid TEXT",
     "wa_confirmed_at TEXT",
     "customer_phone TEXT",
     "email_confirmed_at TEXT",
