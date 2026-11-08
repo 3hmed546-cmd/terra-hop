@@ -104,13 +104,17 @@ async function ConfirmContent({ searchParams }: ConfirmPageProps) {
       after: { note: `تأكيد رغبة الشراء عبر البريد الإلكتروني للطلب ${order.number}` },
     });
 
-    // Notify Admins via Web Push
+    // Notify Admins via Web Push (only once!)
     notifyAdminsOrderConfirmedByCustomer({
       orderId: order.id,
       orderNumber: order.number,
       customerName,
       totalCents: order.total_cents,
     }).catch(() => {});
+  } else {
+    try {
+      db.prepare(`UPDATE orders SET email_confirmed_at = COALESCE(email_confirmed_at, ?) WHERE id = ?`).run(now, order.id);
+    } catch {}
   }
 
   const totalFormatted = Math.round((order.total_cents || 0) / 100);
@@ -155,8 +159,17 @@ async function ConfirmContent({ searchParams }: ConfirmPageProps) {
           </div>
 
           <p className="text-[#a3a3a3] text-sm sm:text-base leading-relaxed mb-7 max-w-md mx-auto">
-            شكراً لك يا <strong className="text-white font-semibold">{customerName}</strong>. تم تسجيل تأكيد رغبتك في شراء الطلب بنجاح.
-            يقوم فريق عمل <strong className="text-white">TERRA HOP</strong> الآن بمراجعة طلبك وتجهيزه للشحن، وسيتواصل معك مندوب شركة التوصيل قريباً.
+            {isFirstConfirmation ? (
+              <>
+                شكراً لك يا <strong className="text-white font-semibold">{customerName}</strong>. تم تسجيل تأكيد رغبتك في شراء الطلب بنجاح.
+                يقوم فريق عمل <strong className="text-white">TERRA HOP</strong> الآن بمراجعة طلبك وتجهيزه للشحن، وسيتواصل معك مندوب شركة التوصيل قريباً.
+              </>
+            ) : (
+              <>
+                أهلاً بك يا <strong className="text-white font-semibold">{customerName}</strong> 👋.
+                هذا الطلب تم تأكيده بالفعل وجاري تجهيزه للشحن حالياً! يقوم فريق عمل <strong className="text-white">TERRA HOP</strong> بمتابعته وسيتواصل معك مندوب شركة التوصيل قريباً.
+              </>
+            )}
           </p>
 
           {/* Info Box */}

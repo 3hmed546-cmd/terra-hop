@@ -508,15 +508,41 @@ async function confirmOrderFromWhatsApp(
     if (cust?.name) customerName = cust.name;
   } catch {}
 
+  const replyJid = remoteJid.includes("@") ? remoteJid : toWhatsAppJid(remoteJid);
   const now = new Date().toISOString();
 
-  // Move order to AWAITING_APPROVAL (transfers out of PENDING_EMAIL into needs_action tab!)
+  // If order was ALREADY confirmed (e.g. from Email or previously on WhatsApp)
+  const isAlreadyConfirmed = order.status !== "PENDING_EMAIL";
+
+  if (isAlreadyConfirmed) {
+    // Only update wa_confirmed_at if not set yet, without changing order state or duplicating
+    try {
+      db.prepare(`
+        UPDATE orders 
+        SET wa_confirmed_at = COALESCE(wa_confirmed_at, ?),
+            revision = revision + 1
+        WHERE id = ?
+      `).run(now, order.id);
+      recordChange("orders", "orders", order.id, Date.now());
+    } catch {}
+
+    console.log(`[WA_BOT:ALREADY_CONFIRMED] Order #${order.number} was already confirmed. Sending status reply.`);
+
+    await sock.sendMessage(replyJid, {
+      text: `أهلاً يا *${customerName}* 👋\n\n` +
+        `طلبك رقم *#${order.number}* تم تأكيده بالفعل وجاري تجهيزه للشحن حالياً! 🚀\n` +
+        `فريق *TERRA HOP* شغال عليه وهيوصلك في أقرب وقت. 🖤`,
+    });
+    return;
+  }
+
+  // First time confirmation: Move order from PENDING_EMAIL to AWAITING_APPROVAL
   db.prepare(`
     UPDATE orders 
     SET status = 'AWAITING_APPROVAL', 
         wa_confirmed_at = ?,
         revision = revision + 1
-    WHERE id = ?
+    WHERE id = ? AND status = 'PENDING_EMAIL'
   `).run(now, order.id);
 
   recordChange("orders", "orders", order.id, Date.now());
@@ -528,7 +554,7 @@ async function confirmOrderFromWhatsApp(
     after: { waConfirmedAt: now, note: triggerNote },
   });
 
-  // Notify Admins via Web Push
+  // Notify Admins via Web Push (only once!)
   try {
     await notifyAdminsOrderConfirmedByCustomer({
       orderId: order.id,
@@ -540,7 +566,6 @@ async function confirmOrderFromWhatsApp(
 
   console.log(`[WA_BOT:CONFIRMED] Order #${order.number} confirmed via WhatsApp (${triggerNote})!`);
 
-  const replyJid = remoteJid.includes("@") ? remoteJid : toWhatsAppJid(remoteJid);
   await sock.sendMessage(replyJid, {
     text: `🎉 *تم تأكيد طلبك بنجاح يا ${customerName}!* 🚀\n\n` +
       `🔢 رقم الطلب: *#${order.number}*\n` +
@@ -565,6 +590,17 @@ async function cancelOrderFromWhatsApp(
     if (cust?.name) customerName = cust.name;
   } catch {}
 
+  const replyJid = remoteJid.includes("@") ? remoteJid : toWhatsAppJid(remoteJid);
+
+  if (order.status === "PROCESSING" || order.status === "SOLD") {
+    await sock.sendMessage(replyJid, {
+      text: `أهلاً يا *${customerName}* 👋\n\n` +
+        `طلبك رقم *#${order.number}* قيد الشحن والتسليم بالفعل. 🚚\n` +
+        `لأي استفسار أو تعديل، يمكنك التواصل مباشرة مع خدمة العملاء. 🖤`,
+    });
+    return;
+  }
+
   const now = new Date().toISOString();
 
   db.prepare(`
@@ -587,7 +623,6 @@ async function cancelOrderFromWhatsApp(
 
   console.log(`[WA_BOT:CANCELLED] Order #${order.number} cancelled via WhatsApp (${triggerNote})!`);
 
-  const replyJid = remoteJid.includes("@") ? remoteJid : toWhatsAppJid(remoteJid);
   await sock.sendMessage(replyJid, {
     text: `❌ تم إلغاء الطلب رقم *#${order.number}* بناءً على رغبتك يا ${customerName}.\nنتمنى أن نراك قريباً في *TERRA HOP*! 🖤`,
   });
