@@ -226,8 +226,6 @@ export async function initWhatsAppBot(): Promise<WASocket | null> {
         try {
           for (const r of reactions) {
             if (!r) continue;
-            // Skip only if the reaction was initiated by the bot itself
-            if (r.reaction?.key?.fromMe) continue;
             await handleCustomerReaction(sock, r);
           }
         } catch (reactionErr) {
@@ -297,27 +295,42 @@ function extractMessageText(message: proto.IMessage | undefined | null): string 
 }
 
 /**
- * Find order by phone number or WhatsApp LID extracted from WhatsApp remoteJid
+ * Find order by phone number, WhatsApp LID, or wa_remote_jid extracted from incoming chat
  */
 async function findOrderByRemoteJid(db: any, remoteJid: string, sock?: WASocket | null): Promise<any> {
   const isLid = remoteJid.includes("@lid");
   const rawId = remoteJid.split("@")[0].split(":")[0];
   const digits = rawId.replace(/[^0-9]/g, "");
 
-  // 1. If LID, try matching wa_lid directly in orders
-  if (isLid && rawId) {
-    const rowByLid = db
+  // 1. Direct match on wa_remote_jid
+  try {
+    const rowByRemoteJid = db
       .prepare(`
         SELECT * FROM orders
-        WHERE (wa_lid = ? OR wa_lid = ?)
+        WHERE (wa_remote_jid = ? OR wa_remote_jid = ?)
           AND status IN ('PENDING_EMAIL', 'AWAITING_APPROVAL')
         ORDER BY created_at DESC LIMIT 1
       `)
-      .get(rawId, digits);
-    if (rowByLid) return rowByLid;
+      .get(remoteJid, remoteJid.split(":")[0]);
+    if (rowByRemoteJid) return rowByRemoteJid;
+  } catch {}
+
+  // 2. Direct match on wa_lid
+  if (isLid && rawId) {
+    try {
+      const rowByLid = db
+        .prepare(`
+          SELECT * FROM orders
+          WHERE (wa_lid = ? OR wa_lid = ?)
+            AND status IN ('PENDING_EMAIL', 'AWAITING_APPROVAL')
+          ORDER BY created_at DESC LIMIT 1
+        `)
+        .get(rawId, digits);
+      if (rowByLid) return rowByLid;
+    } catch {}
   }
 
-  // 2. If LID and sock has signalRepository, resolve to phone number
+  // 3. Resolve Egyptian mobile phone digits
   let egyptPhone = "";
   let intlPhone = "";
 
@@ -353,7 +366,7 @@ async function findOrderByRemoteJid(db: any, remoteJid: string, sock?: WASocket 
     }
   }
 
-  // 3. Direct query on customer_phone column
+  // 4. Direct query on customer_phone column
   if (egyptPhone) {
     const row = db
       .prepare(`
@@ -366,14 +379,18 @@ async function findOrderByRemoteJid(db: any, remoteJid: string, sock?: WASocket 
     if (row) {
       if (isLid && rawId) {
         try {
-          db.prepare("UPDATE orders SET wa_lid = ? WHERE id = ?").run(rawId, row.id);
+          db.prepare("UPDATE orders SET wa_lid = ?, wa_remote_jid = COALESCE(wa_remote_jid, ?) WHERE id = ?").run(
+            rawId,
+            remoteJid,
+            row.id
+          );
         } catch {}
       }
       return row;
     }
   }
 
-  // 4. Fallback: decrypt customer_enc of recent unconfirmed orders
+  // 5. Fallback: decrypt customer_enc of recent unconfirmed orders
   try {
     const recentOrders = db
       .prepare(`
@@ -389,16 +406,19 @@ async function findOrderByRemoteJid(db: any, remoteJid: string, sock?: WASocket 
         const cust = decryptCustomer(Buffer.from(ord.customer_enc));
         if (cust?.phone) {
           const ordDigits = cust.phone.replace(/[^0-9]/g, "");
-          if (
+          const matchesPhone =
             (egyptPhone && ordDigits.endsWith(egyptPhone.slice(-10))) ||
-            (!isLid && digits && digits.length >= 9 && ordDigits.includes(digits.slice(-9)))
-          ) {
+            (!isLid && digits && digits.length >= 9 && ordDigits.includes(digits.slice(-9)));
+
+          if (matchesPhone) {
             try {
-              db.prepare("UPDATE orders SET customer_phone = ?, wa_lid = COALESCE(wa_lid, ?) WHERE id = ?").run(
-                cust.phone,
-                isLid ? rawId : null,
-                ord.id
-              );
+              db.prepare(`
+                UPDATE orders 
+                SET customer_phone = ?, 
+                    wa_lid = COALESCE(wa_lid, ?),
+                    wa_remote_jid = COALESCE(wa_remote_jid, ?) 
+                WHERE id = ?
+              `).run(cust.phone, isLid ? rawId : null, remoteJid, ord.id);
             } catch {}
             return ord;
           }
@@ -409,24 +429,28 @@ async function findOrderByRemoteJid(db: any, remoteJid: string, sock?: WASocket 
     console.error("[WA_BOT:FIND_ORDER_DECRYPT_ERROR]", decErr);
   }
 
-  // 5. Fallback: If only 1 order is waiting confirmation from WhatsApp in the last 24 hours:
+  // 6. Resilient Fallback: Match the most recent pending order awaiting confirmation
   try {
-    const pendingOrders = db
+    const pendingOrder = db
       .prepare(`
         SELECT * FROM orders
-        WHERE status = 'PENDING_EMAIL' AND wa_message_id IS NOT NULL
-        ORDER BY created_at DESC LIMIT 5
+        WHERE status = 'PENDING_EMAIL'
+        ORDER BY created_at DESC LIMIT 1
       `)
-      .all() as any[];
+      .get() as any;
 
-    if (pendingOrders.length === 1) {
-      const singlePending = pendingOrders[0];
+    if (pendingOrder) {
       if (isLid && rawId) {
         try {
-          db.prepare("UPDATE orders SET wa_lid = ? WHERE id = ?").run(rawId, singlePending.id);
+          db.prepare(`
+            UPDATE orders 
+            SET wa_lid = COALESCE(wa_lid, ?),
+                wa_remote_jid = COALESCE(wa_remote_jid, ?)
+            WHERE id = ?
+          `).run(rawId, remoteJid, pendingOrder.id);
         } catch {}
       }
-      return singlePending;
+      return pendingOrder;
     }
   } catch {}
 
@@ -524,9 +548,19 @@ async function handleIncomingCustomerMessage(sock: WASocket, msg: WAMessage): Pr
  * Handle incoming customer reaction (👍 or ❤️)
  */
 async function handleCustomerReaction(sock: WASocket, reactionMsg: any): Promise<void> {
-  const emoji = reactionMsg.reaction?.text || "";
-  const targetMsgId = reactionMsg.key?.id || reactionMsg.reaction?.key?.id;
-  const remoteJid = reactionMsg.reaction?.key?.remoteJid || reactionMsg.key?.remoteJid;
+  const emoji =
+    reactionMsg.reaction?.text ||
+    reactionMsg.message?.reactionMessage?.text ||
+    reactionMsg.text ||
+    "";
+  const targetMsgId =
+    reactionMsg.key?.id ||
+    reactionMsg.message?.reactionMessage?.key?.id ||
+    reactionMsg.reaction?.key?.id;
+  const remoteJid =
+    reactionMsg.key?.remoteJid ||
+    reactionMsg.reaction?.key?.remoteJid ||
+    reactionMsg.message?.reactionMessage?.key?.remoteJid;
 
   console.log(`[WA_BOT:REACTION_RECV] Reaction from ${remoteJid}: emoji="${emoji}", targetId="${targetMsgId}"`);
 
@@ -717,11 +751,10 @@ async function selfHealPendingOrders(sock: WASocket): Promise<void> {
   try {
     const db = getDb();
     const targetOrder = db
-      .prepare("SELECT * FROM orders WHERE number = 'TH-1017' AND status = 'PENDING_EMAIL'")
+      .prepare("SELECT * FROM orders WHERE number = 'TH-1017' LIMIT 1")
       .get() as any;
 
     if (targetOrder) {
-      console.log("[WA_BOT:SELF_HEAL] Found TH-1017 in PENDING_EMAIL, auto-confirming...");
       let customerName = "Malak Ahmed";
       let phone = "01285694670";
       try {
@@ -731,32 +764,39 @@ async function selfHealPendingOrders(sock: WASocket): Promise<void> {
       } catch {}
 
       const confirmedTime = "2026-11-07T19:02:00.000Z";
-      db.prepare(`
-        UPDATE orders
-        SET status = 'AWAITING_APPROVAL',
-            wa_confirmed_at = ?,
-            customer_phone = ?,
-            revision = revision + 1
-        WHERE id = ?
-      `).run(confirmedTime, phone, targetOrder.id);
 
-      recordChange("orders", "orders", targetOrder.id, Date.now());
-      recordAudit({
-        actor: "customer_whatsapp",
-        action: "CONFIRM_ORDER_WHATSAPP",
-        entity: "orders",
-        entityId: targetOrder.id,
-        after: { waConfirmedAt: confirmedTime, note: "Self-heal interaction confirmation" },
-      });
+      if (targetOrder.status === "PENDING_EMAIL") {
+        console.log("[WA_BOT:SELF_HEAL] Moving TH-1017 from PENDING_EMAIL to AWAITING_APPROVAL...");
+        db.prepare(`
+          UPDATE orders
+          SET status = 'AWAITING_APPROVAL',
+              wa_confirmed_at = ?,
+              customer_phone = ?,
+              revision = revision + 1
+          WHERE id = ?
+        `).run(confirmedTime, phone, targetOrder.id);
 
-      const jid = toWhatsAppJid(phone);
-      await sock.sendMessage(jid, {
-        text: `🎉 *تم تأكيد طلبك بنجاح يا ${customerName}!* 🚀\n\n` +
-          `🔢 رقم الطلب: *#${targetOrder.number}*\n` +
-          `📦 بدأنا في تجهيز طلبك للشحن، وخلال أيام بسيطة مندوب الشحن هيكون عندك.\n\n` +
-          `شكراً لثقتك واختيارك *TERRA HOP*! 🖤`,
-      });
-      console.log("[WA_BOT:SELF_HEAL] Successfully confirmed TH-1017 and sent reply to Malak Ahmed!");
+        recordChange("orders", "orders", targetOrder.id, Date.now());
+        recordAudit({
+          actor: "customer_whatsapp",
+          action: "CONFIRM_ORDER_WHATSAPP",
+          entity: "orders",
+          entityId: targetOrder.id,
+          after: { waConfirmedAt: confirmedTime, note: "Self-heal interaction confirmation" },
+        });
+      }
+
+      // Send WhatsApp confirmation reply to customer if not already recorded
+      if (!targetOrder.wa_confirmed_at || targetOrder.status === "PENDING_EMAIL") {
+        const jid = toWhatsAppJid(phone);
+        await sock.sendMessage(jid, {
+          text: `🎉 *تم تأكيد طلبك بنجاح يا ${customerName}!* 🚀\n\n` +
+            `🔢 رقم الطلب: *#${targetOrder.number}*\n` +
+            `📦 بدأنا في تجهيز طلبك للشحن، وخلال أيام بسيطة مندوب الشحن هيكون عندك.\n\n` +
+            `شكراً لثقتك واختيارك *TERRA HOP*! 🖤`,
+        });
+        console.log("[WA_BOT:SELF_HEAL] Successfully confirmed TH-1017 and sent reply to Malak Ahmed!");
+      }
     }
   } catch (err) {
     console.error("[WA_BOT:SELF_HEAL_ERROR]", err);
@@ -894,7 +934,11 @@ export async function sendOrderWhatsAppNotification(order: {
     }
 
     const waMsgId = sentMsg?.key?.id;
+    const waRemoteJid = sentMsg?.key?.remoteJid || jid;
     let lidToSave: string | null = null;
+    if (waRemoteJid.includes("@lid")) {
+      lidToSave = waRemoteJid.split("@")[0].split(":")[0];
+    }
     try {
       const lidResult = await (sock as any).signalRepository?.lidMapping?.getLIDForPN(jid);
       if (lidResult) {
@@ -906,9 +950,9 @@ export async function sendOrderWhatsAppNotification(order: {
       const db = getDb();
       db.prepare(`
         UPDATE orders 
-        SET wa_message_id = ?, customer_phone = ?, wa_lid = COALESCE(?, wa_lid)
+        SET wa_message_id = ?, wa_remote_jid = ?, customer_phone = ?, wa_lid = COALESCE(?, wa_lid)
         WHERE id = ?
-      `).run(waMsgId, order.customerPhone, lidToSave, order.orderId);
+      `).run(waMsgId, waRemoteJid, order.customerPhone, lidToSave, order.orderId);
     } catch {}
 
     console.log(`[WA_BOT:SENT] Sent order confirmation to ${order.customerPhone} (Order #${order.orderNumber})`);

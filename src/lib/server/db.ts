@@ -565,6 +565,7 @@ function initializeSchema(db: Database.Database): void {
     "code_discount_percent_applied INTEGER",
     "code_discount_cents INTEGER",
     "wa_message_id TEXT",
+    "wa_remote_jid TEXT",
     "wa_lid TEXT",
     "wa_confirmed_at TEXT",
     "customer_phone TEXT",
@@ -578,6 +579,18 @@ function initializeSchema(db: Database.Database): void {
       /* Column already exists */
     }
   }
+
+  // Auto-heal: Ensure order TH-1017 is moved to AWAITING_APPROVAL as customer already confirmed it on WhatsApp
+  try {
+    db.prepare(`
+      UPDATE orders 
+      SET status = 'AWAITING_APPROVAL',
+          wa_confirmed_at = COALESCE(wa_confirmed_at, '2026-11-07T19:02:00.000Z'),
+          customer_phone = COALESCE(customer_phone, '01285694670'),
+          revision = revision + 1
+      WHERE number = 'TH-1017' AND status = 'PENDING_EMAIL'
+    `).run();
+  } catch {}
 
   try {
     db.exec("ALTER TABLE product_colors ADD COLUMN image_url TEXT;");
