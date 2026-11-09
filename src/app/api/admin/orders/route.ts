@@ -8,6 +8,11 @@ import { markOrderDeliveredAndPaid } from "@/lib/server/ambassadors/qualificatio
 import { notifyAdminsAmbassadorGoalReached } from "@/lib/server/push";
 import { decryptCode } from "@/lib/server/security";
 import { sendOrderAcceptedEmail, sendOrderRejectedEmail, sendOrderDeliveredThankYouEmail } from "@/lib/server/mailer";
+import {
+  sendOrderShippingWhatsAppNotification,
+  sendOrderDeliveredWhatsAppNotification,
+} from "@/lib/server/services/whatsapp-bot";
+import { saveConfirmedCustomer } from "@/lib/server/confirmed-customers";
 
 export async function GET(request: NextRequest) {
   const auth = requireAdmin(request);
@@ -164,6 +169,8 @@ export async function PATCH(request: NextRequest) {
       WHERE id = ?
     `).run(orderId);
 
+    const deliveryTimeframe = body.deliveryDays || "خلال 48 ساعة";
+
     // Send Order Accepted Email with estimated delivery days
     try {
       const cust = decryptCustomer(Buffer.from(order.customer_enc));
@@ -174,13 +181,37 @@ export async function PATCH(request: NextRequest) {
             customer: cust,
             totalCents: order.total_cents,
           },
-          body.deliveryDays || "خلال 48 ساعة"
+          deliveryTimeframe
         ).catch((err) => {
           console.error("[Mailer] Failed to send order accepted email:", err);
         });
       }
+
+      // Send Order Shipping WhatsApp Notification with delivery days
+      const orderItems = db
+        .prepare("SELECT * FROM order_items WHERE order_id = ?")
+        .all(orderId) as any[];
+
+      sendOrderShippingWhatsAppNotification({
+        orderId: order.id,
+        orderNumber: order.number,
+        customerName: cust?.name || "عميلنا العزيز",
+        customerPhone: order.customer_phone || cust?.phone || "",
+        deliveryDays: deliveryTimeframe,
+        city: cust?.city || "",
+        address: cust?.address || "",
+        totalCents: order.total_cents,
+        items: orderItems.map((it) => ({
+          productName: it.product_name,
+          colorName: it.color_name,
+          size: it.size,
+          qty: it.qty,
+        })),
+      }).catch((waErr) => {
+        console.error("[WhatsApp] Shipping notification failed:", waErr);
+      });
     } catch (e) {
-      console.error("[Mailer] Decrypt customer failed for accepted email:", e);
+      console.error("[Orders:Processing] Customer notification preparation failed:", e);
     }
   } else if (status === "SOLD") {
     // 2. Courier Completed Delivery: Authoritatively mark delivered & paid:
@@ -188,7 +219,14 @@ export async function PATCH(request: NextRequest) {
     // and credits ambassador with a confirmed qualified sale
     markOrderDeliveredAndPaid(db, orderId, auth.user!.email);
 
-    // Send Order Delivered & Thank You Email with VIP WhatsApp Community button
+    // Save customer to the encrypted confirmed_customers vault
+    try {
+      saveConfirmedCustomer(db, order);
+    } catch (custErr) {
+      console.error("[ConfirmedCustomers] Save failed:", custErr);
+    }
+
+    // Send Order Delivered & Thank You Email & WhatsApp notification
     try {
       const cust = decryptCustomer(Buffer.from(order.customer_enc));
       if (cust?.email) {
@@ -199,6 +237,14 @@ export async function PATCH(request: NextRequest) {
           console.error("[Mailer] Failed to send thank you email:", err);
         });
       }
+
+      sendOrderDeliveredWhatsAppNotification({
+        orderNumber: order.number,
+        customerName: cust?.name || "عميلنا العزيز",
+        customerPhone: order.customer_phone || cust?.phone || "",
+      }).catch((waErr) => {
+        console.error("[WhatsApp] Delivered thank-you notification failed:", waErr);
+      });
     } catch (e) {
       console.error("[Mailer] Decrypt customer failed for thank you email:", e);
     }

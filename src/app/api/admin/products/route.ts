@@ -212,6 +212,36 @@ export async function POST(request: NextRequest) {
     after: { prodId, slug, nameAr, priceCents },
   });
 
+  if (body.notifyConfirmedCustomers) {
+    try {
+      const { broadcastNewProductToConfirmedCustomers } = await import("@/lib/server/services/whatsapp-bot");
+      const colorsList = Array.isArray(body.colors) ? body.colors.map((c: any) => c.name).filter(Boolean) : [];
+      const sizesList = Array.isArray(body.sizes) ? body.sizes : ["S", "M", "L", "XL", "XXL"];
+      const firstImg = Array.isArray(body.colors)
+        ? body.colors.find((c: any) => c.image || c.imageUrl || c.image_url)?.image
+        : undefined;
+
+      broadcastNewProductToConfirmedCustomers({
+        product: {
+          id: prodId,
+          slug,
+          nameAr,
+          priceCents,
+          compareAtCents,
+          descriptionAr,
+          colors: colorsList,
+          sizes: sizesList,
+          imageUrl: firstImg,
+        },
+        customNote: typeof body.broadcastCustomNote === "string" ? body.broadcastCustomNote.trim() : undefined,
+      }).catch((broadcastErr) => {
+        console.error("[Products:BroadcastError]", broadcastErr);
+      });
+    } catch (e) {
+      console.error("[Products:BroadcastImportError]", e);
+    }
+  }
+
   return apiSuccess(
     { id: prodId, slug, nameAr, priceCents },
     { revision: 1, topic: "products", topicRevision: 1 }

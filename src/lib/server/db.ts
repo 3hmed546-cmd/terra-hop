@@ -547,6 +547,22 @@ function initializeSchema(db: Database.Database): void {
       last_used_at INTEGER
     );
     CREATE INDEX IF NOT EXISTS ix_admin_push_endpoint ON admin_push_subscriptions(endpoint);
+
+    CREATE TABLE IF NOT EXISTS confirmed_customers (
+      id TEXT PRIMARY KEY,
+      phone_hash TEXT UNIQUE NOT NULL,
+      customer_enc BLOB NOT NULL,
+      raw_phone_masked TEXT,
+      customer_name_preview TEXT,
+      orders_count INTEGER DEFAULT 1,
+      total_spent_cents INTEGER DEFAULT 0,
+      last_order_number TEXT,
+      last_order_at TEXT,
+      marketing_opt_in INTEGER DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_conf_cust_hash ON confirmed_customers(phone_hash);
   `);
 
   const orderColumns = [
@@ -590,6 +606,12 @@ function initializeSchema(db: Database.Database): void {
           revision = revision + 1
       WHERE number = 'TH-1017' AND status = 'PENDING_EMAIL'
     `).run();
+  } catch {}
+
+  // Auto-backfill confirmed customers from existing delivered / sold orders
+  try {
+    const { backfillExistingDeliveredCustomers } = require("./confirmed-customers");
+    backfillExistingDeliveredCustomers(db);
   } catch {}
 
   try {

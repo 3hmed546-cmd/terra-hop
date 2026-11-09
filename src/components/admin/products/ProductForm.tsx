@@ -55,6 +55,8 @@ function Editor({ initial, existing, isNew, tab, onTab, focusLogRef }: EditorPro
   const [restocking, setRestocking] = useState(false);
   const [focusSummary, setFocusSummary] = useState(0);
   const [pendingRemoval, setPendingRemoval] = useState<{ product: Product; status: FormStatus; affected: AffectedOrder[] } | null>(null);
+  const [notifyConfirmed, setNotifyConfirmed] = useState(false);
+  const [broadcastNote, setBroadcastNote] = useState("");
 
   const threshold = data?.settings.lowStockThreshold ?? 3;
   const takenSlugs = useMemo(
@@ -109,13 +111,20 @@ function Editor({ initial, existing, isNew, tab, onTab, focusLogRef }: EditorPro
   };
 
   const commitSave = async (product: Product, status: FormStatus) => {
-    const result = await actions.saveProduct(product);
+    const result = await actions.saveProduct(product, {
+      notifyConfirmedCustomers: isNew ? notifyConfirmed : false,
+      broadcastCustomNote: isNew && notifyConfirmed ? broadcastNote.trim() : undefined,
+    });
     if (!result.ok) {
       toast.push(ADMIN_STRINGS.errors[result.error]);
       return;
     }
     setSaved(true);
-    toast.push(status === "draft" ? F.savedDraft(product.name) : F.saved(product.name));
+    if (isNew && notifyConfirmed) {
+      toast.push(`تم حفظ المنتج ${product.name} وجاري إرسال إشعار الواتساب للعملاء المؤكدين! 🚀`);
+    } else {
+      toast.push(status === "draft" ? F.savedDraft(product.name) : F.saved(product.name));
+    }
     router.push(adminHref("/products"));
   };
 
@@ -229,6 +238,35 @@ function Editor({ initial, existing, isNew, tab, onTab, focusLogRef }: EditorPro
             onChange={(look) => setDetails({ look })}
           />
         </Section>
+
+        {isNew ? (
+          <Section id="broadcast" title="إشعار العملاء المؤكدين عبر الواتساب (VIP Broadcast) 💬">
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
+                <input
+                  type="checkbox"
+                  checked={notifyConfirmed}
+                  onChange={(e) => setNotifyConfirmed(e.target.checked)}
+                  style={{ width: 18, height: 18, cursor: "pointer" }}
+                />
+                <span>إرسال رسالة حب وتقدير مع تفاصيل هذا المنتج الجديد لجميع العملاء المؤكدين في الخزنة تلقائياً 🚀</span>
+              </label>
+              {notifyConfirmed ? (
+                <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 8 }}>
+                  <TextInput
+                    label="ملاحظة أو عرض خاص بالمنتج (اختياري)"
+                    placeholder="مثال: الحق اطلب قبل نهاية الاسبوع واستمتع بعرض الشحن 9 جنية فقط لكل الجمهورية"
+                    value={broadcastNote}
+                    onChange={(e) => setBroadcastNote(e.target.value)}
+                  />
+                  <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>
+                    💡 سيتم إرسال صورة المنتج، الاسم، السعر، الألوان، المقاسات، ورابط الطلب المباشر مع رسالة حب وتقدير على المعاملة السابقة لجميع عملائك الذين استلموا طلبات سابقة.
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          </Section>
+        ) : null}
 
         <div className="adm-form-actions">
           <Link className="adm-btn adm-btn-ghost" href={adminHref("/products")}>{F.actions.cancel}</Link>

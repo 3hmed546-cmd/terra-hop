@@ -5,6 +5,8 @@ import { decryptCustomer } from "@/lib/server/vault";
 import { apiSuccess, apiError } from "@/lib/server/api-envelope";
 import { markOrderDeliveredAndPaid } from "@/lib/server/ambassadors/qualification";
 import { sendOrderDeliveredThankYouEmail } from "@/lib/server/mailer";
+import { sendOrderDeliveredWhatsAppNotification } from "@/lib/server/services/whatsapp-bot";
+import { saveConfirmedCustomer } from "@/lib/server/confirmed-customers";
 
 export async function POST(
   request: NextRequest,
@@ -31,9 +33,18 @@ export async function POST(
       body.courierReference
     );
 
-    // Send Order Delivered & Thank You Email with VIP WhatsApp Community button
+    // Save customer to the encrypted confirmed_customers vault
+    const order = db.prepare("SELECT * FROM orders WHERE id = ?").get(result.orderId) as any;
+    if (order) {
+      try {
+        saveConfirmedCustomer(db, order);
+      } catch (custErr) {
+        console.error("[ConfirmedCustomers:mark-delivered] Save failed:", custErr);
+      }
+    }
+
+    // Send Order Delivered & Thank You Email & WhatsApp message
     try {
-      const order = db.prepare("SELECT * FROM orders WHERE id = ?").get(result.orderId) as any;
       if (order?.customer_enc) {
         const cust = decryptCustomer(Buffer.from(order.customer_enc));
         if (cust?.email) {
@@ -44,6 +55,14 @@ export async function POST(
             console.error("[Mailer] Failed to send thank you email on delivered-paid:", err);
           });
         }
+
+        sendOrderDeliveredWhatsAppNotification({
+          orderNumber: order.number,
+          customerName: cust?.name || "عميلنا العزيز",
+          customerPhone: order.customer_phone || cust?.phone || "",
+        }).catch((waErr) => {
+          console.error("[WhatsApp] Delivered thank-you notification failed:", waErr);
+        });
       }
     } catch (e) {
       console.error("[Mailer] Customer decrypt failed for thank you email on delivered-paid:", e);

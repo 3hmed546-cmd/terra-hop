@@ -328,7 +328,10 @@ export const adminActions = {
     }
   },
 
-  saveProduct: async (product: Product): Promise<ActionResult> => {
+  saveProduct: async (
+    product: Product,
+    broadcastOptions?: { notifyConfirmedCustomers?: boolean; broadcastCustomNote?: string }
+  ): Promise<ActionResult> => {
     const current = getSnapshot();
     if (!current) return { ok: false, error: "NO_CHANGE" };
 
@@ -348,6 +351,8 @@ export const adminActions = {
       colors: product.colors,
       variants: product.variants,
       images: product.images,
+      notifyConfirmedCustomers: broadcastOptions?.notifyConfirmedCustomers,
+      broadcastCustomNote: broadcastOptions?.broadcastCustomNote,
     };
 
     try {

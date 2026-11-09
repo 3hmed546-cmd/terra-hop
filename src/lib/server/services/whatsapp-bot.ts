@@ -962,3 +962,219 @@ export async function sendOrderWhatsAppNotification(order: {
     return false;
   }
 }
+
+/**
+ * Send Order Shipping WhatsApp Notification when Admin confirms order & sets delivery timeframe
+ */
+export async function sendOrderShippingWhatsAppNotification(opts: {
+  orderId: string;
+  orderNumber: string;
+  customerName: string;
+  customerPhone: string;
+  deliveryDays?: string;
+  city?: string;
+  address?: string;
+  totalCents: number;
+  items: Array<{
+    productName: string;
+    colorName?: string;
+    size?: string;
+    qty: number;
+  }>;
+}): Promise<boolean> {
+  if (!isWhatsAppAutoSendEnabled()) return false;
+
+  try {
+    let sock = await initWhatsAppBot();
+    let holder = getHolder();
+
+    let waitCount = 0;
+    while ((!sock || holder.state.status !== "CONNECTED") && waitCount < 16) {
+      await new Promise((r) => setTimeout(r, 500));
+      sock = holder.sock || (await initWhatsAppBot());
+      holder = getHolder();
+      waitCount++;
+    }
+
+    if (!sock || holder.state.status !== "CONNECTED") {
+      console.warn(`[WA_BOT:SHIPPING_SKIPPED] Bot not connected. Skipping #${opts.orderNumber}`);
+      return false;
+    }
+
+    const jid = toWhatsAppJid(opts.customerPhone);
+    const totalEgp = Math.round(opts.totalCents / 100);
+    const daysText = opts.deliveryDays || "خلال 48 ساعة";
+
+    const itemsText = opts.items
+      .map(
+        (it, idx) =>
+          `  ${idx + 1}. *${it.productName}* (${it.colorName || "اللون الأصلي"} - مقاس *${it.size || "Free"}*) × ${it.qty}`
+      )
+      .join("\n");
+
+    const messageText =
+      `🚚 *طلبك قيد الشحن الآن من TERRA HOP!* 🖤\n\n` +
+      `أهلاً يا *${opts.customerName}* 👋\n` +
+      `تم مراجعة طلبك رقم *#${opts.orderNumber}* وتأكيده بنجاح من إدارة المتجر، وتم تسليمه لشركة الشحن للتوصيل إليك! 📦\n\n` +
+      `🗓️ *موعد التوصيل المتوقع:* *${daysText}*\n` +
+      (opts.city || opts.address ? `📍 *عنوان الاستلام:* ${[opts.city, opts.address].filter(Boolean).join(" - ")}\n` : "") +
+      `💰 *المبلغ عند الاستلام:* *${totalEgp} ج.م*\n\n` +
+      `🧥 *المنتجات في الشحنة:*\n${itemsText}\n\n` +
+      `✨ *معاينة مجانية:* تقدر تفتح الشحنة وتتأكد من المقاس والخامة العالية قبل الاستلام والدفع للمندوب.\n` +
+      `📞 مندوب الشحن هيتواصل معاك تليفونياً قبل ما يوصلك.\n\n` +
+      `لو عندك أي استفسار تقدر ترد على الرسالة دي في أي وقت! 🖤`;
+
+    await sock.sendMessage(jid, { text: messageText });
+    console.log(`[WA_BOT:SHIPPING_SENT] Sent shipping update for #${opts.orderNumber} to ${opts.customerPhone}`);
+    return true;
+  } catch (err) {
+    console.error(`[WA_BOT:SHIPPING_FAILED] Error sending shipping update for #${opts.orderNumber}:`, err);
+    return false;
+  }
+}
+
+/**
+ * Send Order Delivered & Thank You WhatsApp Notification when delivery is confirmed
+ */
+export async function sendOrderDeliveredWhatsAppNotification(opts: {
+  orderNumber: string;
+  customerName: string;
+  customerPhone: string;
+}): Promise<boolean> {
+  if (!isWhatsAppAutoSendEnabled()) return false;
+
+  try {
+    let sock = await initWhatsAppBot();
+    let holder = getHolder();
+
+    let waitCount = 0;
+    while ((!sock || holder.state.status !== "CONNECTED") && waitCount < 16) {
+      await new Promise((r) => setTimeout(r, 500));
+      sock = holder.sock || (await initWhatsAppBot());
+      holder = getHolder();
+      waitCount++;
+    }
+
+    if (!sock || holder.state.status !== "CONNECTED") return false;
+
+    const jid = toWhatsAppJid(opts.customerPhone);
+    const messageText =
+      `🎉 *تم تسليم واستلام طلبك بنجاح! شكراً لاختيارك TERRA HOP* 🖤\n\n` +
+      `أهلاً يا *${opts.customerName}* 👋\n` +
+      `سعداء جداً بتعاملك معنا في الطلب رقم *#${opts.orderNumber}*، ونتمنى يكون الهودي عجبك ومقاسه وخامته نالوا رضاك تماماً! ✨\n\n` +
+      `بنشكرك من قلبنا على ثقتك الكبيرة في *TERRA HOP* 🖤 ورقمك أصبح مسجلاً كعميل مميز (VIP) في عيلتنا، وهنبلغك بأحدث العروض والقطع الحصرية فور نزولها.\n\n` +
+      `نتمنى نشوفك دايماً متألق بستايل TERRA HOP! 🖤`;
+
+    await sock.sendMessage(jid, { text: messageText });
+    console.log(`[WA_BOT:DELIVERED_SENT] Sent thank-you update for #${opts.orderNumber} to ${opts.customerPhone}`);
+    return true;
+  } catch (err) {
+    console.error(`[WA_BOT:DELIVERED_FAILED] Error sending thank-you for #${opts.orderNumber}:`, err);
+    return false;
+  }
+}
+
+/**
+ * Broadcast a new product announcement to all confirmed customers in the encrypted vault
+ */
+export async function broadcastNewProductToConfirmedCustomers(opts: {
+  product: {
+    id: string;
+    slug: string;
+    nameAr: string;
+    priceCents: number;
+    compareAtCents?: number | null;
+    descriptionAr?: string;
+    colors?: string[];
+    sizes?: string[];
+    imageUrl?: string;
+  };
+  customNote?: string;
+}): Promise<{ total: number; sent: number; failed: number }> {
+  const db = getDb();
+  const { getConfirmedCustomers } = await import("../confirmed-customers");
+  const customers = getConfirmedCustomers(db);
+
+  if (customers.length === 0) {
+    console.log("[WA_BOT:BROADCAST] No confirmed customers found in vault.");
+    return { total: 0, sent: 0, failed: 0 };
+  }
+
+  let sock = await initWhatsAppBot();
+  let holder = getHolder();
+  let waitCount = 0;
+  while ((!sock || holder.state.status !== "CONNECTED") && waitCount < 16) {
+    await new Promise((r) => setTimeout(r, 500));
+    sock = holder.sock || (await initWhatsAppBot());
+    holder = getHolder();
+    waitCount++;
+  }
+
+  if (!sock || holder.state.status !== "CONNECTED") {
+    throw new Error("بوت الواتساب غير متصل حالياً. يرجى مسح رمز QR من لوحة التحكم أولاً.");
+  }
+
+  const appBaseUrl = (process.env.APP_BASE_URL || "https://terra-hop-production.up.railway.app").replace(/\/$/, "");
+  const productUrl = `${appBaseUrl}/shop/${opts.product.slug}`;
+  const priceEgp = Math.round(opts.product.priceCents / 100);
+  const compareAtEgp = opts.product.compareAtCents ? Math.round(opts.product.compareAtCents / 100) : null;
+  const colorsText = opts.product.colors?.length ? opts.product.colors.join(" - ") : "جميع الألوان متوفرة";
+  const sizesText = opts.product.sizes?.length ? opts.product.sizes.join(" ، ") : "S, M, L, XL, XXL";
+
+  // Resolve product image buffer
+  let imageBuffer: Buffer | null = resolveLocalImageBuffer(opts.product.imageUrl);
+  if (!imageBuffer) {
+    const fallbackHoodie = path.join(process.cwd(), "public", "login-hoodies", "hoodie-black.webp");
+    if (fs.existsSync(fallbackHoodie)) {
+      imageBuffer = fs.readFileSync(fallbackHoodie);
+    }
+  }
+
+  let sent = 0;
+  let failed = 0;
+
+  for (const cust of customers) {
+    try {
+      const jid = toWhatsAppJid(cust.phone);
+      const customerName = cust.name || "عميلنا العزيز";
+
+      const messageText =
+        `🖤 *رسالة حب وتقدير خاصة من TERRA HOP* 🖤\n\n` +
+        `أهلاً يا *${customerName}* 👋\n` +
+        `وحشتنا جداً! بنشكرك من قلبنا على ثقتك فينا في تعاملك الأخير معانا 🖤 ويسعدنا دائماً إنك من عيلتنا المميزة.\n\n` +
+        `حبينا تكون أول حد يعرف إننا نزلنا قطعة جديدة ومميزة جداً تليق بذوقك وستايلك:\n\n` +
+        `🔥 *${opts.product.nameAr}* 🔥\n` +
+        `💰 *السعر:* *${priceEgp} ج.م* ${compareAtEgp ? `~(بدلاً من ${compareAtEgp} ج.م)~` : ""}\n` +
+        `🎨 *الألوان المتاحة:* ${colorsText}\n` +
+        `📏 *المقاسات المتاحة:* ${sizesText}\n\n` +
+        (opts.product.descriptionAr ? `✨ *تفاصيل ومميزات القطعة:*\n${opts.product.descriptionAr}\n\n` : "") +
+        (opts.customNote ? `📢 *ملاحظة خاصة:* ${opts.customNote}\n\n` : "") +
+        `🛡️ *مع ميزة المعاينة والتجربة المجانية عند الاستلام مع مندوب الشحن قبل دفع أي مليم، هتشوف الفينش العالي بنفسك!*\n\n` +
+        `🛒 *اطلب مقاسك ولونك المفضل دلوقتي مباشرة من المتجر:* 👇\n` +
+        `${productUrl}\n\n` +
+        `نتمنى تنورنا دايماً في TERRA HOP! 🖤`;
+
+      if (imageBuffer) {
+        await sock.sendMessage(jid, {
+          image: imageBuffer,
+          caption: messageText,
+        });
+      } else {
+        await sock.sendMessage(jid, {
+          text: messageText,
+        });
+      }
+
+      sent++;
+      console.log(`[WA_BOT:BROADCAST_SENT] Sent new product announcement to ${cust.name} (${cust.phone})`);
+
+      // Gentle delay between messages to respect WhatsApp rate limits (1.5s)
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    } catch (sendErr) {
+      failed++;
+      console.error(`[WA_BOT:BROADCAST_FAILED] Failed sending to ${cust.phone}:`, sendErr);
+    }
+  }
+
+  return { total: customers.length, sent, failed };
+}
