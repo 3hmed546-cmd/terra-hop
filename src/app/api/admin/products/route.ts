@@ -232,7 +232,9 @@ export async function POST(request: NextRequest) {
           colors: colorsList,
           sizes: sizesList,
           imageUrl: firstImg,
+          details: body.details,
         },
+        customCaption: typeof body.broadcastCustomCaption === "string" ? body.broadcastCustomCaption.trim() : undefined,
         customNote: typeof body.broadcastCustomNote === "string" ? body.broadcastCustomNote.trim() : undefined,
       }).catch((broadcastErr) => {
         console.error("[Products:BroadcastError]", broadcastErr);

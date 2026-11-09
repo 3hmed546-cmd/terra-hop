@@ -18,6 +18,7 @@ import { RestockDialog } from "./RestockDialog";
 import { StockLog } from "./StockLog";
 import { VariantsField } from "./VariantsField";
 import { LookField } from "./LookField";
+import { buildProductCaptionTemplate } from "@/lib/broadcast-templates";
 
 const F = ADMIN_STRINGS.productForm;
 
@@ -57,6 +58,8 @@ function Editor({ initial, existing, isNew, tab, onTab, focusLogRef }: EditorPro
   const [pendingRemoval, setPendingRemoval] = useState<{ product: Product; status: FormStatus; affected: AffectedOrder[] } | null>(null);
   const [notifyConfirmed, setNotifyConfirmed] = useState(false);
   const [broadcastNote, setBroadcastNote] = useState("");
+  const [broadcastCaption, setBroadcastCaption] = useState("");
+  const [captionTouched, setCaptionTouched] = useState(false);
 
   const threshold = data?.settings.lowStockThreshold ?? 3;
   const takenSlugs = useMemo(
@@ -114,6 +117,7 @@ function Editor({ initial, existing, isNew, tab, onTab, focusLogRef }: EditorPro
     const result = await actions.saveProduct(product, {
       notifyConfirmedCustomers: isNew ? notifyConfirmed : false,
       broadcastCustomNote: isNew && notifyConfirmed ? broadcastNote.trim() : undefined,
+      broadcastCustomCaption: isNew && notifyConfirmed && broadcastCaption ? broadcastCaption.trim() : undefined,
     });
     if (!result.ok) {
       toast.push(ADMIN_STRINGS.errors[result.error]);
@@ -246,21 +250,72 @@ function Editor({ initial, existing, isNew, tab, onTab, focusLogRef }: EditorPro
                 <input
                   type="checkbox"
                   checked={notifyConfirmed}
-                  onChange={(e) => setNotifyConfirmed(e.target.checked)}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setNotifyConfirmed(checked);
+                    if (checked && (!broadcastCaption || !captionTouched)) {
+                      const initialCaption = buildProductCaptionTemplate({
+                        nameAr: form.name || "قطعة جديدة من TERRA HOP",
+                        priceCents: Math.round((form.price || 0) * 100),
+                        compareAtCents: form.compareAt ? Math.round(form.compareAt * 100) : null,
+                        colors: form.colors.map((c) => c.name).filter(Boolean),
+                        sizes: form.variants.map((v) => v.size).filter(Boolean),
+                        descriptionAr: form.description,
+                        details: form.details,
+                        slug: form.slug || "new-item",
+                      });
+                      setBroadcastCaption(initialCaption);
+                    }
+                  }}
                   style={{ width: 18, height: 18, cursor: "pointer" }}
                 />
-                <span>إرسال رسالة حب وتقدير مع تفاصيل هذا المنتج الجديد لجميع العملاء المؤكدين في الخزنة تلقائياً 🚀</span>
+                <span>إرسال إشعار بهذه القطعة الجديدة لجميع العملاء المؤكدين في الخزنة تلقائياً 🚀</span>
               </label>
               {notifyConfirmed ? (
-                <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 8 }}>
-                  <TextInput
-                    label="ملاحظة أو عرض خاص بالمنتج (اختياري)"
-                    placeholder="مثال: الحق اطلب قبل نهاية الاسبوع واستمتع بعرض الشحن 9 جنية فقط لكل الجمهورية"
-                    value={broadcastNote}
-                    onChange={(e) => setBroadcastNote(e.target.value)}
+                <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <label style={{ fontSize: "13px", fontWeight: 700 }}>
+                      نص رسالة الواتساب بالكامل (يمكنك التعديل عليها بحرية):
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const regenerated = buildProductCaptionTemplate({
+                          nameAr: form.name || "قطعة جديدة من TERRA HOP",
+                          priceCents: Math.round((form.price || 0) * 100),
+                          compareAtCents: form.compareAt ? Math.round(form.compareAt * 100) : null,
+                          colors: form.colors.map((c) => c.name).filter(Boolean),
+                          sizes: form.variants.map((v) => v.size).filter(Boolean),
+                          descriptionAr: form.description,
+                          details: form.details,
+                          slug: form.slug || "new-item",
+                        });
+                        setBroadcastCaption(regenerated);
+                        setCaptionTouched(false);
+                      }}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "#0284c7",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      🔄 توليد النموذج الافتراضي ببيانات هذا المنتج
+                    </button>
+                  </div>
+                  <Textarea
+                    label="نص رسالة الواتساب بالكامل (يمكنك التعديل عليها بحرية)"
+                    rows={12}
+                    value={broadcastCaption}
+                    onChange={(e) => {
+                      setBroadcastCaption(e.target.value);
+                      setCaptionTouched(true);
+                    }}
                   />
                   <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>
-                    💡 سيتم إرسال صورة المنتج، الاسم، السعر، الألوان، المقاسات، ورابط الطلب المباشر مع رسالة حب وتقدير على المعاملة السابقة لجميع عملائك الذين استلموا طلبات سابقة.
+                    💡 يتم إرسال صورة المنتج مع نص الرسالة بالصيغة الراقية لجميع عملائك المسجلين بأعلى معايير الأمان.
                   </p>
                 </div>
               ) : null}

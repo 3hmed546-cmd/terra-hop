@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   // Get active products for dropdown selection
   const products = db
     .prepare(`
-      SELECT id, slug, name_ar, price_cents, compare_at_cents, description_ar
+      SELECT id, slug, name_ar, price_cents, compare_at_cents, description_ar, details
       FROM products
       WHERE status = 'active'
       ORDER BY position ASC, created_at DESC
@@ -65,6 +65,11 @@ export async function GET(request: NextRequest) {
       firstImage = prodColors.find((c) => c.image)?.image;
     }
 
+    let parsedDetails = {};
+    try {
+      parsedDetails = JSON.parse(p.details || "{}");
+    } catch {}
+
     return {
       id: p.id,
       slug: p.slug,
@@ -72,6 +77,7 @@ export async function GET(request: NextRequest) {
       priceCents: p.price_cents,
       compareAtCents: p.compare_at_cents,
       descriptionAr: p.description_ar,
+      details: parsedDetails,
       colors: Array.from(new Set(prodColors.map((c) => c.name).filter(Boolean))),
       sizes: Array.from(new Set(prodVariants.map((v) => v.size).filter(Boolean))),
       imageUrl: firstImage,
@@ -105,7 +111,7 @@ export async function POST(request: NextRequest) {
     return apiError("VALIDATION", "بيانات البث غير صالحة.", 400);
   }
 
-  const { productId, customNote } = body;
+  const { productId, customCaption, customNote } = body;
   if (!productId) {
     return apiError("VALIDATION", "يرجى اختيار المنتج المراد إرسال إشعاره للعملاء.", 400);
   }
@@ -150,6 +156,11 @@ export async function POST(request: NextRequest) {
     firstImage = prodColors.find((c) => c.image)?.image;
   }
 
+  let parsedDetails = {};
+  try {
+    parsedDetails = JSON.parse(product.details || "{}");
+  } catch {}
+
   const formattedProduct = {
     id: product.id,
     slug: product.slug,
@@ -157,6 +168,7 @@ export async function POST(request: NextRequest) {
     priceCents: product.price_cents,
     compareAtCents: product.compare_at_cents,
     descriptionAr: product.description_ar,
+    details: parsedDetails,
     colors: Array.from(new Set(prodColors.map((c) => c.name).filter(Boolean))),
     sizes: Array.from(new Set(prodVariants.map((v) => v.size).filter(Boolean))),
     imageUrl: firstImage,
@@ -165,6 +177,7 @@ export async function POST(request: NextRequest) {
   try {
     const result = await broadcastNewProductToConfirmedCustomers({
       product: formattedProduct,
+      customCaption: typeof customCaption === "string" && customCaption.trim() ? customCaption.trim() : undefined,
       customNote: typeof customNote === "string" ? customNote.trim() : undefined,
     });
 

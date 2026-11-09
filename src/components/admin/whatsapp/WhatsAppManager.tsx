@@ -5,6 +5,7 @@ import Image from "next/image";
 import { apiFetch } from "@/lib/admin-auth";
 import { PageHeader } from "../PageHeader";
 import { Button, TextInput, Textarea, useToast, StatusBadge } from "../ui";
+import { buildProductCaptionTemplate, renderCaptionForCustomer } from "@/lib/broadcast-templates";
 
 interface BotStatus {
   status: "DISCONNECTED" | "CONNECTING" | "SCAN_QR" | "CONNECTED";
@@ -42,7 +43,8 @@ export function WhatsAppManager() {
     products: [],
   });
   const [selectedProductId, setSelectedProductId] = useState<string>("");
-  const [broadcastCustomNote, setBroadcastCustomNote] = useState<string>("الحق اطلب قبل نهاية الاسبوع واستمتع بعرض الشحن 9 جنية فقط لكل الجمهورية");
+  const [customCaption, setCustomCaption] = useState<string>("");
+  const [captionEditedManually, setCaptionEditedManually] = useState(false);
   const [broadcasting, setBroadcasting] = useState(false);
 
   const fetchBroadcastData = useCallback(async () => {
@@ -50,19 +52,45 @@ export function WhatsAppManager() {
       const res = await apiFetch("/api/admin/whatsapp/broadcast", { cache: "no-store" });
       const json = await res.json();
       if (json.ok && json.data) {
+        const prods = json.data.products || [];
         setBroadcastData({
           confirmedCustomersCount: json.data.confirmedCustomersCount || 0,
           recentCustomers: json.data.recentCustomers || [],
-          products: json.data.products || [],
+          products: prods,
         });
-        if (json.data.products?.length > 0 && !selectedProductId) {
-          setSelectedProductId(json.data.products[0].id);
+        if (prods.length > 0 && !selectedProductId) {
+          const first = prods[0];
+          setSelectedProductId(first.id);
+          setCustomCaption(buildProductCaptionTemplate(first));
         }
       }
     } catch (e) {
       console.error("Failed to fetch broadcast data:", e);
     }
   }, [selectedProductId]);
+
+  const handleProductChange = (prodId: string) => {
+    setSelectedProductId(prodId);
+    const prod = broadcastData.products.find((p) => p.id === prodId);
+    if (prod) {
+      setCustomCaption(buildProductCaptionTemplate(prod));
+      setCaptionEditedManually(false);
+    }
+  };
+
+  const handleResetCaption = () => {
+    const prod = broadcastData.products.find((p) => p.id === selectedProductId) || broadcastData.products[0];
+    if (prod) {
+      setCustomCaption(buildProductCaptionTemplate(prod));
+      setCaptionEditedManually(false);
+      toast.push("تمت استعادة النموذج الافتراضي ببيانات المنتج الحالي.");
+    }
+  };
+
+  const handleInsertTag = (tag: string) => {
+    setCustomCaption((prev) => (prev ? `${prev} ${tag}` : tag));
+    setCaptionEditedManually(true);
+  };
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -109,7 +137,7 @@ export function WhatsAppManager() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           productId: selectedProductId,
-          customNote: broadcastCustomNote.trim() || undefined,
+          customCaption: customCaption.trim() || undefined,
         }),
       });
       const json = await res.json();
@@ -399,18 +427,18 @@ export function WhatsAppManager() {
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "24px", marginTop: "20px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "24px", marginTop: "20px" }}>
             {/* Form Controls */}
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               <div>
                 <label style={{ display: "block", fontSize: "13px", fontWeight: 700, marginBottom: "6px" }}>
-                  اختر المنتج المراد إرساله للعملاء:
+                  اختر المنتج المراد إرسال رسالته للعملاء:
                 </label>
                 {broadcastData.products.length > 0 ? (
                   <select
                     className="adm-input"
                     value={selectedProductId}
-                    onChange={(e) => setSelectedProductId(e.target.value)}
+                    onChange={(e) => handleProductChange(e.target.value)}
                     style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1px solid #d1d5db", fontSize: "13px" }}
                   >
                     {broadcastData.products.map((p) => (
@@ -425,19 +453,87 @@ export function WhatsAppManager() {
               </div>
 
               <div>
-                <TextInput
-                  label="عرض الشحن أو ملاحظة خاصة (تظهر في مقدمة الرسالة)"
-                  value={broadcastCustomNote}
-                  onChange={(e) => setBroadcastCustomNote(e.target.value)}
-                  placeholder="مثال: الحق اطلب قبل نهاية الاسبوع واستمتع بعرض الشحن 9 جنية فقط لكل الجمهورية"
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <label style={{ fontSize: "13px", fontWeight: 700 }}>
+                    تعديل نص الرسالة (الكابشن) بالكامل:
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleResetCaption}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#0284c7",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
+                    }}
+                  >
+                    🔄 استعادة النموذج الافتراضي
+                  </button>
+                </div>
+
+                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "8px" }}>
+                  <span style={{ fontSize: "11px", color: "#6b7280", alignSelf: "center" }}>إدراج متغير:</span>
+                  {[
+                    { label: "اسم العميل", tag: "{customerName}" },
+                    { label: "اسم المنتج", tag: "{productName}" },
+                    { label: "السعر", tag: "{price}" },
+                    { label: "الألوان", tag: "{colors}" },
+                    { label: "المقاسات", tag: "{sizes}" },
+                    { label: "رابط المتجر", tag: "{url}" },
+                  ].map((t) => (
+                    <button
+                      key={t.tag}
+                      type="button"
+                      onClick={() => handleInsertTag(t.tag)}
+                      style={{
+                        padding: "2px 8px",
+                        fontSize: "11px",
+                        borderRadius: "4px",
+                        border: "1px solid #d1d5db",
+                        backgroundColor: "#f3f4f6",
+                        cursor: "pointer",
+                      }}
+                    >
+                      + {t.label}
+                    </button>
+                  ))}
+                </div>
+
+                <textarea
+                  className="adm-input"
+                  rows={14}
+                  value={customCaption}
+                  onChange={(e) => {
+                    setCustomCaption(e.target.value);
+                    setCaptionEditedManually(true);
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    borderRadius: "8px",
+                    border: "1px solid #d1d5db",
+                    fontSize: "13px",
+                    lineHeight: "1.6",
+                    fontFamily: "inherit",
+                    resize: "vertical",
+                  }}
+                  placeholder="اكتب أو عدل نص رسالة الواتساب هنا..."
                 />
+                <p style={{ fontSize: "11px", color: "#6b7280", margin: "4px 0 0 0" }}>
+                  💡 يمكنك تعديل أي سطر في الرسالة كما تشاء. وسيتم وضع تفاصيل المنتج والأسعار والألوان والمقاسات تلقائياً.
+                </p>
               </div>
 
               <div style={{ padding: "14px", backgroundColor: "#f9fafb", borderRadius: "8px", border: "1px solid #e5e7eb", fontSize: "12px", color: "#4b5563", lineHeight: "1.7" }}>
-                <strong>🛡️ حماية ضد الحظر والتكرار:</strong>
-                <div>• الرسائل تُرسل بفاصل زمني آمن لتفادي قيود واتساب.</div>
-                <div>• تصل فقط للعملاء الذين أكدوا واستلموا أوردرات سابقة من المتجر.</div>
-                <div>• يتم توجيه الرسالة باسم العميل المخصص مع رسالة تقدير لمعاملته السابقة.</div>
+                <strong>🛡️ حماية وضمانات البث:</strong>
+                <div>• يُرسل بفاصل زمني هادئ (1.5 ثانية) لحماية رقم الواتساب من القيود.</div>
+                <div>• يصل فقط للعملاء الذين أكدوا واستلموا أوردرات سابقة من المتجر.</div>
+                <div>• المعاينة على اليسار تُظهر لك بالضبط كيف ستظهر الرسالة في محادثة الواتساب.</div>
               </div>
 
               <Button
@@ -462,17 +558,18 @@ export function WhatsAppManager() {
             {/* Live WhatsApp Bubble Preview */}
             <div>
               <label style={{ display: "block", fontSize: "13px", fontWeight: 700, marginBottom: "8px" }}>
-                معاينة الرسالة كما ستصل للعميل على الواتساب:
+                معاينة الرسالة الحقيقية في محادثة الواتساب:
               </label>
 
               {(() => {
                 const prod = broadcastData.products.find((p) => p.id === selectedProductId) || broadcastData.products[0];
                 if (!prod) return <p style={{ color: "#6b7280", fontSize: "12px" }}>اختر منتجاً للمعاينة</p>;
 
-                const price = Math.round(prod.priceCents / 100);
-                const compare = prod.compareAtCents ? Math.round(prod.compareAtCents / 100) : null;
-                const colors = prod.colors?.length ? prod.colors.join(" - ") : "جميع الألوان متوفرة";
-                const sizes = prod.sizes?.length ? prod.sizes.join(" ، ") : "S, M, L, XL, XXL";
+                const previewText = renderCaptionForCustomer(
+                  customCaption || buildProductCaptionTemplate(prod),
+                  { name: "أحمد عبد الرحمن" },
+                  prod
+                );
 
                 return (
                   <div
@@ -494,41 +591,61 @@ export function WhatsAppManager() {
                         backgroundColor: "#202c33",
                         borderRadius: "10px",
                         padding: "12px",
-                        maxWidth: "92%",
+                        maxWidth: "96%",
                         margin: "0 auto",
                         border: "1px solid #2a3942",
                       }}
                     >
                       {prod.imageUrl ? (
-                        <div style={{ marginBottom: "10px", borderRadius: "8px", overflow: "hidden", border: "1px solid #374248" }}>
+                        <div style={{ marginBottom: "12px", borderRadius: "8px", overflow: "hidden", border: "1px solid #374248" }}>
                           <img
                             src={prod.imageUrl}
                             alt={prod.nameAr}
-                            style={{ width: "100%", maxHeight: "200px", objectFit: "cover", display: "block" }}
+                            style={{ width: "100%", maxHeight: "240px", objectFit: "cover", display: "block" }}
                           />
                         </div>
                       ) : null}
 
-                      <div style={{ whiteSpace: "pre-line", wordBreak: "break-word" }}>
-                        {`🖤 *رسالة خاصة ومميزة من TERRA HOP* 🖤\n`}
-                        {`أهلاً يا *أحمد عبد الرحمن* 👋\n`}
-                        {`وحشتنا جداً! بنشكرك من قلبنا على ثقتك فينا في تعاملك الأخير معانا 🖤 ويسعدنا دائماً إنك من عيلتنا المميزة.\n\n`}
-                        {broadcastCustomNote ? `📢 *${broadcastCustomNote}*\n\n` : ""}
-                        {`حبينا تكون أول حد يعرف إننا نزلنا قطعة جديدة ومميزة جداً تليق بذوقك:\n`}
-                        {`🔥 *${prod.nameAr}* 🔥\n`}
-                        {`💰 *السعر:* *${price} ج.م* ${compare ? `~(بدلاً من ${compare} ج.م)~` : ""}\n`}
-                        {`🎨 *الألوان المتاحة:* ${colors}\n`}
-                        {`📏 *المقاسات المتاحة:* ${sizes}\n\n`}
-                        {prod.descriptionAr ? `✨ *تفاصيل ومميزات القطعة:*\n${prod.descriptionAr}\n\n` : ""}
-                        {`🛡️ *مع ميزة المعاينة والتجربة المجانية عند الاستلام مع مندوب الشحن قبل دفع أي مليم، هتشوف الفينش العالي بنفسك!*\n\n`}
-                        {`🛒 *اطلب مقاسك ولونك المفضل دلوقتي مباشرة من المتجر:* 👇\n`}
-                        <span style={{ color: "#53bdeb", textDecoration: "underline" }}>
-                          https://terra-hop-production.up.railway.app/shop/{prod.slug}
-                        </span>
-                        {`\n\nنتمنى تنورنا دايماً في TERRA HOP! 🖤`}
+                      <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", direction: "rtl", textAlign: "right" }}>
+                        {previewText.split("\n").map((line, idx) => {
+                          if (!line.trim()) return <div key={idx} style={{ height: "8px" }} />;
+
+                          const isBoldHeader = line.startsWith("*") && line.endsWith("*");
+                          const hasLink = line.includes("http://") || line.includes("https://");
+
+                          if (hasLink) {
+                            return (
+                              <div key={idx} style={{ margin: "2px 0" }}>
+                                <span style={{ color: "#53bdeb", textDecoration: "underline", direction: "ltr", display: "inline-block" }}>
+                                  {line}
+                                </span>
+                              </div>
+                            );
+                          }
+
+                          if (isBoldHeader) {
+                            return (
+                              <div key={idx} style={{ fontWeight: 700, margin: "2px 0" }}>
+                                {line.replace(/^\*|\*$/g, "")}
+                              </div>
+                            );
+                          }
+
+                          const parts = line.split(/(\*[^*]+\*)/g);
+                          return (
+                            <div key={idx} style={{ margin: "1px 0" }}>
+                              {parts.map((p, pIdx) => {
+                                if (p.startsWith("*") && p.endsWith("*")) {
+                                  return <strong key={pIdx}>{p.slice(1, -1)}</strong>;
+                                }
+                                return <span key={pIdx}>{p}</span>;
+                              })}
+                            </div>
+                          );
+                        })}
                       </div>
 
-                      <div style={{ textAlign: "left", fontSize: "10px", color: "#8696a0", marginTop: "6px" }}>
+                      <div style={{ textAlign: "left", fontSize: "10px", color: "#8696a0", marginTop: "10px", direction: "ltr" }}>
                         10:27 pm ✓✓
                       </div>
                     </div>

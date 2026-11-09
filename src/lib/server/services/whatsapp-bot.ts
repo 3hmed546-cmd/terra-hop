@@ -1088,11 +1088,14 @@ export async function broadcastNewProductToConfirmedCustomers(opts: {
     colors?: string[];
     sizes?: string[];
     imageUrl?: string;
+    details?: any;
   };
+  customCaption?: string;
   customNote?: string;
 }): Promise<{ total: number; sent: number; failed: number }> {
   const db = getDb();
   const { getConfirmedCustomers } = await import("../confirmed-customers");
+  const { buildProductCaptionTemplate, renderCaptionForCustomer } = await import("@/lib/broadcast-templates");
   const customers = getConfirmedCustomers(db);
 
   if (customers.length === 0) {
@@ -1115,11 +1118,6 @@ export async function broadcastNewProductToConfirmedCustomers(opts: {
   }
 
   const appBaseUrl = (process.env.APP_BASE_URL || "https://terra-hop-production.up.railway.app").replace(/\/$/, "");
-  const productUrl = `${appBaseUrl}/shop/${opts.product.slug}`;
-  const priceEgp = Math.round(opts.product.priceCents / 100);
-  const compareAtEgp = opts.product.compareAtCents ? Math.round(opts.product.compareAtCents / 100) : null;
-  const colorsText = opts.product.colors?.length ? opts.product.colors.join(" - ") : "جميع الألوان متوفرة";
-  const sizesText = opts.product.sizes?.length ? opts.product.sizes.join(" ، ") : "S, M, L, XL, XXL";
 
   // Resolve product image buffer
   let imageBuffer: Buffer | null = resolveLocalImageBuffer(opts.product.imageUrl);
@@ -1130,29 +1128,19 @@ export async function broadcastNewProductToConfirmedCustomers(opts: {
     }
   }
 
+  // Base template: either admin's custom edited caption or newly generated template
+  const rawBaseCaption =
+    opts.customCaption && opts.customCaption.trim()
+      ? opts.customCaption.trim()
+      : buildProductCaptionTemplate(opts.product, appBaseUrl);
+
   let sent = 0;
   let failed = 0;
 
   for (const cust of customers) {
     try {
       const jid = toWhatsAppJid(cust.phone);
-      const customerName = cust.name || "عميلنا العزيز";
-
-      const messageText =
-        `🖤 *رسالة حب وتقدير خاصة من TERRA HOP* 🖤\n\n` +
-        `أهلاً يا *${customerName}* 👋\n` +
-        `وحشتنا جداً! بنشكرك من قلبنا على ثقتك فينا في تعاملك الأخير معانا 🖤 ويسعدنا دائماً إنك من عيلتنا المميزة.\n\n` +
-        `حبينا تكون أول حد يعرف إننا نزلنا قطعة جديدة ومميزة جداً تليق بذوقك وستايلك:\n\n` +
-        `🔥 *${opts.product.nameAr}* 🔥\n` +
-        `💰 *السعر:* *${priceEgp} ج.م* ${compareAtEgp ? `~(بدلاً من ${compareAtEgp} ج.م)~` : ""}\n` +
-        `🎨 *الألوان المتاحة:* ${colorsText}\n` +
-        `📏 *المقاسات المتاحة:* ${sizesText}\n\n` +
-        (opts.product.descriptionAr ? `✨ *تفاصيل ومميزات القطعة:*\n${opts.product.descriptionAr}\n\n` : "") +
-        (opts.customNote ? `📢 *ملاحظة خاصة:* ${opts.customNote}\n\n` : "") +
-        `🛡️ *مع ميزة المعاينة والتجربة المجانية عند الاستلام مع مندوب الشحن قبل دفع أي مليم، هتشوف الفينش العالي بنفسك!*\n\n` +
-        `🛒 *اطلب مقاسك ولونك المفضل دلوقتي مباشرة من المتجر:* 👇\n` +
-        `${productUrl}\n\n` +
-        `نتمنى تنورنا دايماً في TERRA HOP! 🖤`;
+      const messageText = renderCaptionForCustomer(rawBaseCaption, cust, opts.product, appBaseUrl);
 
       if (imageBuffer) {
         await sock.sendMessage(jid, {
@@ -1166,7 +1154,7 @@ export async function broadcastNewProductToConfirmedCustomers(opts: {
       }
 
       sent++;
-      console.log(`[WA_BOT:BROADCAST_SENT] Sent new product announcement to ${cust.name} (${cust.phone})`);
+      console.log(`[WA_BOT:BROADCAST_SENT] Sent new product announcement to ${cust.name || "Customer"} (${cust.phone})`);
 
       // Gentle delay between messages to respect WhatsApp rate limits (1.5s)
       await new Promise((resolve) => setTimeout(resolve, 1500));
