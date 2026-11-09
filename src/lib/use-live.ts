@@ -81,9 +81,15 @@ function initLiveEngine() {
   fetchSiteData();
   fetchProductsData();
 
+  let sseRetryCount = 0;
+
   function connectSSE() {
     try {
-      if (eventSource) eventSource.close();
+      if (eventSource) {
+        try {
+          eventSource.close();
+        } catch {}
+      }
       const es = new EventSource("/api/public/stream");
       eventSource = es;
 
@@ -91,6 +97,7 @@ function initLiveEngine() {
         try {
           const parsed = JSON.parse(e.data);
           state.connected = true;
+          sseRetryCount = 0;
           if (parsed.revisions) {
             Object.assign(state.revisions, parsed.revisions);
           }
@@ -110,9 +117,15 @@ function initLiveEngine() {
       es.onerror = () => {
         state.connected = false;
         notify();
-        es.close();
-        // Fallback polling will kick in, try reconnecting SSE in 10s
-        setTimeout(connectSSE, 10000);
+        try {
+          es.close();
+        } catch {}
+        sseRetryCount++;
+        // If SSE repeatedly drops (e.g. edge proxy HTTP/2 timeout or device emulation),
+        // pause SSE reconnect to prevent console spam and let silent polling handle updates.
+        if (sseRetryCount <= 3) {
+          setTimeout(connectSSE, 15000);
+        }
       };
     } catch {
       // If SSE not supported, rely on polling

@@ -1,21 +1,13 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { loginHoodieIntervalMs, type LoginHoodie } from "@/content/login-hoodies";
+import Link from "next/link";
+import { loginHoodies, loginHoodieIntervalMs, type LoginHoodie } from "@/content/login-hoodies";
 import { useLive } from "@/lib/use-live";
 import { uiStrings } from "@/lib/ui-strings";
+import { Logo } from "@/components/ui/logo";
 
 const t = uiStrings.adminLogin;
-
-const ARABIC_HOODIE_NAMES: Record<string, string> = {
-  BLACK: "أسود ملكي",
-  "BABY BLUE": "بيبي بلو",
-  CREAM: "كريمي / أوف وايت",
-  MAROON: "مارون / نبيتي",
-  "FOREST GREEN": "أخضر غامق",
-  CHARCOAL: "فحمي",
-  "ROYAL BLUE": "أزرق ملكي",
-};
 
 export function HoodieShowcase() {
   const [index, setIndex] = useState(0);
@@ -39,7 +31,7 @@ export function HoodieShowcase() {
         },
       }));
     }
-    return [];
+    return loginHoodies;
   }, [liveSite]);
 
   useEffect(() => {
@@ -67,75 +59,73 @@ export function HoodieShowcase() {
   }, [running, index, hoodiesList.length]);
 
   const current = hoodiesList[index] ?? hoodiesList[0] ?? null;
-  const arabicName = current?.name
-    ? ARABIC_HOODIE_NAMES[current.name.toUpperCase()] ?? current.name
-    : "";
 
   return (
-    <div className="relative isolate flex h-full flex-col justify-between overflow-hidden bg-obsidian p-8 text-off-white">
+    <div className="relative isolate flex h-full w-full flex-col justify-between p-4 sm:p-6 lg:p-10">
       {/* Dynamic radial glow matching the active hoodie */}
       {current && (
         <div
           className="pointer-events-none absolute inset-0 -z-10 transition-colors duration-1000 ease-out"
           style={{
-            background: `radial-gradient(circle at 50% 45%, ${current.glow} 0%, transparent 65%)`,
+            background: `radial-gradient(circle at 50% 50%, ${current.glow}55 0%, transparent 70%)`,
           }}
           aria-hidden="true"
         />
       )}
 
-      <div className="flex items-center justify-between">
-        <span className="font-mono text-xs uppercase tracking-widest text-concrete">
-          TERRA HOP ARCHIVE
-        </span>
+      {/* Top Header: Brand Logo on the left, subtle Play/Pause toggle on the right */}
+      <div className="relative z-20 flex items-center justify-between">
+        <Link
+          href="/"
+          aria-label={uiStrings.logoAlt}
+          className="block w-28 sm:w-36 lg:w-44 transition-opacity hover:opacity-85 text-off-white"
+        >
+          <Logo />
+        </Link>
         <button
           type="button"
           onClick={() => setPlaying((p) => !p)}
-          className="font-mono text-xs text-concrete hover:text-off-white"
+          className="font-mono text-xs text-concrete hover:text-off-white px-3 py-1 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
           aria-pressed={!playing}
         >
           {playing ? t.pause : t.play}
         </button>
       </div>
 
-      <div className="relative my-auto aspect-square w-full max-w-[420px] self-center">
-        {hoodiesList.map((h, i) => (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            key={h.src}
-            src={h.src}
-            alt={`${t.imageAlt} - ${h.name}`}
-            width={900}
-            height={965}
-            decoding="async"
-            fetchPriority={i === 0 ? "high" : "auto"}
-            className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-1000 ease-out ${
-              i === index ? "opacity-100" : "pointer-events-none opacity-0"
-            }`}
-          />
-        ))}
-      </div>
-
-      <div className="flex items-center justify-between">
-        <div>
-          <span className="font-mono text-xs text-concrete">TERRA HOP &bull; DROP 01</span>
-          {current && (
-            <p className="text-sm font-medium tracking-wide">
-              {current.name} &bull; {arabicName}
-            </p>
-          )}
-        </div>
-
-        <ul className="flex gap-1.5" aria-hidden="true">
+      {/* Central Image Showcase: Proportional, responsive, fully visible, complete */}
+      <div className="relative my-auto flex flex-1 items-center justify-center w-full min-h-0 py-3 sm:py-5">
+        <div className="relative w-full h-full max-w-[320px] sm:max-w-[400px] lg:max-w-[480px] aspect-[4/5] max-h-[300px] sm:max-h-[380px] lg:max-h-[520px] flex items-center justify-center">
           {hoodiesList.map((h, i) => (
-            <li
-              key={h.src}
-              className={`h-1.5 w-6 rounded-full transition-colors duration-500 ${
-                i === index ? "bg-off-white" : "bg-concrete/30"
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={h.src || i}
+              src={h.src}
+              alt={`${t.imageAlt} - ${h.name}`}
+              width={900}
+              height={965}
+              decoding="async"
+              fetchPriority={i === 0 ? "high" : "auto"}
+              className={`absolute inset-0 m-auto max-h-full max-w-full object-contain filter drop-shadow-[0_12px_28px_rgba(0,0,0,0.6)] transition-all duration-700 ease-out ${
+                i === index ? "opacity-100 scale-100" : "pointer-events-none opacity-0 scale-95"
               }`}
             />
           ))}
-        </ul>
+        </div>
+      </div>
+
+      {/* Clean Centered Pagination Dots */}
+      <div className="relative z-20 flex items-center justify-center gap-1.5 pt-2 pb-1" aria-hidden="true">
+        {hoodiesList.map((h, i) => (
+          <button
+            key={h.src || i}
+            type="button"
+            onClick={() => setIndex(i)}
+            aria-label={`عرض الصورة ${i + 1}`}
+            className={`h-1.5 rounded-full transition-all duration-300 ${
+              i === index ? "w-6 bg-off-white" : "w-1.5 bg-concrete/30 hover:bg-concrete/60"
+            }`}
+          />
+        ))}
       </div>
     </div>
   );
