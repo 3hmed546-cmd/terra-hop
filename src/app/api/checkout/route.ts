@@ -67,6 +67,17 @@ export async function POST(request: NextRequest) {
   seedDatabaseIfNeeded();
   const db = getDb();
 
+  // Check if store is in Coming Soon mode
+  try {
+    const csRow = db.prepare("SELECT value FROM settings WHERE group_key = 'store' AND key = 'coming_soon'").get() as any;
+    if (csRow?.value) {
+      const cs = JSON.parse(csRow.value);
+      if (cs.enabled) {
+        return apiError("FORBIDDEN", "المتجر في وضع الإطلاق القريب حالياً، سيتم استقبال الطلبات قريباً جداً!", 403);
+      }
+    }
+  } catch {}
+
   let body: any;
   try {
     body = await request.json();

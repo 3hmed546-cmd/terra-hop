@@ -19,6 +19,7 @@ import { PageHeader } from "../PageHeader";
 import { useShortcutHelp } from "../ShortcutsDialog";
 import { AdminPushToggle } from "../ui/AdminPushToggle";
 import { EmailSettingsSection } from "../ui/EmailSettingsSection";
+import { ComingSoonSection } from "./ComingSoonSection";
 import { Button, Checkbox, Dialog, NumberInput, Select, TextInput, useToast } from "../ui";
 
 const S = ADMIN_STRINGS.settings;
@@ -174,6 +175,10 @@ function SettingsEditor({ settings }: { settings: Settings }) {
           <div className="adm-row">
             <Button variant="secondary" onClick={help.open}>{S.shortcuts.view}</Button>
           </div>
+        </Section>
+
+        <Section id="coming-soon" title="وضع الإطلاق (Coming Soon)">
+          <ComingSoonSection />
         </Section>
 
         <Section id="push-notifications" title="إشعارات الطلبات الفورية (Web Push)">

@@ -4,6 +4,7 @@ import { MotionProvider } from "@/components/motion/motion-provider";
 import { CartProvider } from "@/lib/cart";
 import { LocaleProvider } from "@/lib/locale-context";
 import { SkipLink } from "@/components/ui/skip-link";
+import { StorefrontGate } from "@/components/storefront/StorefrontGate";
 import { uiStrings } from "@/lib/ui-strings";
 import "./globals.css";
 
@@ -42,7 +43,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <SkipLink />
         <LocaleProvider>
           <MotionProvider>
-            <CartProvider>{children}</CartProvider>
+            <CartProvider>
+              <StorefrontGate>{children}</StorefrontGate>
+            </CartProvider>
           </MotionProvider>
         </LocaleProvider>
       </body>

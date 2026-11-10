@@ -190,6 +190,15 @@ export function seedDatabaseIfNeeded(targetDb?: any, force = false): boolean {
         },
       ],
       [
+        "store",
+        "coming_soon",
+        {
+          enabled: false,
+          targetDate: "2026-11-20T00:00:00",
+          title: "TERRA HOP IS COMING SOON",
+        },
+      ],
+      [
         "shipping",
         "rules",
         {
