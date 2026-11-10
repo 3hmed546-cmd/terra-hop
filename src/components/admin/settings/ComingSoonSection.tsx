@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Clock, Eye, Sparkles, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { useLive } from "@/lib/use-live";
+import { apiFetch } from "@/lib/admin-auth";
 
 export function ComingSoonSection() {
   const { data: liveSite } = useLive("settings");
@@ -39,7 +40,7 @@ export function ComingSoonSection() {
     setStatusMessage(null);
 
     try {
-      const res = await fetch("/api/admin/settings", {
+      const res = await apiFetch("/api/admin/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -54,8 +55,10 @@ export function ComingSoonSection() {
         }),
       });
 
-      if (!res.ok) {
-        throw new Error("فشل حفظ الإعدادات، يرجى المحاولة مرة أخرى.");
+      const payload = await res.json().catch(() => ({}));
+
+      if (!res.ok || !payload.ok) {
+        throw new Error(payload?.error?.message || payload?.error || "فشل حفظ الإعدادات، يرجى المحاولة مرة أخرى.");
       }
 
       setEnabled(newEnabled);
