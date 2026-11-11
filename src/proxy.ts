@@ -135,7 +135,11 @@ export function proxy(request: NextRequest) {
   // Secret login URL: /<ADMIN_PATH> -> rewrites to /admin-login
   const requested = pathname.replace(/\/+$/, "").slice(1);
   if (valid.test(secret) && requested === secret) {
-    const res = NextResponse.rewrite(new URL(LOGIN_INTERNAL, request.url));
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-pathname", pathname);
+    const res = NextResponse.rewrite(new URL(LOGIN_INTERNAL, request.url), {
+      request: { headers: requestHeaders },
+    });
     res.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
     res.headers.set("Cache-Control", "no-store");
     res.headers.set("Referrer-Policy", "no-referrer");
@@ -149,7 +153,11 @@ export function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL(`/${secret}`, request.url));
     }
     const subpath = pathname.slice(secret.length + 2);
-    const res = NextResponse.rewrite(new URL(`/admin/${subpath}`, request.url));
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-pathname", pathname);
+    const res = NextResponse.rewrite(new URL(`/admin/${subpath}`, request.url), {
+      request: { headers: requestHeaders },
+    });
     res.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
     res.headers.set("Cache-Control", "no-store");
     res.headers.set("Referrer-Policy", "no-referrer");
@@ -166,7 +174,14 @@ export function proxy(request: NextRequest) {
     return NextResponse.json({ error: "DISABLED", message: "بوابة السفراء غير مفعّلة." }, { status: 404 });
   }
 
-  return NextResponse.next();
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pathname", pathname);
+
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
 }
 
 export const config = {
