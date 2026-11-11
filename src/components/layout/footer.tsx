@@ -68,21 +68,12 @@ export function Footer({ footer }: { footer: typeof home.footer }) {
             <h2 className="text-label text-(--fg-muted)">{t.footer.contact}</h2>
             <ul className="mt-4 space-y-3 text-left">
               <li>
-                <a
-                  href="tel:+201285694670"
-                  dir="ltr"
-                  className={`${link} tabular-nums font-mono block font-medium`}
-                >
-                  +20 128 569 4670
-                </a>
-              </li>
-              <li>
-                <a href="mailto:support@terra-hop.com" className={`${link} block`}>
+                <a href="mailto:support@terra-hop.com" className={`${link} block font-medium`}>
                   support@terra-hop.com
                 </a>
               </li>
               <li>
-                <a href="mailto:info@terra-hop.com" className={`${link} block text-xs text-(--fg-muted)`}>
+                <a href="mailto:info@terra-hop.com" className={`${link} block font-medium`}>
                   info@terra-hop.com
                 </a>
               </li>
