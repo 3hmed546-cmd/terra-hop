@@ -11,7 +11,71 @@ import { GA_MEASUREMENT_ID } from "@/lib/analytics";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: uiStrings.document.title, template: `%s | ${uiStrings.document.title}` },
+  metadataBase: new URL("https://terra-hop.com"),
+  title: {
+    default: "TERRA HOP | تيرا هوب - براند ستريت وير مصري",
+    template: "%s | TERRA HOP - تيرا هوب",
+  },
+  description:
+    "TERRA HOP (تيرا هوب) براند مصري رائد في الستريت وير الأوفر سايز للشباب في مصر. تشكيلات فريدة وخامات قطن فاخرة وإصدارات محدودة بحجز مسبق. Higher on Purpose.",
+  keywords: [
+    "تيرا هوب",
+    "تيراهوب",
+    "terra hop",
+    "terrahop",
+    "براند تيرا هوب",
+    "ستريت وير مصري",
+    "streetwear egypt",
+    "ملابس اوفر سايز",
+    "oversized hoodie egypt",
+    "هودي اوفر سايز",
+    "براند ملابس مصري للشباب",
+    "ملابس شبابية مصر",
+  ],
+  authors: [{ name: "TERRA HOP" }],
+  creator: "TERRA HOP",
+  publisher: "TERRA HOP",
+  applicationName: "TERRA HOP",
+  formatDetection: {
+    telephone: false,
+  },
+  alternates: {
+    canonical: "https://terra-hop.com",
+  },
+  openGraph: {
+    title: "TERRA HOP | تيرا هوب - براند ستريت وير مصري",
+    description:
+      "TERRA HOP (تيرا هوب) براند مصري رائد في الستريت وير الأوفر سايز للشباب في مصر. Higher on Purpose.",
+    url: "https://terra-hop.com",
+    siteName: "TERRA HOP - تيرا هوب",
+    locale: "ar_EG",
+    type: "website",
+    images: [
+      {
+        url: "/icon.png",
+        width: 512,
+        height: 512,
+        alt: "TERRA HOP - تيرا هوب",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "TERRA HOP | تيرا هوب - براند ستريت وير مصري",
+    description: "براند مصري رائد في الستريت وير الأوفر سايز للشباب في مصر.",
+    images: ["/icon.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
   icons: {
     icon: [
       { url: "/icon.png", type: "image/png" },
@@ -30,6 +94,44 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
+const brandJsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://terra-hop.com/#organization",
+      name: "TERRA HOP",
+      alternateName: ["تيرا هوب", "تيراهوب", "Terra Hop", "terra-hop"],
+      url: "https://terra-hop.com",
+      logo: "https://terra-hop.com/icon.png",
+      sameAs: [
+        "https://www.tiktok.com/@teera.hop",
+        "https://www.instagram.com/terr3hop/",
+        "https://www.facebook.com/terrahop.wear",
+      ],
+      contactPoint: {
+        "@type": "ContactPoint",
+        email: "support@terra-hop.com",
+        contactType: "customer service",
+        areaServed: "EG",
+        availableLanguage: ["Arabic", "English"],
+      },
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://terra-hop.com/#website",
+      url: "https://terra-hop.com",
+      name: "TERRA HOP - تيرا هوب",
+      alternateName: ["تيرا هوب", "Terra Hop"],
+      description: "براند مصري للملابس الستريت وير الأوفر سايز للشباب في مصر",
+      publisher: {
+        "@id": "https://terra-hop.com/#organization",
+      },
+      inLanguage: ["ar-EG", "en-US"],
+    },
+  ],
+};
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="ar" dir="ltr" className={`${archivo.variable} ${inter.variable}`}>
@@ -39,6 +141,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <link
           href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap"
           rel="stylesheet"
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(brandJsonLd) }}
         />
       </head>
       <body className="min-h-dvh">
