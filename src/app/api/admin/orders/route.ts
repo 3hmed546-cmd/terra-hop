@@ -361,3 +361,28 @@ export async function PATCH(request: NextRequest) {
 
   return apiSuccess({ updated: true, orderId, status });
 }
+
+export async function DELETE(request: NextRequest) {
+  const auth = requireAdmin(request);
+  if (!auth.authenticated || !auth.user) return auth.responseError!;
+
+  const db = getDb();
+  db.prepare("DELETE FROM order_items").run();
+  db.prepare("DELETE FROM orders").run();
+  try {
+    db.prepare("DELETE FROM stock_movements WHERE order_id IS NOT NULL").run();
+  } catch {}
+  try {
+    db.prepare("DELETE FROM confirmed_customers").run();
+  } catch {}
+
+  recordChange("orders", "cleanup", null, Date.now());
+  recordAudit({
+    actor: auth.user.email,
+    action: "PURGE_TEST_ORDERS",
+    entity: "orders",
+    entityId: "all",
+  });
+
+  return apiSuccess({ cleared: true, message: "تم مسح جميع الطلبات والبيانات التجريبية بنجاح." });
+}
