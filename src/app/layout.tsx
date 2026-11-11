@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import { archivo, inter } from "./fonts";
 import { MotionProvider } from "@/components/motion/motion-provider";
 import { CartProvider } from "@/lib/cart";
@@ -6,6 +7,7 @@ import { LocaleProvider } from "@/lib/locale-context";
 import { SkipLink } from "@/components/ui/skip-link";
 import { StorefrontGate } from "@/components/storefront/StorefrontGate";
 import { uiStrings } from "@/lib/ui-strings";
+import { GA_MEASUREMENT_ID } from "@/lib/analytics";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -40,6 +42,25 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         />
       </head>
       <body className="min-h-dvh">
+        {/* Google Analytics (GA4) */}
+        {GA_MEASUREMENT_ID && (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+              strategy="afterInteractive"
+            />
+            <Script id="google-analytics" strategy="afterInteractive">
+              {`
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', '${GA_MEASUREMENT_ID}', {
+                  page_path: window.location.pathname,
+                });
+              `}
+            </Script>
+          </>
+        )}
         <SkipLink />
         <LocaleProvider>
           <MotionProvider>
