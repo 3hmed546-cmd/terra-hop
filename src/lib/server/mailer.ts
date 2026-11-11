@@ -2,7 +2,7 @@ import crypto from "crypto";
 import nodemailer from "nodemailer";
 import { getDb } from "./db";
 
-const DEFAULT_SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL || process.env.GMAIL_USER || "terr3hop@gmail.com";
+const DEFAULT_SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL || "support@terra-hop.com";
 const DEFAULT_SENDER_NAME = "TERRA HOP";
 
 const APP_BASE_URL =
@@ -486,7 +486,7 @@ export async function sendOrderInvoiceEmail(order: EmailOrderData): Promise<bool
           <tr>
             <td style="padding: 24px 4px 12px; border-top: 1px solid #262626; text-align: center; color: #737373; font-size: 12px; line-height: 1.7; direction: rtl;">
               <span dir="ltr" style="unicode-bidi: isolate; display: inline-block;">TERRA HOP · Streetwear Redefined © 2026</span><br>
-              <span dir="ltr" style="color: #a3a3a3; unicode-bidi: isolate; display: inline-block;">terr3hop@gmail.com</span>
+              <span dir="ltr" style="color: #a3a3a3; unicode-bidi: isolate; display: inline-block;">support@terra-hop.com</span>
             </td>
           </tr>
 
@@ -595,7 +595,7 @@ export async function sendOrderAcceptedEmail(
           <tr>
             <td style="padding: 24px 4px 12px; border-top: 1px solid #262626; text-align: center; color: #737373; font-size: 12px; line-height: 1.7; direction: rtl;">
               <span dir="ltr" style="unicode-bidi: isolate; display: inline-block;">TERRA HOP · Streetwear Redefined © 2026</span><br>
-              <span dir="ltr" style="color: #a3a3a3; unicode-bidi: isolate; display: inline-block;">terr3hop@gmail.com</span>
+              <span dir="ltr" style="color: #a3a3a3; unicode-bidi: isolate; display: inline-block;">support@terra-hop.com</span>
             </td>
           </tr>
 
@@ -692,7 +692,7 @@ export async function sendOrderRejectedEmail(
           <tr>
             <td style="padding: 24px 4px 12px; border-top: 1px solid #262626; text-align: center; color: #737373; font-size: 12px; line-height: 1.7; direction: rtl;">
               <span dir="ltr" style="unicode-bidi: isolate; display: inline-block;">TERRA HOP · Streetwear Redefined © 2026</span><br>
-              <span dir="ltr" style="color: #a3a3a3; unicode-bidi: isolate; display: inline-block;">terr3hop@gmail.com</span>
+              <span dir="ltr" style="color: #a3a3a3; unicode-bidi: isolate; display: inline-block;">support@terra-hop.com</span>
             </td>
           </tr>
 
@@ -804,7 +804,7 @@ export async function sendOrderDeliveredThankYouEmail(order: {
           <tr>
             <td style="padding: 24px 4px 12px; border-top: 1px solid #262626; text-align: center; color: #737373; font-size: 12px; line-height: 1.7; direction: rtl;">
               <span dir="ltr" style="unicode-bidi: isolate; display: inline-block;">TERRA HOP · Streetwear Redefined © 2026</span><br>
-              <span dir="ltr" style="color: #a3a3a3; unicode-bidi: isolate; display: inline-block;">terr3hop@gmail.com</span>
+              <span dir="ltr" style="color: #a3a3a3; unicode-bidi: isolate; display: inline-block;">support@terra-hop.com</span>
             </td>
           </tr>
 

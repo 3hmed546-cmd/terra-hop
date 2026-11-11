@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
 
   // If this is a test email request
   if (body.action === "TEST_EMAIL") {
-    const to = String(body.to || userEmail || "terr3hop@gmail.com").trim();
+    const to = String(body.to || userEmail || "support@terra-hop.com").trim();
     const ok = await sendOrderInvoiceEmail({
       id: "test_order_" + Date.now(),
       number: "TH-1002",

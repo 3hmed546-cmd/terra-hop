@@ -373,7 +373,7 @@ export const translations: Record<Locale, Translations> = {
       tagline: "Higher on Purpose. ارتقِ بأسلوبك اليومي.",
       contact: "خدمة العملاء",
       phone: "+20 128 569 4670",
-      email: "terr3hop@gmail.com",
+      email: "support@terra-hop.com",
       copyright: "جميع الحقوق محفوظة لـ TERRA HOP ©",
       developedBy: "DEVELOPED & DESIGNED BY NASAQ",
       columns: {
@@ -709,7 +709,7 @@ export const translations: Record<Locale, Translations> = {
       tagline: "Higher on Purpose.",
       contact: "Contact",
       phone: "+20 128 569 4670",
-      email: "terr3hop@gmail.com",
+      email: "support@terra-hop.com",
       copyright: "© TERRA HOP",
       developedBy: "DEVELOPED & DESIGNED BY NASAQ",
       columns: {

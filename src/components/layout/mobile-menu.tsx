@@ -5,7 +5,7 @@ import { useRef } from "react";
 import { useLocale } from "@/lib/locale-context";
 import { useCart } from "@/lib/cart";
 import { Logo } from "@/components/ui/logo";
-import { FacebookIcon, InstagramIcon, TikTokIcon } from "@/components/ui/social-icons";
+import { FacebookIcon, InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/ui/social-icons";
 import { X, Menu, ShoppingBag, Search } from "lucide-react";
 
 type Props = {
@@ -147,11 +147,20 @@ export function MobileMenu({ links, labels }: Props) {
             </Link>
           </nav>
 
-          {/* 3. Bottom Bar: 3 Social Media Icons matching Image 2 (TikTok, Instagram, Facebook) */}
+          {/* 3. Bottom Bar: Social Media Icons (WhatsApp, TikTok, Instagram, Facebook) */}
           <div className="mt-auto shrink-0 border-t border-stone-200/80 px-6 py-6 flex flex-col items-center justify-center bg-white">
-            <div className="flex items-center justify-center gap-7 text-stone-900">
+            <div className="flex items-center justify-center gap-6 text-stone-900">
               <a
-                href="https://tiktok.com/"
+                href="https://chat.whatsapp.com/EWcBrybFmbr7jbMJUJGSUk?s=sh&p=a&iam=2"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="WhatsApp Group"
+                className="flex h-10 w-10 items-center justify-center rounded-full text-stone-900 hover:bg-stone-100 transition"
+              >
+                <WhatsAppIcon className="h-5 w-5 fill-current" />
+              </a>
+              <a
+                href="https://www.tiktok.com/@teera.hop?_r=1&_t=ZS-9BJsTH7KSZu"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="TikTok"

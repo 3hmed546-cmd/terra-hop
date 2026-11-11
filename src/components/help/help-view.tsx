@@ -66,8 +66,11 @@ export function HelpView() {
           >
             WhatsApp: +20 128 569 4670
           </a>
-          <a href="mailto:terr3hop@gmail.com" className={link}>
-            terr3hop@gmail.com
+          <a href="mailto:support@terra-hop.com" className={link}>
+            support@terra-hop.com
+          </a>
+          <a href="mailto:info@terra-hop.com" className={link}>
+            info@terra-hop.com
           </a>
         </p>
       </Reveal>

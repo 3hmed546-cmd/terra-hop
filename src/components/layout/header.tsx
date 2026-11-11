@@ -8,7 +8,7 @@ import { Logo } from "@/components/ui/logo";
 import { CartLink } from "@/components/cart/cart-link";
 import { MobileMenu } from "./mobile-menu";
 import { useLocale } from "@/lib/locale-context";
-import { FacebookIcon, InstagramIcon, TikTokIcon } from "@/components/ui/social-icons";
+import { FacebookIcon, InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/ui/social-icons";
 import type { home } from "@/content/home";
 
 type Props = { header: typeof home.header; overlay?: boolean };
@@ -73,8 +73,17 @@ export function Header({ header, overlay = false }: Props) {
           {/* Right: Social Media Icons (on homepage overlay) OR Cart & Language (on other pages) */}
           <div className="flex items-center gap-2 sm:gap-3">
             {overlay ? (
-              // Social Media Icons in top header before scroll (Facebook, Instagram, TikTok)
+              // Social Media Icons in top header before scroll (WhatsApp, Facebook, Instagram, TikTok)
               <div className="flex items-center gap-3.5 sm:gap-4 text-off-white">
+                <a
+                  href="https://chat.whatsapp.com/EWcBrybFmbr7jbMJUJGSUk?s=sh&p=a&iam=2"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="WhatsApp Group"
+                  className="hover:text-white transition-opacity hover:opacity-75 p-1"
+                >
+                  <WhatsAppIcon className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
+                </a>
                 <a
                   href="https://www.facebook.com/terrahop.wear"
                   target="_blank"
@@ -94,7 +103,7 @@ export function Header({ header, overlay = false }: Props) {
                   <InstagramIcon className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
                 </a>
                 <a
-                  href="https://tiktok.com/"
+                  href="https://www.tiktok.com/@teera.hop?_r=1&_t=ZS-9BJsTH7KSZu"
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="TikTok"

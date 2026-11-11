@@ -12,9 +12,9 @@ export function EmailSettingsSection() {
   const [testing, setTesting] = useState(false);
 
   const [brevoApiKey, setBrevoApiKey] = useState("");
-  const [senderEmail, setSenderEmail] = useState("terr3hop@gmail.com");
+  const [senderEmail, setSenderEmail] = useState("support@terra-hop.com");
   const [hasBrevo, setHasBrevo] = useState(false);
-  const [testEmail, setTestEmail] = useState("terr3hop@gmail.com");
+  const [testEmail, setTestEmail] = useState("support@terra-hop.com");
   const [statusMsg, setStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
@@ -29,9 +29,9 @@ export function EmailSettingsSection() {
         const json = await res.json();
         const d = json.data;
         setBrevoApiKey(d.brevoApiKey || "");
-        setSenderEmail(d.senderEmail || "terr3hop@gmail.com");
+        setSenderEmail(d.senderEmail || "support@terra-hop.com");
         setHasBrevo(d.hasBrevo);
-        setTestEmail(d.senderEmail || "terr3hop@gmail.com");
+        setTestEmail(d.senderEmail || "support@terra-hop.com");
       }
     } catch {}
     setLoading(false);

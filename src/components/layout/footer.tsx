@@ -77,8 +77,13 @@ export function Footer({ footer }: { footer: typeof home.footer }) {
                 </a>
               </li>
               <li>
-                <a href="mailto:terr3hop@gmail.com" className={`${link} block`}>
-                  terr3hop@gmail.com
+                <a href="mailto:support@terra-hop.com" className={`${link} block`}>
+                  support@terra-hop.com
+                </a>
+              </li>
+              <li>
+                <a href="mailto:info@terra-hop.com" className={`${link} block text-xs text-(--fg-muted)`}>
+                  info@terra-hop.com
                 </a>
               </li>
             </ul>
