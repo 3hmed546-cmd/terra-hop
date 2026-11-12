@@ -77,13 +77,19 @@ export function ComingSoonView({ targetDate = "2026-11-20T00:00:00", title }: Co
 
       {/* 2. Main Hero Poster & Countdown Stage: Full width on mobile, commanding and framed on desktop */}
       <div className="relative z-10 flex flex-col items-center justify-center w-full my-auto pt-0 sm:pt-6">
+        {/* Semantic SEO Heading for Google Search Indexing (Matches "تيرا هوب" and "TERRA HOP") */}
+        <h1 className="sr-only">TERRA HOP | تيرا هوب - براند ستريت وير مصري</h1>
+        <p className="sr-only">
+          موقع تيرا هوب (TERRA HOP) الرسمي - براند مصري للأزياء والستريت وير الأوفر سايز للشباب في مصر. هوديز وتيشيرتات بتصاميم عصرية وخامات فاخرة بحجز مسبق.
+        </p>
+
         {/* The Poster Image */}
         <div className="relative w-full sm:w-auto flex justify-center">
           <div className="relative w-full max-w-full sm:max-w-[440px] md:max-w-[500px] lg:max-w-[580px] xl:max-w-[640px] aspect-[764/1024] sm:rounded-2xl overflow-hidden shadow-[0_20px_70px_rgba(0,0,0,0.95)] sm:border sm:border-white/10 group bg-black">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/coming-soon.jpg"
-              alt={title || "TERRA HOP IS COMING SOON"}
+              alt={title || "TERRA HOP | تيرا هوب - براند ملابس ستريت وير مصري قريباً"}
               width={764}
               height={1024}
               fetchPriority="high"
