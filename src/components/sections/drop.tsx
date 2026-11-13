@@ -14,7 +14,8 @@ export function Drop({ drop }: { drop: typeof home.drop }) {
   const { data: liveProducts } = useLive("products");
 
   const effectiveProducts = useMemo<Product[]>(() => {
-    if (Array.isArray(liveProducts) && liveProducts.length > 0) {
+    // If live products array was fetched (even if empty [])
+    if (Array.isArray(liveProducts)) {
       return liveProducts.map((p: any) => ({
         slug: p.slug || p.id,
         name: p.name || p.nameAr,
@@ -35,6 +36,7 @@ export function Drop({ drop }: { drop: typeof home.drop }) {
         demo: false,
       }));
     }
+    // Fallback to static drop.products (which is now empty [])
     return drop.products;
   }, [liveProducts, drop.products]);
 
@@ -43,9 +45,11 @@ export function Drop({ drop }: { drop: typeof home.drop }) {
       <Container>
         <Reveal className="flex items-baseline justify-between gap-4">
           <h2 id="drop-heading" className="text-h1">{t.drop.heading}</h2>
-          <Link href={drop.viewAll.href} className="text-label min-h-11 py-3 underline underline-offset-4">
-            {t.drop.viewAll}
-          </Link>
+          {effectiveProducts.length > 0 && (
+            <Link href={drop.viewAll.href} className="text-label min-h-11 py-3 underline underline-offset-4">
+              {t.drop.viewAll}
+            </Link>
+          )}
         </Reveal>
         <ProductGrid products={effectiveProducts} />
       </Container>

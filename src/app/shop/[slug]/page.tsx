@@ -97,7 +97,7 @@ function getCatalogProducts(): Product[] {
       }));
     }
   } catch {}
-  return [...home.drop.products];
+  return [];
 }
 
 const SLUG_ALIASES: Record<string, string> = {

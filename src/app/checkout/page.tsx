@@ -39,7 +39,7 @@ function getCatalogProducts(): Product[] {
       }));
     }
   } catch {}
-  return [...home.drop.products];
+  return [];
 }
 
 export default function CheckoutPage() {

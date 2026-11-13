@@ -13,7 +13,7 @@ export function ShopView({ products }: { products: Product[] }) {
   const { data: liveProducts } = useLive("products");
 
   const effectiveProducts = useMemo<Product[]>(() => {
-    if (Array.isArray(liveProducts) && liveProducts.length > 0) {
+    if (Array.isArray(liveProducts)) {
       return liveProducts.map((p: any) => {
         const isSoldOut = p.forceSoldOut === true || p.status === "sold_out";
         return {
