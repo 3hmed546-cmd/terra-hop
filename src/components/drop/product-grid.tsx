@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles } from "lucide-react";
+import { HangerIcon } from "@/components/ui/hanger-icon";
 import { RevealItem } from "@/components/motion/reveal";
 import { ProductCard } from "./product-card";
 import { useLocale } from "@/lib/locale-context";
@@ -17,8 +17,8 @@ export function ProductGrid({ products }: Props) {
   if (!products || products.length === 0) {
     return (
       <div className="mt-8 sm:mt-12 w-full flex flex-col items-center justify-center py-16 sm:py-20 px-6 rounded-2xl border border-stone-200/80 bg-stone-50/60 text-center shadow-xs">
-        <div className="w-14 h-14 rounded-full bg-obsidian text-off-white flex items-center justify-center mb-4 shadow-sm">
-          <Sparkles className="w-7 h-7 text-amber-400" />
+        <div className="mb-5 flex items-center justify-center filter drop-shadow-md transition-transform hover:scale-105 duration-300">
+          <HangerIcon className="w-18 h-18 sm:w-22 sm:h-22" />
         </div>
         <h3 className="font-bold text-xl sm:text-2xl text-obsidian tracking-tight">
           {locale === "ar"
@@ -30,8 +30,8 @@ export function ProductGrid({ products }: Props) {
             ? "المخزن فارغ حالياً ويجري تجهيز قطع الكولكشن الشتوي الجديد بعناية فائقة وتصاميم حصرية."
             : "The store inventory is currently empty. Our new exclusive winter drop is being crafted with the highest standards."}
         </p>
-        <span className="mt-5 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-obsidian text-off-white text-xs font-mono uppercase tracking-widest">
-          {locale === "ar" ? "🔥 إصدار شتوي محدود قريباً" : "🔥 Limited Winter Drop Coming Soon"}
+        <span className="mt-5 inline-flex items-center gap-2 px-5 py-2 rounded-full bg-obsidian text-off-white text-xs sm:text-sm font-semibold tracking-wide border border-white/10 shadow-sm">
+          {locale === "ar" ? "اللي جاي مجاش قبل كده." : "What's coming has never been done before."}
         </span>
       </div>
     );
