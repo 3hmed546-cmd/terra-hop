@@ -6,12 +6,16 @@ export interface ComingSoonSetting {
   enabled: boolean;
   targetDate: string;
   title?: string;
+  imageUrl?: string;
+  caption?: string;
 }
 
 const DEFAULT_COMING_SOON: ComingSoonSetting = {
-  enabled: false,
+  enabled: true,
   targetDate: "2026-11-20T00:00:00",
   title: "TERRA HOP IS COMING SOON",
+  imageUrl: "/coming-soon.jpg",
+  caption: "",
 };
 
 export async function getComingSoonSettingServer(): Promise<ComingSoonSetting> {
@@ -27,9 +31,11 @@ export async function getComingSoonSettingServer(): Promise<ComingSoonSetting> {
       try {
         const parsed = JSON.parse(row.value);
         return {
-          enabled: Boolean(parsed.enabled),
+          enabled: parsed.enabled !== undefined ? Boolean(parsed.enabled) : DEFAULT_COMING_SOON.enabled,
           targetDate: parsed.targetDate || DEFAULT_COMING_SOON.targetDate,
           title: parsed.title || DEFAULT_COMING_SOON.title,
+          imageUrl: parsed.imageUrl || DEFAULT_COMING_SOON.imageUrl,
+          caption: parsed.caption !== undefined ? parsed.caption : DEFAULT_COMING_SOON.caption,
         };
       } catch {
         // malformed JSON fallback

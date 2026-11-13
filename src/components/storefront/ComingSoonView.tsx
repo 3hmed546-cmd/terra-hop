@@ -7,6 +7,8 @@ import { useLocale } from "@/lib/locale-context";
 interface ComingSoonViewProps {
   targetDate?: string;
   title?: string;
+  imageUrl?: string;
+  caption?: string;
 }
 
 interface TimeLeft {
@@ -39,13 +41,16 @@ function padZero(num: number): string {
   return String(num).padStart(2, "0");
 }
 
-export function ComingSoonView({ targetDate = "2026-11-20T00:00:00", title }: ComingSoonViewProps) {
+export function ComingSoonView({
+  targetDate = "2026-11-20T00:00:00",
+  title,
+  imageUrl = "/coming-soon.jpg",
+  caption,
+}: ComingSoonViewProps) {
   const { locale } = useLocale();
-  const [mounted, setMounted] = useState(false);
   const [timeLeft, setTimeLeft] = useState<TimeLeft>(() => calculateTimeLeft(targetDate));
 
   useEffect(() => {
-    setMounted(true);
     setTimeLeft(calculateTimeLeft(targetDate));
     const timer = setInterval(() => {
       setTimeLeft(calculateTimeLeft(targetDate));
@@ -53,15 +58,20 @@ export function ComingSoonView({ targetDate = "2026-11-20T00:00:00", title }: Co
     return () => clearInterval(timer);
   }, [targetDate]);
 
+  const activeImage = imageUrl || "/coming-soon.jpg";
+
   return (
     <section className="relative min-h-screen w-full flex flex-col items-center justify-between bg-[#040404] text-off-white overflow-hidden pb-8 sm:pb-12 select-none">
-      {/* 1. Atmospheric Ambient Backdrop on Desktop: Fills large screens with misty cinematic blur so there are zero empty voids */}
+      {/* 1. Atmospheric Ambient Backdrop: Fills large screens with misty cinematic blur so there are zero empty voids */}
       <div className="pointer-events-none absolute inset-0 -z-20 overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/coming-soon.jpg"
+          src={activeImage}
           alt=""
           aria-hidden="true"
+          fetchPriority="low"
+          loading="lazy"
+          decoding="async"
           className="w-full h-full object-cover scale-125 blur-3xl opacity-35 md:opacity-45 brightness-75 contrast-125 transform-gpu"
         />
         {/* Deep dark gradient overlay on top & sides */}
@@ -75,8 +85,8 @@ export function ComingSoonView({ targetDate = "2026-11-20T00:00:00", title }: Co
         />
       </div>
 
-      {/* 2. Main Hero Poster & Countdown Stage: Full width on mobile, commanding and framed on desktop */}
-      <div className="relative z-10 flex flex-col items-center justify-center w-full my-auto pt-0 sm:pt-6">
+      {/* 2. Main Hero Poster Stage: Widescreen banner with zero layout shift / zero glitch */}
+      <div className="relative z-10 flex flex-col items-center justify-center w-full my-auto pt-2 sm:pt-6">
         {/* Semantic SEO Heading for Google Search Indexing (Matches "تيرا هوب" and "TERRA HOP") */}
         <h1 className="sr-only">TERRA HOP | تيرا هوب - براند ستريت وير مصري</h1>
         <p className="sr-only">
@@ -84,27 +94,35 @@ export function ComingSoonView({ targetDate = "2026-11-20T00:00:00", title }: Co
         </p>
 
         {/* The Poster Image */}
-        <div className="relative w-full sm:w-auto flex justify-center">
-          <div className="relative w-full max-w-full sm:max-w-[440px] md:max-w-[500px] lg:max-w-[580px] xl:max-w-[640px] aspect-[764/1024] sm:rounded-2xl overflow-hidden shadow-[0_20px_70px_rgba(0,0,0,0.95)] sm:border sm:border-white/10 group bg-black">
+        <div className="relative w-full flex flex-col items-center justify-center px-3 sm:px-6">
+          <div className="relative w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl aspect-[1024/434] rounded-xl sm:rounded-2xl overflow-hidden shadow-[0_25px_80px_rgba(0,0,0,0.95)] border border-white/10 group bg-black/95">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/coming-soon.jpg"
-              alt={title || "TERRA HOP | تيرا هوب - براند ملابس ستريت وير مصري قريباً"}
-              width={764}
-              height={1024}
+              src={activeImage}
+              alt={title || "TERRA HOP | تيرا هوب - براند ستريت وير مصري قريباً"}
+              width={1024}
+              height={434}
               fetchPriority="high"
+              loading="eager"
               decoding="async"
-              className="w-full h-full object-cover sm:object-contain transition-transform duration-1000 ease-out group-hover:scale-[1.01]"
+              className="w-full h-full object-cover sm:object-contain transition-transform duration-700 ease-out group-hover:scale-[1.01]"
             />
-            {/* Edge fade on mobile so it blends seamlessly into the background */}
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#040404] via-transparent to-transparent sm:hidden opacity-90 h-24 top-auto" />
           </div>
+
+          {/* Optional Admin-Defined Caption */}
+          {caption ? (
+            <div className="mt-3.5 sm:mt-4 text-center px-4 max-w-2xl">
+              <p className="text-xs sm:text-sm md:text-base font-medium text-concrete/90 tracking-wide leading-relaxed">
+                {caption}
+              </p>
+            </div>
+          ) : null}
         </div>
 
         {/* 3. Live Countdown Dock */}
-        <div className="w-full max-w-lg mt-4 sm:mt-8 px-4">
+        <div className="w-full max-w-lg mt-4 sm:mt-7 px-4">
           <div className="relative overflow-hidden bg-black/75 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 sm:p-5 shadow-2xl">
-            {/* Top Tagline without any star emojis or icons */}
+            {/* Top Tagline */}
             <div className="flex items-center justify-center mb-3.5 text-center">
               <span className="font-mono text-[11px] sm:text-xs uppercase tracking-widest text-concrete/90 font-semibold">
                 {locale === "ar" ? "العد التنازلي لموعد الإطلاق الرسمي" : "OFFICIAL DROP LAUNCH COUNTDOWN"}
@@ -115,8 +133,11 @@ export function ComingSoonView({ targetDate = "2026-11-20T00:00:00", title }: Co
             <div className="grid grid-cols-4 gap-2 sm:gap-3 text-center">
               {/* Days */}
               <div className="flex flex-col items-center justify-center bg-white/[0.04] border border-white/5 rounded-xl py-2.5 sm:py-3 px-1">
-                <span className="font-mono text-2xl sm:text-4xl md:text-5xl font-extrabold text-off-white tracking-wider tabular-nums">
-                  {mounted ? padZero(timeLeft.days) : "00"}
+                <span
+                  suppressHydrationWarning
+                  className="font-mono text-2xl sm:text-4xl md:text-5xl font-extrabold text-off-white tracking-wider tabular-nums"
+                >
+                  {padZero(timeLeft.days)}
                 </span>
                 <span className="text-[10px] sm:text-xs text-concrete uppercase tracking-widest mt-1 font-semibold">
                   {locale === "ar" ? "يوم" : "DAYS"}
@@ -125,8 +146,11 @@ export function ComingSoonView({ targetDate = "2026-11-20T00:00:00", title }: Co
 
               {/* Hours */}
               <div className="flex flex-col items-center justify-center bg-white/[0.04] border border-white/5 rounded-xl py-2.5 sm:py-3 px-1">
-                <span className="font-mono text-2xl sm:text-4xl md:text-5xl font-extrabold text-off-white tracking-wider tabular-nums">
-                  {mounted ? padZero(timeLeft.hours) : "00"}
+                <span
+                  suppressHydrationWarning
+                  className="font-mono text-2xl sm:text-4xl md:text-5xl font-extrabold text-off-white tracking-wider tabular-nums"
+                >
+                  {padZero(timeLeft.hours)}
                 </span>
                 <span className="text-[10px] sm:text-xs text-concrete uppercase tracking-widest mt-1 font-semibold">
                   {locale === "ar" ? "ساعة" : "HRS"}
@@ -135,8 +159,11 @@ export function ComingSoonView({ targetDate = "2026-11-20T00:00:00", title }: Co
 
               {/* Minutes */}
               <div className="flex flex-col items-center justify-center bg-white/[0.04] border border-white/5 rounded-xl py-2.5 sm:py-3 px-1">
-                <span className="font-mono text-2xl sm:text-4xl md:text-5xl font-extrabold text-off-white tracking-wider tabular-nums">
-                  {mounted ? padZero(timeLeft.minutes) : "00"}
+                <span
+                  suppressHydrationWarning
+                  className="font-mono text-2xl sm:text-4xl md:text-5xl font-extrabold text-off-white tracking-wider tabular-nums"
+                >
+                  {padZero(timeLeft.minutes)}
                 </span>
                 <span className="text-[10px] sm:text-xs text-concrete uppercase tracking-widest mt-1 font-semibold">
                   {locale === "ar" ? "دقيقة" : "MINS"}
@@ -145,8 +172,11 @@ export function ComingSoonView({ targetDate = "2026-11-20T00:00:00", title }: Co
 
               {/* Seconds */}
               <div className="flex flex-col items-center justify-center bg-white/[0.04] border border-white/5 rounded-xl py-2.5 sm:py-3 px-1">
-                <span className="font-mono text-2xl sm:text-4xl md:text-5xl font-extrabold text-off-white tracking-wider tabular-nums text-white">
-                  {mounted ? padZero(timeLeft.seconds) : "00"}
+                <span
+                  suppressHydrationWarning
+                  className="font-mono text-2xl sm:text-4xl md:text-5xl font-extrabold text-off-white tracking-wider tabular-nums text-white"
+                >
+                  {padZero(timeLeft.seconds)}
                 </span>
                 <span className="text-[10px] sm:text-xs text-concrete uppercase tracking-widest mt-1 font-semibold">
                   {locale === "ar" ? "ثانية" : "SECS"}

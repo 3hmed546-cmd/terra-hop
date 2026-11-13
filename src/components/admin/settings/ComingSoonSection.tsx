@@ -1,24 +1,48 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Clock, Eye, Sparkles, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  Clock,
+  Eye,
+  Sparkles,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  Upload,
+  Image as ImageIcon,
+  RotateCcw,
+  Type,
+} from "lucide-react";
 import { useLive } from "@/lib/use-live";
 import { apiFetch } from "@/lib/admin-auth";
+
+const DEFAULT_IMAGE_URL = "/coming-soon.jpg";
 
 export function ComingSoonSection() {
   const { data: liveSite } = useLive("settings");
   const [enabled, setEnabled] = useState(false);
   const [targetDate, setTargetDate] = useState("2026-11-20T00:00");
+  const [imageUrl, setImageUrl] = useState(DEFAULT_IMAGE_URL);
+  const [caption, setCaption] = useState("");
+
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Sync with live database setting
   useEffect(() => {
     const cs = liveSite?.settings?.store?.coming_soon;
     if (cs) {
       setEnabled(Boolean(cs.enabled));
+      if (cs.imageUrl) {
+        setImageUrl(cs.imageUrl);
+      }
+      if (cs.caption !== undefined) {
+        setCaption(cs.caption);
+      }
       if (cs.targetDate) {
-        // Format ISO string to datetime-local format (YYYY-MM-DDTHH:mm)
         try {
           const d = new Date(cs.targetDate);
           if (!isNaN(d.getTime())) {
@@ -35,9 +59,16 @@ export function ComingSoonSection() {
     }
   }, [liveSite]);
 
-  async function updateSetting(newEnabled: boolean, newDate: string) {
+  async function handleSaveSettings(
+    override?: { newEnabled?: boolean; newDate?: string; newImage?: string; newCaption?: string }
+  ) {
     setLoading(true);
     setStatusMessage(null);
+
+    const saveEnabled = override?.newEnabled !== undefined ? override.newEnabled : enabled;
+    const saveDate = override?.newDate !== undefined ? override.newDate : targetDate;
+    const saveImage = override?.newImage !== undefined ? override.newImage : imageUrl;
+    const saveCaption = override?.newCaption !== undefined ? override.newCaption : caption;
 
     try {
       const res = await apiFetch("/api/admin/settings", {
@@ -47,9 +78,11 @@ export function ComingSoonSection() {
           groupKey: "store",
           key: "coming_soon",
           value: {
-            enabled: newEnabled,
-            targetDate: newDate ? new Date(newDate).toISOString() : "2026-11-20T00:00:00.000Z",
+            enabled: saveEnabled,
+            targetDate: saveDate ? new Date(saveDate).toISOString() : "2026-11-20T00:00:00.000Z",
             title: "TERRA HOP IS COMING SOON",
+            imageUrl: saveImage || DEFAULT_IMAGE_URL,
+            caption: saveCaption.trim(),
             updatedAt: new Date().toISOString(),
           },
         }),
@@ -61,12 +94,13 @@ export function ComingSoonSection() {
         throw new Error(payload?.error?.message || payload?.error || "فشل حفظ الإعدادات، يرجى المحاولة مرة أخرى.");
       }
 
-      setEnabled(newEnabled);
+      setEnabled(saveEnabled);
+      setImageUrl(saveImage);
+      setCaption(saveCaption);
+
       setStatusMessage({
         type: "success",
-        text: newEnabled
-          ? "تم تفعيل وضع Coming Soon بنجاح! الموقع يعرض الآن شاشة الإطلاق والعداد."
-          : "تم إلغاء وضع Coming Soon بنجاح! الموقع عاد للعمل بشكل طبيعي لجميع الزوار.",
+        text: "تم حفظ إعدادات Coming Soon بنجاح! التغييرات تظهر لحظياً لجميع الزوار.",
       });
     } catch (err: any) {
       setStatusMessage({
@@ -79,17 +113,62 @@ export function ComingSoonSection() {
   }
 
   async function handleToggle() {
-    await updateSetting(!enabled, targetDate);
+    const nextState = !enabled;
+    setEnabled(nextState);
+    await handleSaveSettings({ newEnabled: nextState });
   }
 
-  async function handleSaveDate(e: React.FormEvent) {
-    e.preventDefault();
-    await updateSetting(enabled, targetDate);
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    setStatusMessage(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await apiFetch("/api/admin/assets", {
+        method: "POST",
+        body: formData,
+      });
+
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok || !payload.ok || !payload.data?.url) {
+        throw new Error(payload?.error?.message || payload?.error || "فشل رفع الصورة.");
+      }
+
+      const uploadedUrl = payload.data.url;
+      setImageUrl(uploadedUrl);
+      setStatusMessage({
+        type: "success",
+        text: "تم رفع الصورة بنجاح! اضغط 'حفظ جميع التغييرات' لاعتمادها على الموقع.",
+      });
+    } catch (err: any) {
+      setStatusMessage({
+        type: "error",
+        text: err?.message || "حدث خطأ أثناء رفع الصورة.",
+      });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  }
+
+  function handleResetImage() {
+    setImageUrl(DEFAULT_IMAGE_URL);
+    setStatusMessage({
+      type: "success",
+      text: "تم استعادة مسار الصورة الافتراضية. اضغط 'حفظ جميع التغييرات' للتأكيد.",
+    });
   }
 
   return (
     <div className="space-y-6 pt-2">
-      {/* Status banner */}
+      {/* 1. Status Banner with Instant Live Toggle */}
       <div
         className={`p-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all ${
           enabled
@@ -141,43 +220,166 @@ export function ComingSoonSection() {
         </button>
       </div>
 
-      {/* Target Date Configuration Form */}
-      <form onSubmit={handleSaveDate} className="bg-white/[0.02] border border-white/10 rounded-xl p-4 sm:p-5 space-y-4">
+      {/* 2. Target Date Picker */}
+      <div className="bg-white/[0.02] border border-white/10 rounded-xl p-4 sm:p-5 space-y-3">
+        <div>
+          <label htmlFor="target-date-input" className="block text-sm font-semibold text-off-white flex items-center gap-2">
+            <Clock className="w-4 h-4 text-concrete" />
+            موعد الإطلاق المستهدف (نهاية العداد التنازلي)
+          </label>
+          <p className="text-xs text-concrete mt-0.5">
+            حدد اليوم والساعة التي سينتهي عندها العداد على شاشة الموقع.
+          </p>
+        </div>
+
+        <input
+          id="target-date-input"
+          type="datetime-local"
+          value={targetDate}
+          onChange={(e) => setTargetDate(e.target.value)}
+          disabled={loading}
+          className="w-full sm:max-w-md bg-obsidian border border-white/20 rounded-lg px-3.5 py-2 text-off-white text-sm focus:outline-none focus:border-white transition-colors"
+        />
+      </div>
+
+      {/* 3. Image Selection & Upload */}
+      <div className="bg-white/[0.02] border border-white/10 rounded-xl p-4 sm:p-5 space-y-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
-            <label htmlFor="target-date-input" className="block text-sm font-semibold text-off-white">
-              موعد الإطلاق المستهدف (نهاية العداد التنازلي)
+            <label className="block text-sm font-semibold text-off-white flex items-center gap-2">
+              <ImageIcon className="w-4 h-4 text-concrete" />
+              صورة الإطلاق (Coming Soon Banner)
             </label>
             <p className="text-xs text-concrete mt-0.5">
-              حدد اليوم والساعة التي سينتهي عندها العداد (الافتراضي: 20 نوفمبر 2026).
+              يمكنك رفع صورة جديدة من جهازك أو تحديد رابط صورة مخصص (الأبعاد المثالية: 1024 × 434 عريضة).
             </p>
+          </div>
+
+          {/* Upload Button */}
+          <div className="flex items-center gap-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              accept="image/*"
+              className="hidden"
+              id="coming-soon-file-input"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading || loading}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-off-white text-xs font-semibold border border-white/20 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+              {uploading ? "جاري الرفع..." : "رفع صورة من جهازك"}
+            </button>
+
+            {imageUrl !== DEFAULT_IMAGE_URL && (
+              <button
+                type="button"
+                onClick={handleResetImage}
+                title="استعادة الصورة الافتراضية"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-800/80 hover:bg-zinc-800 text-concrete hover:text-off-white text-xs border border-white/10 transition-colors cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                استعادة الافتراضية
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 pt-1">
+        {/* URL Input */}
+        <div>
+          <label htmlFor="image-url-input" className="block text-xs text-concrete mb-1">
+            رابط / مسار الصورة المباشر:
+          </label>
           <input
-            id="target-date-input"
-            type="datetime-local"
-            value={targetDate}
-            onChange={(e) => setTargetDate(e.target.value)}
+            id="image-url-input"
+            type="text"
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
             disabled={loading}
-            className="flex-1 bg-obsidian border border-white/20 rounded-lg px-3.5 py-2 text-off-white text-sm focus:outline-none focus:border-white transition-colors"
+            placeholder="/coming-soon.jpg"
+            className="w-full bg-obsidian border border-white/20 rounded-lg px-3.5 py-2 text-off-white text-sm focus:outline-none focus:border-white font-mono text-xs transition-colors"
           />
-          <button
-            type="submit"
-            disabled={loading}
-            className="inline-flex items-center justify-center gap-2 px-5 py-2 rounded-lg bg-off-white text-obsidian font-bold text-sm hover:bg-white transition-colors cursor-pointer disabled:opacity-50"
-          >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Clock className="w-4 h-4" />}
-            حفظ الموعد
-          </button>
         </div>
-      </form>
+
+        {/* Live Preview Box */}
+        <div className="space-y-2 pt-2">
+          <span className="text-xs font-medium text-concrete">معاينة مباشرة لشكل البانر:</span>
+          <div className="relative w-full max-w-xl aspect-[1024/434] rounded-xl overflow-hidden border border-white/20 bg-black shadow-lg">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imageUrl || DEFAULT_IMAGE_URL}
+              alt="معاينة Coming Soon"
+              className="w-full h-full object-cover sm:object-contain"
+              onError={(e) => {
+                // Fallback to default if custom url breaks
+                (e.currentTarget as HTMLImageElement).src = DEFAULT_IMAGE_URL;
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Caption Input */}
+      <div className="bg-white/[0.02] border border-white/10 rounded-xl p-4 sm:p-5 space-y-3">
+        <div>
+          <label htmlFor="caption-input" className="block text-sm font-semibold text-off-white flex items-center gap-2">
+            <Type className="w-4 h-4 text-concrete" />
+            نص توضيحي (Caption) اختياري
+          </label>
+          <p className="text-xs text-concrete mt-0.5">
+            نص يظهر أسفل صورة Coming Soon بشكل أنيق للزوار (مثال: ترقبوا كولكشن الشتاء الأول قريباً).
+          </p>
+        </div>
+
+        <input
+          id="caption-input"
+          type="text"
+          value={caption}
+          onChange={(e) => setCaption(e.target.value)}
+          disabled={loading}
+          placeholder="مثال: ترقبوا كولكشن الشتاء الأول قريباً | Raising The Standard"
+          className="w-full bg-obsidian border border-white/20 rounded-lg px-3.5 py-2 text-off-white text-sm focus:outline-none focus:border-white transition-colors"
+        />
+
+        {caption.trim() && (
+          <div className="p-3 rounded-lg bg-black/60 border border-white/10 text-center">
+            <span className="text-xs text-concrete block mb-1">معاينة النص كما سيظهر للزوار:</span>
+            <p className="text-sm font-medium text-concrete/95 tracking-wide">{caption.trim()}</p>
+          </div>
+        )}
+      </div>
+
+      {/* 5. Save Action Button */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+        <button
+          type="button"
+          onClick={() => handleSaveSettings()}
+          disabled={loading || uploading}
+          className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-off-white text-obsidian font-bold text-sm hover:bg-white transition-colors cursor-pointer disabled:opacity-50 shadow-md"
+        >
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+          حفظ جميع إعدادات Coming Soon
+        </button>
+
+        <a
+          href="/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-white/20 text-xs font-semibold text-off-white hover:bg-white/5 transition-colors"
+        >
+          <Eye className="w-3.5 h-3.5" />
+          معاينة الواجهة كزائر ↗
+        </a>
+      </div>
 
       {/* Status feedback message */}
       {statusMessage && (
         <div
-          className={`p-3 rounded-lg flex items-center gap-2.5 text-xs ${
+          className={`p-3.5 rounded-lg flex items-center gap-2.5 text-xs ${
             statusMessage.type === "success"
               ? "bg-emerald-950/40 border border-emerald-500/30 text-emerald-300"
               : "bg-rose-950/40 border border-rose-500/30 text-rose-300"
@@ -192,20 +394,11 @@ export function ComingSoonSection() {
         </div>
       )}
 
-      {/* Info and Preview Button */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-2 border-t border-white/5">
-        <p className="text-xs text-concrete leading-relaxed max-w-xl">
-          💡 عند التفعيل، ستتغير واجهة الموقع كلياً في نفس اللحظة عبر البث المباشر (SSE)، وتظهر صورة الإطلاق مع العداد التنازلي، ويبقى الفوتر متاحاً أسفل الصفحة بالمعلومات وروابط التواصل. لوحة تحكم الإدارة تظل متاحة لك دائماً.
+      {/* Footer Info */}
+      <div className="pt-2 border-t border-white/5">
+        <p className="text-xs text-concrete leading-relaxed">
+          💡 عند تفعيل الوضع أو تحديث الصورة أو الـ Caption، تنعكس التغييرات فورياً عبر البث المباشر (SSE) لجميع المتصفحات المفتوحة دون الحاجة لإعادة تحميل الصفحة. لوحة تحكم الإدارة تظل متاحة لك دائماً.
         </p>
-        <a
-          href="/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-white/20 text-xs font-semibold text-off-white hover:bg-white/5 transition-colors shrink-0"
-        >
-          <Eye className="w-3.5 h-3.5" />
-          معاينة الواجهة كزائر ↗
-        </a>
       </div>
     </div>
   );

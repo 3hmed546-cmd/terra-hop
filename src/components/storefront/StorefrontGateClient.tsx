@@ -48,11 +48,18 @@ export function StorefrontGateClient({
   const targetDate =
     liveComingSoon?.targetDate || initialSetting.targetDate || "2026-11-20T00:00:00";
   const title = liveComingSoon?.title || initialSetting.title;
+  const imageUrl = liveComingSoon?.imageUrl || initialSetting.imageUrl || "/coming-soon.jpg";
+  const caption = liveComingSoon?.caption !== undefined ? liveComingSoon.caption : initialSetting.caption;
 
   if (isEnabled) {
     return (
       <div className="min-h-screen bg-[#040404] text-off-white flex flex-col justify-between selection:bg-white/20">
-        <ComingSoonView targetDate={targetDate} title={title} />
+        <ComingSoonView
+          targetDate={targetDate}
+          title={title}
+          imageUrl={imageUrl}
+          caption={caption}
+        />
         <Footer footer={home.footer} />
       </div>
     );
