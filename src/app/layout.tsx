@@ -105,7 +105,7 @@ const brandJsonLd = {
       url: "https://terra-hop.com",
       logo: "https://terra-hop.com/icon.png",
       sameAs: [
-        "https://www.tiktok.com/@teera.hop",
+        "https://www.tiktok.com/@terr3hop",
         "https://www.instagram.com/terr3hop/",
         "https://www.facebook.com/terrahop.wear",
       ],
@@ -142,8 +142,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap"
           rel="stylesheet"
         />
-        {/* Preload hero Coming Soon banner for instant, zero-glitch rendering */}
-        <link rel="preload" as="image" href="/coming-soon.jpg" fetchPriority="high" />
+        {/* Preload hero Coming Soon banners for instant, zero-glitch rendering */}
+        <link rel="preload" as="image" href="/coming-soon-mobile.jpg" media="(max-width: 639px)" fetchPriority="high" />
+        <link rel="preload" as="image" href="/coming-soon.jpg" media="(min-width: 640px)" fetchPriority="high" />
         {/* Google Tag (gtm.js / GTM-TBQL5NFR) */}
         <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-TBQL5NFR" />
         <script

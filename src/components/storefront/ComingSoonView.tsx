@@ -8,6 +8,7 @@ interface ComingSoonViewProps {
   targetDate?: string;
   title?: string;
   imageUrl?: string;
+  mobileImageUrl?: string;
   caption?: string;
 }
 
@@ -45,6 +46,7 @@ export function ComingSoonView({
   targetDate = "2026-11-20T00:00:00",
   title,
   imageUrl = "/coming-soon.jpg",
+  mobileImageUrl = "/coming-soon-mobile.jpg",
   caption,
 }: ComingSoonViewProps) {
   const { locale } = useLocale();
@@ -58,22 +60,27 @@ export function ComingSoonView({
     return () => clearInterval(timer);
   }, [targetDate]);
 
-  const activeImage = imageUrl || "/coming-soon.jpg";
+  const activeDesktopImage = imageUrl || "/coming-soon.jpg";
+  const activeMobileImage = mobileImageUrl || "/coming-soon-mobile.jpg";
 
   return (
     <section className="relative min-h-screen w-full flex flex-col items-center justify-between bg-[#040404] text-off-white overflow-hidden pb-8 sm:pb-12 select-none">
-      {/* 1. Atmospheric Ambient Backdrop: Fills large screens with misty cinematic blur so there are zero empty voids */}
+      {/* 1. Atmospheric Ambient Backdrop: Fills screens with misty cinematic blur so there are zero empty voids */}
       <div className="pointer-events-none absolute inset-0 -z-20 overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={activeImage}
-          alt=""
-          aria-hidden="true"
-          fetchPriority="low"
-          loading="lazy"
-          decoding="async"
-          className="w-full h-full object-cover scale-125 blur-3xl opacity-35 md:opacity-45 brightness-75 contrast-125 transform-gpu"
-        />
+        <picture>
+          <source media="(max-width: 639px)" srcSet={activeMobileImage} />
+          <source media="(min-width: 640px)" srcSet={activeDesktopImage} />
+          <img
+            src={activeDesktopImage}
+            alt=""
+            aria-hidden="true"
+            fetchPriority="low"
+            loading="lazy"
+            decoding="async"
+            className="w-full h-full object-cover scale-125 blur-3xl opacity-35 md:opacity-45 brightness-75 contrast-125 transform-gpu"
+          />
+        </picture>
         {/* Deep dark gradient overlay on top & sides */}
         <div className="absolute inset-0 bg-gradient-to-b from-[#040404]/90 via-[#040404]/60 to-[#040404]" />
         <div
@@ -85,7 +92,7 @@ export function ComingSoonView({
         />
       </div>
 
-      {/* 2. Main Hero Poster Stage: Widescreen banner with zero layout shift / zero glitch */}
+      {/* 2. Main Hero Poster Stage: Responsive (Portrait on Mobile, Widescreen on Desktop) */}
       <div className="relative z-10 flex flex-col items-center justify-center w-full my-auto pt-2 sm:pt-6">
         {/* Semantic SEO Heading for Google Search Indexing (Matches "تيرا هوب" and "TERRA HOP") */}
         <h1 className="sr-only">TERRA HOP | تيرا هوب - براند ستريت وير مصري</h1>
@@ -93,19 +100,35 @@ export function ComingSoonView({
           موقع تيرا هوب (TERRA HOP) الرسمي - براند مصري للأزياء والستريت وير الأوفر سايز للشباب في مصر. هوديز وتيشيرتات بتصاميم عصرية وخامات فاخرة بحجز مسبق.
         </p>
 
-        {/* The Poster Image */}
+        {/* The Responsive Poster Stage */}
         <div className="relative w-full flex flex-col items-center justify-center px-3 sm:px-6">
-          <div className="relative w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl aspect-[1024/434] rounded-xl sm:rounded-2xl overflow-hidden shadow-[0_25px_80px_rgba(0,0,0,0.95)] border border-white/10 group bg-black/95">
+          {/* Mobile Vertical Poster (< sm): Fills phone viewport elegantly like the original poster */}
+          <div className="block sm:hidden relative w-full max-w-[340px] xs:max-w-[360px] aspect-[768/1376] rounded-xl overflow-hidden shadow-[0_25px_80px_rgba(0,0,0,0.95)] border border-white/10 group bg-black/95">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={activeImage}
+              src={activeMobileImage}
+              alt={title || "TERRA HOP | تيرا هوب - براند ستريت وير مصري قريباً"}
+              width={768}
+              height={1376}
+              fetchPriority="high"
+              loading="eager"
+              decoding="async"
+              className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.01]"
+            />
+          </div>
+
+          {/* Desktop Cinematic Banner (>= sm): Widescreen cinematic spectacle */}
+          <div className="hidden sm:block relative w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl aspect-[1024/434] rounded-2xl overflow-hidden shadow-[0_25px_80px_rgba(0,0,0,0.95)] border border-white/10 group bg-black/95">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={activeDesktopImage}
               alt={title || "TERRA HOP | تيرا هوب - براند ستريت وير مصري قريباً"}
               width={1024}
               height={434}
               fetchPriority="high"
               loading="eager"
               decoding="async"
-              className="w-full h-full object-cover sm:object-contain transition-transform duration-700 ease-out group-hover:scale-[1.01]"
+              className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.01]"
             />
           </div>
 

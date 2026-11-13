@@ -20,6 +20,7 @@ import { useShortcutHelp } from "../ShortcutsDialog";
 import { AdminPushToggle } from "../ui/AdminPushToggle";
 import { EmailSettingsSection } from "../ui/EmailSettingsSection";
 import { ComingSoonSection } from "./ComingSoonSection";
+import { SocialContactsSection } from "./SocialContactsSection";
 import { Button, Checkbox, Dialog, NumberInput, Select, TextInput, useToast } from "../ui";
 
 const S = ADMIN_STRINGS.settings;
@@ -179,6 +180,10 @@ function SettingsEditor({ settings }: { settings: Settings }) {
 
         <Section id="coming-soon" title="وضع الإطلاق (Coming Soon)">
           <ComingSoonSection />
+        </Section>
+
+        <Section id="social-contacts" title="روابط السوشيال ميديا والتواصل (الفوتر)">
+          <SocialContactsSection />
         </Section>
 
         <Section id="push-notifications" title="إشعارات الطلبات الفورية (Web Push)">

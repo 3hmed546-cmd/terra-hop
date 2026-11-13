@@ -5,13 +5,27 @@ import { Globe } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { WhatsAppIcon, InstagramIcon, FacebookIcon, TikTokIcon } from "@/components/ui/social-icons";
 import { useLocale } from "@/lib/locale-context";
+import { useLive } from "@/lib/use-live";
 import type { home } from "@/content/home";
 
 const link = "underline-offset-4 hover:underline";
 
 export function Footer({ footer }: { footer: typeof home.footer }) {
   const { locale, toggleLocale, t } = useLocale();
+  const { data: liveSite } = useLive("settings");
   const currentYear = 2026;
+
+  // Real-time live settings from admin dashboard (with instant fallback to content defaults)
+  const liveContacts = liveSite?.settings?.store?.footer_contacts;
+
+  const supportEmail = liveContacts?.supportEmail || footer.email || "support@terra-hop.com";
+  const infoEmail = liveContacts?.infoEmail || "info@terra-hop.com";
+  const phone = (liveContacts?.phone || "").trim();
+
+  const whatsappUrl = liveContacts?.whatsappUrl || footer.socials.whatsapp;
+  const instagramUrl = liveContacts?.instagramUrl || footer.socials.instagram;
+  const facebookUrl = liveContacts?.facebookUrl || footer.socials.facebook;
+  const tiktokUrl = liveContacts?.tiktokUrl || footer.socials.tiktok;
 
   const navColumns = [
     [
@@ -63,63 +77,82 @@ export function Footer({ footer }: { footer: typeof home.footer }) {
             ))}
           </nav>
 
-          {/* Contact Details - Always LTR */}
+          {/* Contact Details - Live Dynamic Binding */}
           <div className="md:col-span-4 text-left">
             <h2 className="text-label text-(--fg-muted)">{t.footer.contact}</h2>
             <ul className="mt-4 space-y-3 text-left">
-              <li>
-                <a href="mailto:support@terra-hop.com" className={`${link} block font-medium`}>
-                  support@terra-hop.com
-                </a>
-              </li>
-              <li>
-                <a href="mailto:info@terra-hop.com" className={`${link} block font-medium`}>
-                  info@terra-hop.com
-                </a>
-              </li>
+              {supportEmail && (
+                <li>
+                  <a href={`mailto:${supportEmail}`} className={`${link} block font-medium`}>
+                    {supportEmail}
+                  </a>
+                </li>
+              )}
+              {infoEmail && (
+                <li>
+                  <a href={`mailto:${infoEmail}`} className={`${link} block font-medium`}>
+                    {infoEmail}
+                  </a>
+                </li>
+              )}
+              {phone && (
+                <li>
+                  <a href={`tel:${phone.replace(/\s+/g, "")}`} className={`${link} block font-medium text-off-white`} dir="ltr">
+                    {phone}
+                  </a>
+                </li>
+              )}
             </ul>
           </div>
         </div>
 
-        {/* Centered Responsive Social Icons Bar on mobile and desktop */}
+        {/* Centered Responsive Social Icons Bar on mobile and desktop - Live Dynamic Binding */}
         <div className="mt-10 border-t border-charcoal/70 pt-8 flex items-center justify-center">
           <div className="flex items-center justify-center gap-4 sm:gap-5 flex-wrap">
-            <a
-              href={footer.socials.whatsapp}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="WhatsApp"
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-off-white text-obsidian transition-transform duration-200 hover:scale-110 hover:bg-white shadow-sm"
-            >
-              <WhatsAppIcon />
-            </a>
-            <a
-              href={footer.socials.instagram}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Instagram"
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-off-white text-obsidian transition-transform duration-200 hover:scale-110 hover:bg-white shadow-sm"
-            >
-              <InstagramIcon />
-            </a>
-            <a
-              href={footer.socials.facebook}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Facebook"
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-off-white text-obsidian transition-transform duration-200 hover:scale-110 hover:bg-white shadow-sm"
-            >
-              <FacebookIcon />
-            </a>
-            <a
-              href={footer.socials.tiktok}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="TikTok"
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-off-white text-obsidian transition-transform duration-200 hover:scale-110 hover:bg-white shadow-sm"
-            >
-              <TikTokIcon />
-            </a>
+            {whatsappUrl && (
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="WhatsApp"
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-off-white text-obsidian transition-transform duration-200 hover:scale-110 hover:bg-white shadow-sm"
+              >
+                <WhatsAppIcon />
+              </a>
+            )}
+            {instagramUrl && (
+              <a
+                href={instagramUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Instagram"
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-off-white text-obsidian transition-transform duration-200 hover:scale-110 hover:bg-white shadow-sm"
+              >
+                <InstagramIcon />
+              </a>
+            )}
+            {facebookUrl && (
+              <a
+                href={facebookUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Facebook"
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-off-white text-obsidian transition-transform duration-200 hover:scale-110 hover:bg-white shadow-sm"
+              >
+                <FacebookIcon />
+              </a>
+            )}
+            {tiktokUrl && (
+              <a
+                href={tiktokUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="TikTok"
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-off-white text-obsidian transition-transform duration-200 hover:scale-110 hover:bg-white shadow-sm"
+              >
+                <TikTokIcon />
+              </a>
+            )}
           </div>
         </div>
 

@@ -199,7 +199,7 @@ export const home = {
       whatsapp: "https://chat.whatsapp.com/EWcBrybFmbr7jbMJUJGSUk?s=sh&p=a&iam=2",
       instagram: "https://www.instagram.com/terr3hop/",
       facebook: "https://www.facebook.com/terrahop.wear",
-      tiktok: "https://www.tiktok.com/@teera.hop?_r=1&_t=ZS-9BJsTH7KSZu",
+      tiktok: "https://www.tiktok.com/@terr3hop",
     },
     copyright: "TERRA HOP",
     tagline: "Higher on Purpose.",

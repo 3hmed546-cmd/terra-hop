@@ -7,6 +7,7 @@ export interface ComingSoonSetting {
   targetDate: string;
   title?: string;
   imageUrl?: string;
+  mobileImageUrl?: string;
   caption?: string;
 }
 
@@ -15,6 +16,7 @@ const DEFAULT_COMING_SOON: ComingSoonSetting = {
   targetDate: "2026-11-20T00:00:00",
   title: "TERRA HOP IS COMING SOON",
   imageUrl: "/coming-soon.jpg",
+  mobileImageUrl: "/coming-soon-mobile.jpg",
   caption: "",
 };
 
@@ -35,6 +37,7 @@ export async function getComingSoonSettingServer(): Promise<ComingSoonSetting> {
           targetDate: parsed.targetDate || DEFAULT_COMING_SOON.targetDate,
           title: parsed.title || DEFAULT_COMING_SOON.title,
           imageUrl: parsed.imageUrl || DEFAULT_COMING_SOON.imageUrl,
+          mobileImageUrl: parsed.mobileImageUrl || DEFAULT_COMING_SOON.mobileImageUrl,
           caption: parsed.caption !== undefined ? parsed.caption : DEFAULT_COMING_SOON.caption,
         };
       } catch {

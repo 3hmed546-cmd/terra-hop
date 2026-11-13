@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRef } from "react";
 import { useLocale } from "@/lib/locale-context";
 import { useCart } from "@/lib/cart";
+import { useLive } from "@/lib/use-live";
 import { Logo } from "@/components/ui/logo";
 import { FacebookIcon, InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/ui/social-icons";
 import { X, Menu, ShoppingBag, Search } from "lucide-react";
@@ -25,7 +26,14 @@ export function MobileMenu({ links, labels }: Props) {
   const openerRef = useRef<HTMLButtonElement>(null);
   const { locale, t } = useLocale();
   const { count } = useCart();
+  const { data: liveSite } = useLive("settings");
   const close = () => dialogRef.current?.close();
+
+  const liveContacts = liveSite?.settings?.store?.footer_contacts;
+  const whatsappUrl = liveContacts?.whatsappUrl || "https://chat.whatsapp.com/EWcBrybFmbr7jbMJUJGSUk?s=sh&p=a&iam=2";
+  const tiktokUrl = liveContacts?.tiktokUrl || "https://www.tiktok.com/@terr3hop";
+  const instagramUrl = liveContacts?.instagramUrl || "https://www.instagram.com/terr3hop/";
+  const facebookUrl = liveContacts?.facebookUrl || "https://www.facebook.com/terrahop.wear";
 
   return (
     <>
@@ -151,7 +159,7 @@ export function MobileMenu({ links, labels }: Props) {
           <div className="mt-auto shrink-0 border-t border-stone-200/80 px-6 py-6 flex flex-col items-center justify-center bg-white">
             <div className="flex items-center justify-center gap-6 text-stone-900">
               <a
-                href="https://chat.whatsapp.com/EWcBrybFmbr7jbMJUJGSUk?s=sh&p=a&iam=2"
+                href={whatsappUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="WhatsApp Group"
@@ -160,7 +168,7 @@ export function MobileMenu({ links, labels }: Props) {
                 <WhatsAppIcon className="h-5 w-5 fill-current" />
               </a>
               <a
-                href="https://www.tiktok.com/@teera.hop?_r=1&_t=ZS-9BJsTH7KSZu"
+                href={tiktokUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="TikTok"
@@ -169,7 +177,7 @@ export function MobileMenu({ links, labels }: Props) {
                 <TikTokIcon className="h-5 w-5 fill-current" />
               </a>
               <a
-                href="https://www.instagram.com/terr3hop/"
+                href={instagramUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Instagram"
@@ -178,7 +186,7 @@ export function MobileMenu({ links, labels }: Props) {
                 <InstagramIcon className="h-5 w-5 fill-current" />
               </a>
               <a
-                href="https://www.facebook.com/terrahop.wear"
+                href={facebookUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Facebook"

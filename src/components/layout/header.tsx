@@ -8,6 +8,7 @@ import { Logo } from "@/components/ui/logo";
 import { CartLink } from "@/components/cart/cart-link";
 import { MobileMenu } from "./mobile-menu";
 import { useLocale } from "@/lib/locale-context";
+import { useLive } from "@/lib/use-live";
 import { FacebookIcon, InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/ui/social-icons";
 import type { home } from "@/content/home";
 
@@ -18,6 +19,13 @@ const linkClass = "text-label px-2 py-3 underline-offset-4 hover:underline";
 export function Header({ header, overlay = false }: Props) {
   const [isScrolled, setIsScrolled] = useState(false);
   const { locale, toggleLocale, t } = useLocale();
+  const { data: liveSite } = useLive("settings");
+
+  const liveContacts = liveSite?.settings?.store?.footer_contacts;
+  const whatsappUrl = liveContacts?.whatsappUrl || "https://chat.whatsapp.com/EWcBrybFmbr7jbMJUJGSUk?s=sh&p=a&iam=2";
+  const facebookUrl = liveContacts?.facebookUrl || "https://www.facebook.com/terrahop.wear";
+  const instagramUrl = liveContacts?.instagramUrl || "https://www.instagram.com/terr3hop/";
+  const tiktokUrl = liveContacts?.tiktokUrl || "https://www.tiktok.com/@terr3hop";
 
   useEffect(() => {
     const handleScroll = () => {
@@ -76,7 +84,7 @@ export function Header({ header, overlay = false }: Props) {
               // Social Media Icons in top header before scroll (WhatsApp, Facebook, Instagram, TikTok)
               <div className="flex items-center gap-3.5 sm:gap-4 text-off-white">
                 <a
-                  href="https://chat.whatsapp.com/EWcBrybFmbr7jbMJUJGSUk?s=sh&p=a&iam=2"
+                  href={whatsappUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="WhatsApp Group"
@@ -85,7 +93,7 @@ export function Header({ header, overlay = false }: Props) {
                   <WhatsAppIcon className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
                 </a>
                 <a
-                  href="https://www.facebook.com/terrahop.wear"
+                  href={facebookUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Facebook"
@@ -94,7 +102,7 @@ export function Header({ header, overlay = false }: Props) {
                   <FacebookIcon className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
                 </a>
                 <a
-                  href="https://www.instagram.com/terr3hop/"
+                  href={instagramUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Instagram"
@@ -103,7 +111,7 @@ export function Header({ header, overlay = false }: Props) {
                   <InstagramIcon className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
                 </a>
                 <a
-                  href="https://www.tiktok.com/@teera.hop?_r=1&_t=ZS-9BJsTH7KSZu"
+                  href={tiktokUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="TikTok"

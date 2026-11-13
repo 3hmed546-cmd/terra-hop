@@ -49,6 +49,8 @@ export function StorefrontGateClient({
     liveComingSoon?.targetDate || initialSetting.targetDate || "2026-11-20T00:00:00";
   const title = liveComingSoon?.title || initialSetting.title;
   const imageUrl = liveComingSoon?.imageUrl || initialSetting.imageUrl || "/coming-soon.jpg";
+  const mobileImageUrl =
+    liveComingSoon?.mobileImageUrl || initialSetting.mobileImageUrl || "/coming-soon-mobile.jpg";
   const caption = liveComingSoon?.caption !== undefined ? liveComingSoon.caption : initialSetting.caption;
 
   if (isEnabled) {
@@ -58,6 +60,7 @@ export function StorefrontGateClient({
           targetDate={targetDate}
           title={title}
           imageUrl={imageUrl}
+          mobileImageUrl={mobileImageUrl}
           caption={caption}
         />
         <Footer footer={home.footer} />
