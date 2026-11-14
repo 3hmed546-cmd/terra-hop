@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useLocale } from "@/lib/locale-context";
 import { FlipCard } from "@/components/storefront/FlipCard";
+import { InteractiveComingSoonPoster } from "@/components/storefront/InteractiveComingSoonPoster";
 
 interface ComingSoonViewProps {
   targetDate?: string;
@@ -91,47 +92,12 @@ export function ComingSoonView({
           موقع تيرا هوب (TERRA HOP) الرسمي - براند مصري للأزياء والستريت وير الأوفر سايز للشباب في مصر. هوديز وتيشيرتات بتصاميم عصرية وخامات فاخرة بحجز مسبق.
         </p>
 
-        {/* =========================================================================
-            DESKTOP BANNER (>= sm):
-            Full width (w-full max-w-none px-0) edge-to-edge.
-            Eliminates ALL side empty space (red zigzags) completely!
-           ========================================================================= */}
-        <div className="hidden sm:block relative w-full max-w-none px-0 overflow-hidden bg-white shadow-[0_30px_90px_rgba(0,0,0,0.95)] border-b border-white/10">
-          <div className="relative w-full aspect-[16/9] lg:aspect-[1920/950] xl:aspect-[1920/900] max-h-[65vh]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={activeDesktopImage}
-              alt={title || "TERRA HOP | تيرا هوب - براند ستريت وير مصري قريباً"}
-              width={1920}
-              height={1072}
-              fetchPriority="high"
-              loading="eager"
-              decoding="async"
-              className="w-full h-full object-cover object-center"
-            />
-          </div>
-        </div>
-
-        {/* =========================================================================
-            MOBILE TALL POSTER (< sm):
-            Full width edge-to-edge (px-0), tall portrait aspect ratio (9:15 / 9:16).
-            Features generous white space above and below the hand & phone.
-           ========================================================================= */}
-        <div className="block sm:hidden relative w-full px-0 overflow-hidden bg-white shadow-[0_20px_60px_rgba(0,0,0,0.9)] border-b border-white/10">
-          <div className="relative w-full aspect-[9/15] xs:aspect-[9/15.5]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={activeMobileImage}
-              alt={title || "TERRA HOP | تيرا هوب - براند ستريت وير مصري قريباً"}
-              width={1080}
-              height={1920}
-              fetchPriority="high"
-              loading="eager"
-              decoding="async"
-              className="w-full h-full object-cover object-center"
-            />
-          </div>
-        </div>
+        {/* Interactive 3D Tilt & Metallic Light Sheen Poster */}
+        <InteractiveComingSoonPoster
+          desktopImage={activeDesktopImage}
+          mobileImage={activeMobileImage}
+          title={title}
+        />
 
         {/* Optional Admin-Defined Caption */}
         {caption ? (
