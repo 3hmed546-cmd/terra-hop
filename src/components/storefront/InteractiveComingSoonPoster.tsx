@@ -8,6 +8,40 @@ interface InteractivePosterProps {
   title?: string;
 }
 
+const COMING_SOON_TEXT = "COMING SOON";
+
+function BouncingComingSoonText({ className = "" }: { className?: string }) {
+  return (
+    <span
+      className={`font-serif tracking-[0.18em] sm:tracking-[0.24em] uppercase select-none font-bold text-neutral-900 drop-shadow-[0_1px_1px_rgba(255,255,255,0.7)] flex items-center justify-center ${className}`}
+      style={{
+        fontFamily: "'Cinzel', 'Playfair Display', 'Didot', 'Bodoni MT', 'Georgia', serif",
+      }}
+    >
+      {COMING_SOON_TEXT.split("").map((char, index) => {
+        if (char === " ") {
+          return (
+            <span key={index} className="inline-block w-2 sm:w-3.5">
+              &nbsp;
+            </span>
+          );
+        }
+        return (
+          <span
+            key={index}
+            className="animate-letter-bounce hover:scale-125 transition-transform duration-200 cursor-pointer"
+            style={{
+              animationDelay: `${(index * 0.08).toFixed(2)}s`,
+            }}
+          >
+            {char}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
 export function InteractiveComingSoonPoster({
   desktopImage,
   mobileImage,
@@ -49,7 +83,7 @@ export function InteractiveComingSoonPoster({
     const centerX = rect.width / 2;
     const centerY = rect.height / 2;
 
-    // Max tilt angles (luxury restraint, ultra subtle)
+    // Subtle 3D tilt
     const maxTilt = 4.5;
     const tiltY = ((x - centerX) / centerX) * maxTilt;
     const tiltX = -((y - centerY) / centerY) * maxTilt;
@@ -71,9 +105,8 @@ export function InteractiveComingSoonPoster({
   useEffect(() => {
     const handleOrientation = (e: DeviceOrientationEvent) => {
       if (e.gamma === null || e.beta === null) return;
-      // Gamma is left/right [-90, 90], Beta is front/back [-180, 180]
       const clampedGamma = Math.max(-25, Math.min(25, e.gamma));
-      const clampedBeta = Math.max(15, Math.min(65, e.beta)) - 40; // calibrated for ~40deg viewing angle
+      const clampedBeta = Math.max(15, Math.min(65, e.beta)) - 40;
 
       targetTilt.current = {
         x: -(clampedBeta / 25) * 3.5,
@@ -112,7 +145,7 @@ export function InteractiveComingSoonPoster({
             Full width (w-full max-w-none px-0) edge-to-edge.
            ========================================================================= */}
         <div className="hidden sm:block relative w-full max-w-none px-0 overflow-hidden bg-white shadow-[0_30px_90px_rgba(0,0,0,0.95)] border-b border-white/10">
-          <div className="relative w-full aspect-[16/9] lg:aspect-[1920/950] xl:aspect-[1920/900] max-h-[65vh]">
+          <div className="relative w-full aspect-[1920/1072] max-h-[70vh]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={desktopImage}
@@ -125,7 +158,20 @@ export function InteractiveComingSoonPoster({
               className="w-full h-full object-cover object-center"
             />
 
-            {/* Specular Light Sheen Sweeping Over "COMING SOON" */}
+            {/* Dynamic Bouncing & Shaking "COMING SOON" Letters Over Phone Screen */}
+            <div
+              className="pointer-events-auto absolute z-25 flex items-center justify-center"
+              style={{
+                top: "49.44%",
+                left: "51.04%",
+                transform: "translate(-50%, -50%)",
+                width: "29%",
+              }}
+            >
+              <BouncingComingSoonText className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-[42px] leading-none" />
+            </div>
+
+            {/* Specular Light Sheen Sweeping Over Phone Screen */}
             <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
               <div className="absolute inset-0 animate-shimmer-sweep bg-gradient-to-r from-transparent via-white/35 to-transparent opacity-70" />
             </div>
@@ -146,7 +192,7 @@ export function InteractiveComingSoonPoster({
             Full width edge-to-edge (px-0), tall portrait aspect ratio (9:15 / 9:16).
            ========================================================================= */}
         <div className="block sm:hidden relative w-full px-0 overflow-hidden bg-white shadow-[0_20px_60px_rgba(0,0,0,0.9)] border-b border-white/10">
-          <div className="relative w-full aspect-[9/15] xs:aspect-[9/15.5]">
+          <div className="relative w-full aspect-[1080/1920]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={mobileImage}
@@ -158,6 +204,19 @@ export function InteractiveComingSoonPoster({
               decoding="async"
               className="w-full h-full object-cover object-center"
             />
+
+            {/* Dynamic Bouncing & Shaking "COMING SOON" Letters Over Phone Screen on Mobile */}
+            <div
+              className="pointer-events-auto absolute z-25 flex items-center justify-center"
+              style={{
+                top: "49.61%",
+                left: "51.15%",
+                transform: "translate(-50%, -50%)",
+                width: "48%",
+              }}
+            >
+              <BouncingComingSoonText className="text-[17px] xs:text-[20px] leading-none" />
+            </div>
 
             {/* Specular Light Sheen Sweeping Over Mobile Phone Screen */}
             <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">

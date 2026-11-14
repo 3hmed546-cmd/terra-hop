@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import { useLocale } from "@/lib/locale-context";
 import { FlipCard } from "@/components/storefront/FlipCard";
 import { InteractiveComingSoonPoster } from "@/components/storefront/InteractiveComingSoonPoster";
+import { ThreeLogoScene } from "@/components/storefront/ThreeLogoScene";
 
 interface ComingSoonViewProps {
   targetDate?: string;
@@ -34,7 +36,7 @@ function calculateTimeLeft(targetIso: string): TimeLeft {
   return {
     days: Math.floor(diff / (1000 * 60 * 60 * 24)),
     hours: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
-    minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
+    minutes: Math.floor((diff % (1000 * 60)) / (1000 * 60)),
     seconds: Math.floor((diff % (1000 * 60)) / 1000),
     isExpired: false,
   };
@@ -62,13 +64,13 @@ export function ComingSoonView({
   const activeDesktopImage =
     imageUrl && imageUrl !== "/coming-soon.jpg" && imageUrl !== "/coming-soon-desktop.jpg"
       ? imageUrl
-      : "/coming-soon-desktop.jpg?v=20261114-4";
+      : "/coming-soon-desktop.jpg?v=20261114-5";
 
   // Use tall mobile version with version cache-buster
   const activeMobileImage =
     mobileImageUrl && mobileImageUrl !== "/coming-soon-mobile.jpg"
       ? mobileImageUrl
-      : "/coming-soon-mobile.jpg?v=20261114-4";
+      : "/coming-soon-mobile.jpg?v=20261114-5";
 
   return (
     <section className="relative min-h-screen w-full flex flex-col items-center justify-between bg-[#0A0A0C] text-off-white overflow-hidden pb-8 sm:pb-14 select-none">
@@ -84,7 +86,30 @@ export function ComingSoonView({
         <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0C]/90 via-transparent to-[#0A0A0C]" />
       </div>
 
-      {/* 2. Main Hero Poster Stage */}
+      {/* 2. Top Header with Three.js Animated 3D Logo */}
+      <header className="relative z-20 w-full flex flex-col items-center justify-center pt-5 pb-3 sm:pt-6 sm:pb-4">
+        <Link
+          href="/"
+          className="group flex flex-col items-center gap-1.5 focus:outline-hidden"
+          aria-label="TERRA HOP Home"
+        >
+          {/* Three.js Interactive 3D Orbiting Logo Emblem */}
+          <div className="relative flex items-center justify-center drop-shadow-[0_8px_24px_rgba(0,0,0,0.85)]">
+            <ThreeLogoScene size={84} />
+          </div>
+
+          <div className="flex flex-col items-center -mt-1">
+            <span className="font-display font-black text-sm sm:text-base md:text-lg tracking-[0.38em] text-off-white uppercase">
+              TERRA HOP
+            </span>
+            <span className="font-mono text-[8.5px] sm:text-[9.5px] tracking-[0.28em] text-concrete/70 uppercase">
+              {locale === "ar" ? "براند ستريت وير مصري فاخر" : "LUXURY EGYPTIAN STREETWEAR"}
+            </span>
+          </div>
+        </Link>
+      </header>
+
+      {/* 3. Main Hero Poster Stage */}
       <div className="relative z-10 flex flex-col items-center justify-start w-full pt-0">
         {/* Semantic SEO Heading for Google Search Indexing */}
         <h1 className="sr-only">TERRA HOP | تيرا هوب - براند ستريت وير مصري</h1>
@@ -92,7 +117,7 @@ export function ComingSoonView({
           موقع تيرا هوب (TERRA HOP) الرسمي - براند مصري للأزياء والستريت وير الأوفر سايز للشباب في مصر. هوديز وتيشيرتات بتصاميم عصرية وخامات فاخرة بحجز مسبق.
         </p>
 
-        {/* Interactive 3D Tilt & Metallic Light Sheen Poster */}
+        {/* Interactive 3D Tilt, Metallic Light Sheen & Bouncing Letters Poster */}
         <InteractiveComingSoonPoster
           desktopImage={activeDesktopImage}
           mobileImage={activeMobileImage}
@@ -109,7 +134,7 @@ export function ComingSoonView({
         ) : null}
 
         {/* =========================================================================
-            3. LIVE COUNTDOWN DOCK:
+            4. LIVE COUNTDOWN DOCK:
             Pushed down into the lower area (as requested with the blue arrow)
             with balanced spacing above the footer logo.
            ========================================================================= */}
@@ -153,7 +178,7 @@ export function ComingSoonView({
         </div>
       </div>
 
-      {/* 4. Scroll Down Invitation to Footer */}
+      {/* 5. Scroll Down Invitation to Footer */}
       <footer className="relative z-10 w-full flex flex-col items-center justify-center pt-8 sm:pt-10 text-concrete/70">
         <div className="flex flex-col items-center gap-1.5 cursor-pointer opacity-80 hover:opacity-100 transition-opacity">
           <span className="font-mono text-[11px] sm:text-xs tracking-wider">
