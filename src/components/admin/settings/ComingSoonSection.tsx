@@ -275,7 +275,7 @@ export function ComingSoonSection() {
                 صورة الكمبيوتر (Desktop Widescreen)
               </label>
               <span className="text-[11px] font-mono text-concrete bg-white/5 px-2 py-0.5 rounded border border-white/10">
-                1024 × 434 عريضة
+                16:9 عريضة (1920 × 1080)
               </span>
             </div>
             <p className="text-xs text-concrete">
@@ -332,7 +332,7 @@ export function ComingSoonSection() {
           {/* Desktop Preview */}
           <div className="pt-2">
             <span className="text-[11px] text-concrete block mb-1.5">معاينة شاشة الكمبيوتر:</span>
-            <div className="relative w-full aspect-[1024/434] rounded-lg overflow-hidden border border-white/15 bg-black shadow-md">
+            <div className="relative w-full aspect-[16/9] rounded-lg overflow-hidden border border-white/15 bg-black shadow-md">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={imageUrl || DEFAULT_DESKTOP_IMAGE}
@@ -355,7 +355,7 @@ export function ComingSoonSection() {
                 صورة الهاتف (Mobile Portrait)
               </label>
               <span className="text-[11px] font-mono text-concrete bg-white/5 px-2 py-0.5 rounded border border-white/10">
-                768 × 1376 طولية
+                9:16 طولية (576 × 1024)
               </span>
             </div>
             <p className="text-xs text-concrete">
@@ -412,7 +412,7 @@ export function ComingSoonSection() {
           {/* Mobile Preview */}
           <div className="pt-2">
             <span className="text-[11px] text-concrete block mb-1.5">معاينة شاشة الهاتف:</span>
-            <div className="relative w-36 mx-auto aspect-[768/1376] rounded-lg overflow-hidden border border-white/15 bg-black shadow-md">
+            <div className="relative w-36 mx-auto aspect-[576/1024] rounded-lg overflow-hidden border border-white/15 bg-black shadow-md">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={mobileImageUrl || DEFAULT_MOBILE_IMAGE}

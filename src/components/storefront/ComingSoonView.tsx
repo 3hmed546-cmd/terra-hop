@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useLocale } from "@/lib/locale-context";
+import { FlipCard } from "@/components/storefront/FlipCard";
 
 interface ComingSoonViewProps {
   targetDate?: string;
@@ -38,10 +39,6 @@ function calculateTimeLeft(targetIso: string): TimeLeft {
   };
 }
 
-function padZero(num: number): string {
-  return String(num).padStart(2, "0");
-}
-
 export function ComingSoonView({
   targetDate = "2026-11-20T00:00:00",
   title,
@@ -64,37 +61,22 @@ export function ComingSoonView({
   const activeMobileImage = mobileImageUrl || "/coming-soon-mobile.jpg";
 
   return (
-    <section className="relative min-h-screen w-full flex flex-col items-center justify-between bg-[#040404] text-off-white overflow-hidden pb-8 sm:pb-12 select-none">
-      {/* 1. Atmospheric Ambient Backdrop: Fills screens with misty cinematic blur so there are zero empty voids */}
+    <section className="relative min-h-screen w-full flex flex-col items-center justify-between bg-[#0A0A0C] text-off-white overflow-hidden pb-8 sm:pb-12 select-none">
+      {/* 1. Atmospheric Ambient Backdrop: Subtle dark studio spotlight matching the split-flap countdown backdrop */}
       <div className="pointer-events-none absolute inset-0 -z-20 overflow-hidden">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <picture>
-          <source media="(max-width: 639px)" srcSet={activeMobileImage} />
-          <source media="(min-width: 640px)" srcSet={activeDesktopImage} />
-          <img
-            src={activeDesktopImage}
-            alt=""
-            aria-hidden="true"
-            fetchPriority="low"
-            loading="lazy"
-            decoding="async"
-            className="w-full h-full object-cover scale-125 blur-3xl opacity-35 md:opacity-45 brightness-75 contrast-125 transform-gpu"
-          />
-        </picture>
-        {/* Deep dark gradient overlay on top & sides */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#040404]/90 via-[#040404]/60 to-[#040404]" />
         <div
           className="absolute inset-0"
           style={{
             background:
-              "radial-gradient(ellipse at 50% 40%, rgba(255, 255, 255, 0.08) 0%, rgba(5, 5, 5, 0.6) 55%, #040404 85%)",
+              "radial-gradient(ellipse at 50% 32%, rgba(65, 65, 75, 0.35) 0%, rgba(20, 20, 24, 0.75) 50%, #0A0A0C 85%)",
           }}
         />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0C]/90 via-transparent to-[#0A0A0C]" />
       </div>
 
       {/* 2. Main Hero Poster Stage: Responsive (Portrait on Mobile, Widescreen on Desktop) */}
       <div className="relative z-10 flex flex-col items-center justify-center w-full my-auto pt-2 sm:pt-6">
-        {/* Semantic SEO Heading for Google Search Indexing (Matches "تيرا هوب" and "TERRA HOP") */}
+        {/* Semantic SEO Heading for Google Search Indexing */}
         <h1 className="sr-only">TERRA HOP | تيرا هوب - براند ستريت وير مصري</h1>
         <p className="sr-only">
           موقع تيرا هوب (TERRA HOP) الرسمي - براند مصري للأزياء والستريت وير الأوفر سايز للشباب في مصر. هوديز وتيشيرتات بتصاميم عصرية وخامات فاخرة بحجز مسبق.
@@ -102,14 +84,14 @@ export function ComingSoonView({
 
         {/* The Responsive Poster Stage */}
         <div className="relative w-full flex flex-col items-center justify-center px-3 sm:px-6">
-          {/* Mobile Vertical Poster (< sm): Fills phone viewport elegantly like the original poster */}
-          <div className="block sm:hidden relative w-full max-w-[340px] xs:max-w-[360px] aspect-[768/1376] rounded-xl overflow-hidden shadow-[0_25px_80px_rgba(0,0,0,0.95)] border border-white/10 group bg-black/95">
+          {/* Mobile Vertical Poster (< sm): 9:16 portrait filling phone viewport elegantly */}
+          <div className="block sm:hidden relative w-full max-w-[320px] xs:max-w-[360px] aspect-[576/1024] rounded-2xl overflow-hidden shadow-[0_25px_80px_rgba(0,0,0,0.95)] border border-white/10 group bg-black/95">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={activeMobileImage}
               alt={title || "TERRA HOP | تيرا هوب - براند ستريت وير مصري قريباً"}
-              width={768}
-              height={1376}
+              width={576}
+              height={1024}
               fetchPriority="high"
               loading="eager"
               decoding="async"
@@ -117,14 +99,14 @@ export function ComingSoonView({
             />
           </div>
 
-          {/* Desktop Cinematic Banner (>= sm): Widescreen cinematic spectacle */}
-          <div className="hidden sm:block relative w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl aspect-[1024/434] rounded-2xl overflow-hidden shadow-[0_25px_80px_rgba(0,0,0,0.95)] border border-white/10 group bg-black/95">
+          {/* Desktop Cinematic Banner (>= sm): 16:9 widescreen taking the computer screen nicely */}
+          <div className="hidden sm:block relative w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl aspect-[16/9] rounded-2xl sm:rounded-3xl overflow-hidden shadow-[0_30px_90px_rgba(0,0,0,0.95)] border border-white/10 group bg-black/95">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={activeDesktopImage}
               alt={title || "TERRA HOP | تيرا هوب - براند ستريت وير مصري قريباً"}
-              width={1024}
-              height={434}
+              width={1920}
+              height={1080}
               fetchPriority="high"
               loading="eager"
               decoding="async"
@@ -142,77 +124,44 @@ export function ComingSoonView({
           ) : null}
         </div>
 
-        {/* 3. Live Countdown Dock */}
-        <div className="w-full max-w-lg mt-4 sm:mt-7 px-4">
-          <div className="relative overflow-hidden bg-black/75 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 sm:p-5 shadow-2xl">
-            {/* Top Tagline */}
-            <div className="flex items-center justify-center mb-3.5 text-center">
-              <span className="font-mono text-[11px] sm:text-xs uppercase tracking-widest text-concrete/90 font-semibold">
-                {locale === "ar" ? "العد التنازلي لموعد الإطلاق الرسمي" : "OFFICIAL DROP LAUNCH COUNTDOWN"}
-              </span>
-            </div>
-
-            {/* Timer Grid */}
-            <div className="grid grid-cols-4 gap-2 sm:gap-3 text-center">
-              {/* Days */}
-              <div className="flex flex-col items-center justify-center bg-white/[0.04] border border-white/5 rounded-xl py-2.5 sm:py-3 px-1">
-                <span
-                  suppressHydrationWarning
-                  className="font-mono text-2xl sm:text-4xl md:text-5xl font-extrabold text-off-white tracking-wider tabular-nums"
-                >
-                  {padZero(timeLeft.days)}
-                </span>
-                <span className="text-[10px] sm:text-xs text-concrete uppercase tracking-widest mt-1 font-semibold">
-                  {locale === "ar" ? "يوم" : "DAYS"}
-                </span>
-              </div>
-
-              {/* Hours */}
-              <div className="flex flex-col items-center justify-center bg-white/[0.04] border border-white/5 rounded-xl py-2.5 sm:py-3 px-1">
-                <span
-                  suppressHydrationWarning
-                  className="font-mono text-2xl sm:text-4xl md:text-5xl font-extrabold text-off-white tracking-wider tabular-nums"
-                >
-                  {padZero(timeLeft.hours)}
-                </span>
-                <span className="text-[10px] sm:text-xs text-concrete uppercase tracking-widest mt-1 font-semibold">
-                  {locale === "ar" ? "ساعة" : "HRS"}
-                </span>
-              </div>
-
-              {/* Minutes */}
-              <div className="flex flex-col items-center justify-center bg-white/[0.04] border border-white/5 rounded-xl py-2.5 sm:py-3 px-1">
-                <span
-                  suppressHydrationWarning
-                  className="font-mono text-2xl sm:text-4xl md:text-5xl font-extrabold text-off-white tracking-wider tabular-nums"
-                >
-                  {padZero(timeLeft.minutes)}
-                </span>
-                <span className="text-[10px] sm:text-xs text-concrete uppercase tracking-widest mt-1 font-semibold">
-                  {locale === "ar" ? "دقيقة" : "MINS"}
-                </span>
-              </div>
-
-              {/* Seconds */}
-              <div className="flex flex-col items-center justify-center bg-white/[0.04] border border-white/5 rounded-xl py-2.5 sm:py-3 px-1">
-                <span
-                  suppressHydrationWarning
-                  className="font-mono text-2xl sm:text-4xl md:text-5xl font-extrabold text-off-white tracking-wider tabular-nums text-white"
-                >
-                  {padZero(timeLeft.seconds)}
-                </span>
-                <span className="text-[10px] sm:text-xs text-concrete uppercase tracking-widest mt-1 font-semibold">
-                  {locale === "ar" ? "ثانية" : "SECS"}
-                </span>
-              </div>
-            </div>
-
-            {timeLeft.isExpired && (
-              <p className="mt-3.5 text-center font-mono text-xs sm:text-sm text-off-white font-bold tracking-widest bg-white/10 py-2 rounded-lg">
-                {locale === "ar" ? "🔥 حان موعد الإطلاق الرسمي · The Drop is Live" : "🔥 THE DROP IS LIVE NOW"}
-              </p>
-            )}
+        {/* 3. Live Countdown Dock: Mechanical Split-Flap Flip Clock Aesthetic matching the reference */}
+        <div className="w-full max-w-3xl mt-5 sm:mt-9 px-3 flex flex-col items-center">
+          {/* Top Tagline */}
+          <div className="flex items-center justify-center mb-3 sm:mb-4 text-center">
+            <span className="font-mono text-[10px] sm:text-xs uppercase tracking-[0.25em] text-neutral-400 font-semibold bg-white/[0.04] px-4 py-1.5 rounded-full border border-white/10 shadow-xs">
+              {locale === "ar" ? "العد التنازلي لموعد الإطلاق الرسمي" : "OFFICIAL DROP LAUNCH COUNTDOWN"}
+            </span>
           </div>
+
+          {/* Mechanical Flip Cards Grid (DAYS - HOURS - MINUTES - SECONDS) */}
+          <div className="flex items-center justify-center gap-2 xs:gap-3 sm:gap-4 md:gap-5 lg:gap-6">
+            <FlipCard
+              label="DAYS"
+              subLabel={locale === "ar" ? "أيام" : undefined}
+              value={timeLeft.days}
+            />
+            <FlipCard
+              label="HOURS"
+              subLabel={locale === "ar" ? "ساعات" : undefined}
+              value={timeLeft.hours}
+            />
+            <FlipCard
+              label="MINUTES"
+              subLabel={locale === "ar" ? "دقائق" : undefined}
+              value={timeLeft.minutes}
+            />
+            <FlipCard
+              label="SECONDS"
+              subLabel={locale === "ar" ? "ثواني" : undefined}
+              value={timeLeft.seconds}
+            />
+          </div>
+
+          {timeLeft.isExpired && (
+            <p className="mt-4 text-center font-mono text-xs sm:text-sm text-off-white font-bold tracking-widest bg-white/10 py-2.5 px-6 rounded-xl border border-white/10 shadow-lg">
+              {locale === "ar" ? "🔥 حان موعد الإطلاق الرسمي · The Drop is Live" : "🔥 THE DROP IS LIVE NOW"}
+            </p>
+          )}
         </div>
       </div>
 
