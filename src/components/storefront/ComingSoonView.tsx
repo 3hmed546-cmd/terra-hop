@@ -42,8 +42,8 @@ function calculateTimeLeft(targetIso: string): TimeLeft {
 export function ComingSoonView({
   targetDate = "2026-11-20T00:00:00",
   title,
-  imageUrl = "/coming-soon.jpg",
-  mobileImageUrl = "/coming-soon-mobile.jpg",
+  imageUrl,
+  mobileImageUrl,
   caption,
 }: ComingSoonViewProps) {
   const { locale } = useLocale();
@@ -57,12 +57,21 @@ export function ComingSoonView({
     return () => clearInterval(timer);
   }, [targetDate]);
 
-  const activeDesktopImage = imageUrl || "/coming-soon.jpg";
-  const activeMobileImage = mobileImageUrl || "/coming-soon-mobile.jpg";
+  // Use Image #2 for desktop with unique version query to avoid browser disk cache
+  const activeDesktopImage =
+    imageUrl && imageUrl !== "/coming-soon.jpg" && imageUrl !== "/coming-soon-desktop.jpg"
+      ? imageUrl
+      : "/coming-soon-desktop.jpg?v=20261114-3";
+
+  // Use zoomed & centered mobile version with version query
+  const activeMobileImage =
+    mobileImageUrl && mobileImageUrl !== "/coming-soon-mobile.jpg"
+      ? mobileImageUrl
+      : "/coming-soon-mobile.jpg?v=20261114-3";
 
   return (
     <section className="relative min-h-screen w-full flex flex-col items-center justify-between bg-[#0A0A0C] text-off-white overflow-hidden pb-8 sm:pb-12 select-none">
-      {/* 1. Atmospheric Ambient Backdrop: Subtle dark studio spotlight matching the split-flap countdown backdrop */}
+      {/* 1. Atmospheric Ambient Backdrop */}
       <div className="pointer-events-none absolute inset-0 -z-20 overflow-hidden">
         <div
           className="absolute inset-0"
@@ -75,7 +84,7 @@ export function ComingSoonView({
       </div>
 
       {/* 2. Main Hero Poster Stage: Responsive (Portrait on Mobile, Widescreen on Desktop) */}
-      <div className="relative z-10 flex flex-col items-center justify-center w-full my-auto pt-2 sm:pt-6">
+      <div className="relative z-10 flex flex-col items-center justify-start sm:justify-center w-full my-0 sm:my-auto pt-0 sm:pt-6">
         {/* Semantic SEO Heading for Google Search Indexing */}
         <h1 className="sr-only">TERRA HOP | تيرا هوب - براند ستريت وير مصري</h1>
         <p className="sr-only">
@@ -83,30 +92,35 @@ export function ComingSoonView({
         </p>
 
         {/* The Responsive Poster Stage */}
-        <div className="relative w-full flex flex-col items-center justify-center px-3 sm:px-6">
-          {/* Mobile Vertical Poster (< sm): 9:16 portrait filling phone viewport elegantly */}
-          <div className="block sm:hidden relative w-full max-w-[320px] xs:max-w-[360px] aspect-[576/1024] rounded-2xl overflow-hidden shadow-[0_25px_80px_rgba(0,0,0,0.95)] border border-white/10 group bg-black/95">
+        <div className="relative w-full flex flex-col items-center justify-center px-0 sm:px-6">
+          {/* Mobile View (< sm):
+              - Zero side padding (px-0) & w-full to eliminate all side gaps completely.
+              - pt-0 to remove any empty top gap.
+              - Zoomed image centered directly on hand, mobile & "COMING SOON" text.
+              - Responsive aspect ratio taking the middle of screen without stretching.
+          */}
+          <div className="block sm:hidden relative w-full aspect-[576/540] xs:aspect-[1/0.95] overflow-hidden bg-white shadow-[0_20px_60px_rgba(0,0,0,0.9)] border-b border-white/10 group">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={activeMobileImage}
               alt={title || "TERRA HOP | تيرا هوب - براند ستريت وير مصري قريباً"}
-              width={576}
-              height={1024}
+              width={750}
+              height={730}
               fetchPriority="high"
               loading="eager"
               decoding="async"
-              className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.01]"
+              className="w-full h-full object-cover object-center transform scale-100"
             />
           </div>
 
-          {/* Desktop Cinematic Banner (>= sm): 16:9 widescreen taking the computer screen nicely */}
-          <div className="hidden sm:block relative w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl aspect-[16/9] rounded-2xl sm:rounded-3xl overflow-hidden shadow-[0_30px_90px_rgba(0,0,0,0.95)] border border-white/10 group bg-black/95">
+          {/* Desktop Cinematic Banner (>= sm): Image 2 Widescreen (1024x572) taking the computer screen nicely */}
+          <div className="hidden sm:block relative w-full max-w-4xl lg:max-w-5xl xl:max-w-6xl aspect-[1024/572] rounded-2xl sm:rounded-3xl overflow-hidden shadow-[0_30px_90px_rgba(0,0,0,0.95)] border border-white/10 group bg-black/95">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={activeDesktopImage}
               alt={title || "TERRA HOP | تيرا هوب - براند ستريت وير مصري قريباً"}
-              width={1920}
-              height={1080}
+              width={1024}
+              height={572}
               fetchPriority="high"
               loading="eager"
               decoding="async"
@@ -116,7 +130,7 @@ export function ComingSoonView({
 
           {/* Optional Admin-Defined Caption */}
           {caption ? (
-            <div className="mt-3.5 sm:mt-4 text-center px-4 max-w-2xl">
+            <div className="mt-4 sm:mt-5 text-center px-4 max-w-2xl">
               <p className="text-xs sm:text-sm md:text-base font-medium text-concrete/90 tracking-wide leading-relaxed">
                 {caption}
               </p>
@@ -124,8 +138,8 @@ export function ComingSoonView({
           ) : null}
         </div>
 
-        {/* 3. Live Countdown Dock: Mechanical Split-Flap Flip Clock Aesthetic matching the reference */}
-        <div className="w-full max-w-3xl mt-5 sm:mt-9 px-3 flex flex-col items-center">
+        {/* 3. Live Countdown Dock: Mechanical Split-Flap Flip Clock */}
+        <div className="w-full max-w-3xl mt-5 sm:mt-8 px-3 flex flex-col items-center">
           {/* Top Tagline */}
           <div className="flex items-center justify-center mb-3 sm:mb-4 text-center">
             <span className="font-mono text-[10px] sm:text-xs uppercase tracking-[0.25em] text-neutral-400 font-semibold bg-white/[0.04] px-4 py-1.5 rounded-full border border-white/10 shadow-xs">

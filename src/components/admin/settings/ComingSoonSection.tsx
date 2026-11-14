@@ -18,7 +18,7 @@ import {
 import { useLive } from "@/lib/use-live";
 import { apiFetch } from "@/lib/admin-auth";
 
-const DEFAULT_DESKTOP_IMAGE = "/coming-soon.jpg";
+const DEFAULT_DESKTOP_IMAGE = "/coming-soon-desktop.jpg";
 const DEFAULT_MOBILE_IMAGE = "/coming-soon-mobile.jpg";
 
 export function ComingSoonSection() {

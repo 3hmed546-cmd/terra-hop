@@ -15,7 +15,7 @@ const DEFAULT_COMING_SOON: ComingSoonSetting = {
   enabled: true,
   targetDate: "2026-11-20T00:00:00",
   title: "TERRA HOP IS COMING SOON",
-  imageUrl: "/coming-soon.jpg",
+  imageUrl: "/coming-soon-desktop.jpg",
   mobileImageUrl: "/coming-soon-mobile.jpg",
   caption: "",
 };
