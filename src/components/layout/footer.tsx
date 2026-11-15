@@ -47,9 +47,9 @@ export function Footer({ footer }: { footer: typeof home.footer }) {
           {/* Brand & Tagline - Always on Left */}
           <div className="md:col-span-4 text-left">
             <div className="w-56 sm:w-64 md:w-60 lg:w-72 max-w-full">
-              <Logo className="w-full" />
+              <Logo className="w-full bg-white" />
               <p
-                className="mt-3.5 w-full flex justify-between items-center text-[10px] sm:text-[11px] md:text-xs font-semibold tracking-wider text-concrete/85 uppercase select-none font-mono"
+                className="mt-3.5 w-full flex justify-between items-center text-[10px] sm:text-[11px] md:text-xs font-bold tracking-wider text-white uppercase select-none font-mono"
                 aria-label="HIGHER ON PURPOSE"
               >
                 <span className="sr-only">HIGHER ON PURPOSE</span>
