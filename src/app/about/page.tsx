@@ -3,7 +3,7 @@ import { AboutView } from "@/components/about/about-view";
 
 export const metadata: Metadata = {
   title: "عن البراند | About",
-  description: "TERRA HOP makes oversized streetwear for young men in Egypt, in small drops.",
+  description: "موقع تيرا هوب (TERRA HOP) الرسمي - براند مصري للأزياء والهوديز الأوفر سايز والتيشرتات للشباب في مصر.",
 };
 
 export default function AboutPage() {

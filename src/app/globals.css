@@ -174,48 +174,6 @@
   transform-style: preserve-3d;
 }
 
-/* Specular Metallic Shimmer Sweep Across COMING SOON */
-@keyframes shimmer-sweep {
-  0% {
-    transform: translateX(-160%) skewX(-25deg);
-  }
-  35% {
-    transform: translateX(260%) skewX(-25deg);
-  }
-  100% {
-    transform: translateX(260%) skewX(-25deg);
-  }
-}
-
-.animate-shimmer-sweep {
-  animation: shimmer-sweep 5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-  will-change: transform;
-}
-
-/* Dynamic Bouncing & Shaking Letters for COMING SOON */
-@keyframes letter-wave-bounce {
-  0%, 100% {
-    transform: translateY(0) scale(1) rotate(0deg);
-  }
-  10% {
-    transform: translateY(-9px) scale(1.08) rotate(-2deg);
-  }
-  22% {
-    transform: translateY(2.5px) scale(0.96) rotate(1.5deg);
-  }
-  32% {
-    transform: translateY(-3.5px) scale(1.02) rotate(-0.8deg);
-  }
-  42% {
-    transform: translateY(0) scale(1) rotate(0deg);
-  }
-}
-
-.animate-letter-bounce {
-  display: inline-block;
-  animation: letter-wave-bounce 3.2s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
-  will-change: transform;
-}
 
 
 

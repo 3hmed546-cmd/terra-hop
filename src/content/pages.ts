@@ -5,15 +5,15 @@ import type { ImageSlot } from "./images";
 export const pages = {
   shop: {
     demo: true,
-    meta: { title: "Shop", description: "Every TERRA HOP piece. Oversized streetwear, small drops, confirmed by preorder." },
+    meta: { title: "Shop", description: "Every TERRA HOP piece. Oversized hoodies & fashion, small drops, confirmed by preorder." },
     heading: "Shop",
     text: "Every piece in the current drop. Small runs, confirmed by preorder.",
   },
   about: {
     demo: true,
-    meta: { title: "About", description: "TERRA HOP makes oversized streetwear for young men in Egypt, in small drops." },
+    meta: { title: "About", description: "TERRA HOP creates oversized hoodies and fashion for young men in Egypt, in small drops." },
     heading: "About TERRA HOP",
-    intro: "Oversized streetwear for young men in Egypt.",
+    intro: "Oversized hoodies and fashion for young men in Egypt.",
     body: [
       "TERRA HOP releases small drops. Every piece is confirmed by preorder before production, so nothing is made that nobody asked for.",
       "We keep the range short and the fit oversized. The goal is simple: pieces you reach for every day.",
