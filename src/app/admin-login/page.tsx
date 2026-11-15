@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { headers } from "next/headers";
+import { notFound } from "next/navigation";
 import { HoodieShowcase } from "@/components/admin/hoodie-showcase";
 import { LoginForm } from "@/components/admin/login-form";
 import { uiStrings } from "@/lib/ui-strings";
@@ -12,7 +14,16 @@ export const metadata: Metadata = {
 };
 
 // Reached only through the hidden path (see src/proxy.ts). No header, no footer, no links into this page.
-export default function AdminLoginPage() {
+export default async function AdminLoginPage() {
+  const headerList = await headers();
+  const reqPath = headerList.get("x-pathname") || "";
+  const secret = (process.env.ADMIN_PATH ?? process.env.ADMIN_LOGIN_PATH ?? process.env.ADMIN_KEY ?? "").replace(/^\/+|\/+$/g, "");
+
+  // Fail closed if not accessed via the secret route
+  if (secret && reqPath !== `/${secret}`) {
+    notFound();
+  }
+
   return (
     <main id="main" className="grid min-h-dvh lg:grid-cols-2 bg-[#fcfaf7]">
       {/* Left visual panel */}

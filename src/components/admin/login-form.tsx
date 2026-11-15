@@ -12,11 +12,11 @@ import { login } from "@/lib/admin-auth";
 import { adminHref } from "@/lib/admin/paths";
 
 const t = uiStrings.adminLogin;
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const emailPattern = /^([^\s@]+@[^\s@]+\.[^\s@]{2,}|admin)$/i;
 
 const ERR = "البريد الإلكتروني أو كلمة المرور غير صحيحة.";
 const NET = "حدث خطأ في الاتصال. يرجى المحاولة مرة أخرى.";
-const LOCK = "محاولات كثيرة خاطئة. يرجى الانتظار قليلاً ثم المحاولة.";
+const LOCK = "تم حظر محاولات تسجيل الدخول مؤقتاً لمدة 20 دقيقة لحماية الحساب.";
 
 export function LoginForm() {
   const router = useRouter();
@@ -78,10 +78,12 @@ export function LoginForm() {
     }
 
     if (r.status === 429) {
-      setError(LOCK);
-      setWait(r.retryAfter ?? 60);
+      setError(r.error || LOCK);
+      setWait(r.retryAfter ?? 1200);
+    } else if (r.status === 401) {
+      setError(r.error || ERR);
     } else {
-      setError(r.status === 401 ? ERR : NET);
+      setError(r.error || NET);
     }
     setShake((n) => n + 1);
   }

@@ -115,42 +115,59 @@ export function proxy(request: NextRequest) {
   // 2. Secret Admin Routing & IDOR / Access Control Protection
   const secret = (process.env.ADMIN_PATH ?? process.env.ADMIN_LOGIN_PATH ?? process.env.ADMIN_KEY ?? "").replace(/^\/+|\/+$/g, "");
 
-  // Clean redirection for admin entry: /admin, /admin/, or /admin/login -> redirect to secret login URL
-  if (pathname === "/admin" || pathname === "/admin/" || pathname === "/admin/login") {
-    const target = valid.test(secret) ? `/${secret}` : LOGIN_INTERNAL;
-    return NextResponse.redirect(new URL(target, request.url));
+  // FAIL CLOSED (404 Error Page):
+  // Direct visits to /admin, /admin/, /admin/login, or /admin/* by unauthenticated users MUST NOT redirect to login!
+  // It returns a 404 error page so search engines, scanners, and public visitors cannot detect that an admin exists.
+  if (
+    pathname === "/admin" ||
+    pathname === "/admin/" ||
+    pathname === "/admin/login" ||
+    pathname.startsWith("/admin/")
+  ) {
+    if (!isAuthedSession) {
+      const res = NextResponse.rewrite(new URL("/_not-found-hidden", request.url));
+      res.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+      res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+      return res;
+    }
+    // If authenticated admin: redirect /admin to secret dashboard
+    if (pathname === "/admin" || pathname === "/admin/") {
+      const target = valid.test(secret) ? `/${secret}/dashboard` : "/admin/dashboard";
+      return NextResponse.redirect(new URL(target, request.url));
+    }
   }
 
-  // Redirect /admin/<subpath> to /<secret>/<subpath> so direct bookmarks work seamlessly
-  if (pathname.startsWith("/admin/") && valid.test(secret)) {
-    const subpath = pathname.slice("/admin/".length);
-    return NextResponse.redirect(new URL(`/${secret}/${subpath}`, request.url));
-  }
-
-  // Direct hits on internal login folder when not routed through secret URL
+  // Direct hits on internal login folder (/admin-login) fail closed with 404
   if (pathname === LOGIN_INTERNAL || pathname.startsWith(`${LOGIN_INTERNAL}/`)) {
     return NextResponse.rewrite(new URL("/_not-found-hidden", request.url));
   }
 
-  // Secret login URL: /<ADMIN_PATH> -> rewrites to /admin-login
+  // Secret login URL: ONLY the exact /<ADMIN_PATH> serves the login screen
   const requested = pathname.replace(/\/+$/, "").slice(1);
   if (valid.test(secret) && requested === secret) {
+    if (isAuthedSession) {
+      return NextResponse.redirect(new URL(`/${secret}/dashboard`, request.url));
+    }
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-pathname", pathname);
     const res = NextResponse.rewrite(new URL(LOGIN_INTERNAL, request.url), {
       request: { headers: requestHeaders },
     });
     res.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
-    res.headers.set("Cache-Control", "no-store");
+    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
     res.headers.set("Referrer-Policy", "no-referrer");
     return res;
   }
 
   // Secret dashboard URLs: /<ADMIN_PATH>/<subpath> -> rewrites to /admin/<subpath>
-  // IDOR & Authorization Shield: Block unauthenticated users from guessing order IDs (/orders/[id]) or products
+  // IDOR & Authorization Shield: Block unauthenticated users from probing dashboard routes (returns 404 Not Found)
   if (valid.test(secret) && pathname.startsWith(`/${secret}/`)) {
     if (!isAuthedSession) {
-      return NextResponse.redirect(new URL(`/${secret}`, request.url));
+      // Return 404 error page. DO NOT redirect to login (which would confirm the subpath exists).
+      const res = NextResponse.rewrite(new URL("/_not-found-hidden", request.url));
+      res.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+      res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+      return res;
     }
     const subpath = pathname.slice(secret.length + 2);
     const requestHeaders = new Headers(request.headers);
@@ -159,7 +176,7 @@ export function proxy(request: NextRequest) {
       request: { headers: requestHeaders },
     });
     res.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
-    res.headers.set("Cache-Control", "no-store");
+    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
     res.headers.set("Referrer-Policy", "no-referrer");
     return res;
   }

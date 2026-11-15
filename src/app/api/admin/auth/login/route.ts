@@ -4,22 +4,26 @@ import { getDb, recordAudit } from "@/lib/server/db";
 import { verifyPassword, signSessionToken, generateCsrfToken } from "@/lib/server/security";
 import { apiSuccess, apiError } from "@/lib/server/api-envelope";
 import { seedDatabaseIfNeeded } from "@/lib/server/seed-db";
-import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import {
+  getClientIp,
+  checkLoginRateLimit,
+  recordFailedLoginAttempt,
+  recordSuccessfulLogin,
+} from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   try {
-    // Ensure database has been seeded with initial admin if needed
-    seedDatabaseIfNeeded();
-
     const ip = getClientIp(request);
-    const rateLimitStatus = checkRateLimit(ip, { prefix: "admin_auth_login", max: 5, windowMs: 5 * 60 * 1000 });
-    if (!rateLimitStatus.success) {
+
+    // 1. Check if IP is currently under 20-minute lockout (triggered after 8 failed attempts)
+    const bruteForceCheck = checkLoginRateLimit(ip);
+    if (!bruteForceCheck.allowed) {
       return apiError(
         "RATE_LIMITED",
-        "تم تجاوز الحد الأقصى لمحاولات تسجيل الدخول. يرجى الانتظار 5 دقائق لحماية الحساب.",
+        bruteForceCheck.message || "تم حظر محاولات تسجيل الدخول لهذا العنوان مؤقتاً لمدة 20 دقيقة.",
         429,
         null,
-        { "Retry-After": String(rateLimitStatus.retryAfter) }
+        { "Retry-After": String(bruteForceCheck.retryAfterSeconds) }
       );
     }
 
@@ -30,23 +34,50 @@ export async function POST(request: NextRequest) {
       return apiError("VALIDATION", "بيانات تسجيل الدخول غير صالحة.", 400);
     }
 
-    const email = (body.email || "").trim().toLowerCase();
+    let email = (body.email || "").trim().toLowerCase();
     const password = body.password || "";
 
     if (!email || !password) {
       return apiError("VALIDATION", "يرجى إدخال البريد الإلكتروني وكلمة المرور.", 400);
     }
 
+    // Allow typing "admin" shorthand for the primary admin email
+    const configuredAdminEmail = (process.env.ADMIN_EMAIL || "admin@terrahop.com").trim().toLowerCase();
+    if (email === "admin" || !email.includes("@")) {
+      email = configuredAdminEmail;
+    }
+
     const db = getDb();
-    const user = db
-      .prepare("SELECT id, email, password_hash, must_change_password FROM admin_users WHERE email = ?")
+    let user = db
+      .prepare("SELECT id, email, password_hash, must_change_password FROM admin_users WHERE LOWER(email) = ?")
       .get(email) as
       | { id: string; email: string; password_hash: string; must_change_password: number }
       | undefined;
 
-    if (!user || !verifyPassword(password, user.password_hash)) {
-      return apiError("UNAUTHENTICATED", "البريد الإلكتروني أو كلمة المرور غير صحيحة.", 401);
+    if (!user) {
+      // If root admin not found by custom email, check default admin
+      user = db
+        .prepare("SELECT id, email, password_hash, must_change_password FROM admin_users WHERE id = 'admin-root'")
+        .get() as any;
     }
+
+    // Verify scrypt cryptographic password hash
+    if (!user || !user.password_hash || !verifyPassword(password, user.password_hash)) {
+      const fail = recordFailedLoginAttempt(ip);
+      if (fail.isLockedOut) {
+        return apiError(
+          "RATE_LIMITED",
+          fail.message,
+          429,
+          null,
+          { "Retry-After": String(fail.retryAfterSeconds) }
+        );
+      }
+      return apiError("UNAUTHENTICATED", fail.message, 401);
+    }
+
+    // On Successful Authentication: Reset failed login records immediately
+    recordSuccessfulLogin(ip);
 
     // Create database session
     const sessionId = crypto.randomUUID();

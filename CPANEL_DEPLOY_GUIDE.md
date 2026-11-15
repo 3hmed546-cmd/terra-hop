@@ -29,7 +29,7 @@
      * `ADMIN_PATH` = `k7q2-vault-9xm4`
      * `ADMIN_LOGIN_PATH` = `k7q2-vault-9xm4`
      * `ADMIN_EMAIL` = `admin@terrahop.com`
-     * `ADMIN_PASSWORD` = `admin123`
+     * `ADMIN_PASSWORD` = `A5eapu/8$e9Gwpf`
      * `SESSION_SECRET` = `terra-hop-secure-jwt-secret-key-2026-v1`
      * `PROMO_CODES` = `TERRA10:10,VIP20:20,WELCOME50:50,DROP01:15`
      * `NODE_ENV` = `production`

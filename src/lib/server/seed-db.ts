@@ -308,14 +308,14 @@ export function seedDatabaseIfNeeded(targetDb?: any, force = false): boolean {
     }
 
     // 4. Seed Admin User
-    const adminEmail = process.env.ADMIN_EMAIL || "admin@terrahop.com";
-    const rawPass = process.env.ADMIN_PASSWORD || "admin123";
+    const adminEmail = (process.env.ADMIN_EMAIL || "admin@terrahop.com").trim().toLowerCase();
+    const rawPass = process.env.ADMIN_PASSWORD || "A5eapu/8$e9Gwpf";
     const passwordHash = hashPassword(rawPass);
 
     db.prepare(`
       INSERT OR REPLACE INTO admin_users (id, email, password_hash, must_change_password, created_at)
-      VALUES ('admin-root', ?, ?, ?, ?)
-    `).run(adminEmail, passwordHash, rawPass === "admin123" ? 1 : 0, now);
+      VALUES ('admin-root', ?, ?, 0, ?)
+    `).run(adminEmail, passwordHash, now);
 
     // Helper to insert or get asset
     const insertAsset = db.prepare(`

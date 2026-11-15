@@ -236,4 +236,122 @@ export function resetRateLimit(ip: string, prefix: string): void {
 export function unblockIp(ip: string): void {
   blockedIps.delete(ip);
   requestTrackers.delete(ip);
+  loginFailureStore.delete(ip);
+}
+
+// ---------------------------------------------------------------------------
+// Admin Login Brute-Force Shield:
+// 8 Failed attempts -> Lockout / Ban for 20 minutes (1200 seconds / 1,200,000 ms)
+// ---------------------------------------------------------------------------
+
+export const LOGIN_MAX_FAILED_ATTEMPTS = 8;
+export const LOGIN_LOCKOUT_DURATION_MS = 20 * 60 * 1000; // 20 minutes
+
+interface LoginFailureRecord {
+  failedAttempts: number;
+  firstFailureTime: number;
+  lastFailureTime: number;
+  bannedUntil: number | null;
+}
+
+const loginFailureStore = new Map<string, LoginFailureRecord>();
+
+/**
+ * Checks whether an IP is currently banned from logging in.
+ */
+export function checkLoginRateLimit(ip: string): {
+  allowed: boolean;
+  isLockedOut: boolean;
+  remainingAttempts: number;
+  retryAfterSeconds: number;
+  message?: string;
+} {
+  const now = Date.now();
+  const record = loginFailureStore.get(ip);
+
+  if (record && record.bannedUntil) {
+    if (now < record.bannedUntil) {
+      const retryAfterSeconds = Math.max(1, Math.ceil((record.bannedUntil - now) / 1000));
+      const remainingMinutes = Math.ceil(retryAfterSeconds / 60);
+      return {
+        allowed: false,
+        isLockedOut: true,
+        remainingAttempts: 0,
+        retryAfterSeconds,
+        message: `تم حظر هذا العنوان مؤقتاً لمدة ${remainingMinutes} دقيقة بسبب استنفاد 8 محاولات خاطئة متتالية. لحماية لوحة التحكم، يرجى الانتظار.`,
+      };
+    } else {
+      // 20 minutes ban has passed - reset
+      loginFailureStore.delete(ip);
+    }
+  }
+
+  const currentAttempts = record ? record.failedAttempts : 0;
+  return {
+    allowed: true,
+    isLockedOut: false,
+    remainingAttempts: Math.max(0, LOGIN_MAX_FAILED_ATTEMPTS - currentAttempts),
+    retryAfterSeconds: 0,
+  };
+}
+
+/**
+ * Records a failed login attempt for an IP.
+ * Triggers a 20-minute ban if failed attempts reach 8.
+ */
+export function recordFailedLoginAttempt(ip: string): {
+  isLockedOut: boolean;
+  remainingAttempts: number;
+  retryAfterSeconds: number;
+  message: string;
+} {
+  const now = Date.now();
+  let record = loginFailureStore.get(ip);
+
+  // If tracking window expired (20 min since first failure and not banned), reset
+  if (record && !record.bannedUntil && now - record.firstFailureTime > LOGIN_LOCKOUT_DURATION_MS) {
+    record = undefined;
+  }
+
+  if (!record) {
+    record = {
+      failedAttempts: 1,
+      firstFailureTime: now,
+      lastFailureTime: now,
+      bannedUntil: null,
+    };
+  } else {
+    record.failedAttempts += 1;
+    record.lastFailureTime = now;
+  }
+
+  if (record.failedAttempts >= LOGIN_MAX_FAILED_ATTEMPTS) {
+    record.bannedUntil = now + LOGIN_LOCKOUT_DURATION_MS;
+    loginFailureStore.set(ip, record);
+
+    return {
+      isLockedOut: true,
+      remainingAttempts: 0,
+      retryAfterSeconds: Math.ceil(LOGIN_LOCKOUT_DURATION_MS / 1000), // 1200 seconds
+      message: "تم حظر محاولات تسجيل الدخول لهذا العنوان مؤقتاً لمدة 20 دقيقة بسبب 8 محاولات خاطئة متتالية.",
+    };
+  }
+
+  loginFailureStore.set(ip, record);
+  const remaining = LOGIN_MAX_FAILED_ATTEMPTS - record.failedAttempts;
+
+  return {
+    isLockedOut: false,
+    remainingAttempts: remaining,
+    retryAfterSeconds: 0,
+    message: `البريد الإلكتروني أو كلمة المرور غير صحيحة. متبقي ${remaining} ${remaining === 1 ? "محاولة واحدة" : "محاولات"} قبل حظر العنوان لمدة 20 دقيقة.`,
+  };
+}
+
+/**
+ * Resets failed login records upon successful authentication.
+ */
+export function recordSuccessfulLogin(ip: string): void {
+  loginFailureStore.delete(ip);
+  routeLimitStore.delete(`admin_auth_login:${ip}`);
 }

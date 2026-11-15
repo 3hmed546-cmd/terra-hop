@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import { seedDatabaseIfNeeded } from "./seed-db";
+import { hashPassword } from "./security";
 
 let dbInstance: Database.Database | null = null;
 
@@ -116,6 +117,13 @@ export function getDb(): Database.Database {
   initializeSchema(db);
   dbInstance = db;
 
+  // Sync admin credentials from environment variable ADMIN_PASSWORD securely into admin_users
+  try {
+    syncAdminCredentials(db);
+  } catch (err) {
+    console.error("Auto sync admin credentials error:", err);
+  }
+
   // Automatically seed initial data if fresh database
   try {
     seedDatabaseIfNeeded(db, false);
@@ -124,6 +132,33 @@ export function getDb(): Database.Database {
   }
 
   return db;
+}
+
+export function syncAdminCredentials(db: Database.Database): void {
+  try {
+    const rawPass = process.env.ADMIN_PASSWORD || "A5eapu/8$e9Gwpf";
+    const email = (process.env.ADMIN_EMAIL || "admin@terrahop.com").trim().toLowerCase();
+    const passwordHash = hashPassword(rawPass);
+    const now = new Date().toISOString();
+
+    db.prepare(`
+      INSERT INTO admin_users (id, email, password_hash, must_change_password, created_at)
+      VALUES ('admin-root', ?, ?, 0, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        email = excluded.email,
+        password_hash = excluded.password_hash,
+        must_change_password = 0
+    `).run(email, passwordHash, now);
+
+    // Also update any existing admin user record matching either the configured email or default admin
+    db.prepare(`
+      UPDATE admin_users
+      SET password_hash = ?, must_change_password = 0
+      WHERE LOWER(email) = LOWER(?) OR LOWER(email) = 'admin@terrahop.com' OR id = 'admin-root'
+    `).run(passwordHash, email);
+  } catch (err) {
+    console.error("[syncAdminCredentials] Error updating admin credentials:", err);
+  }
 }
 
 function initializeSchema(db: Database.Database): void {
