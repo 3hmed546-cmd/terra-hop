@@ -30,7 +30,7 @@ export const images: Record<string, ImageAsset> = {
   "hoodie-slate-navy": hoodie("hoodie-slate-navy", "موديل يرتدي هودي كحلي أردوازي"),
   "hoodie-sand-beige": hoodie("hoodie-sand-beige", "موديل يرتدي هودي بيج صحراوي رملي"),
   "hoodie-washed-black": hoodie("hoodie-washed-black", "موديل يرتدي هودي أسيد واش مغسول"),
-  "hoodie-1": tile("hoodie-1", "الموديل يرتدي هودي ستريت وير أسود"),
+  "hoodie-1": tile("hoodie-1", "الموديل يرتدي هودي أسود أوفر سايز"),
   "hoodie-2": tile("hoodie-2", "هودي أسود بتطريز اللوجو الأمامي"),
 
   story: { src: "/preview-images/story.jpg", width: 1484, height: 1060, alt: "تشكيلة هوديز TERRA HOP الفاخرة", demo: true },
@@ -40,7 +40,7 @@ export const images: Record<string, ImageAsset> = {
   "look-2": hoodie("hoodie-charcoal", "لوك بوك - هودي رمادي فحمي بتأثير مغسول فاخر"),
   "look-3": hoodie("hoodie-forest", "لوك بوك - هودي أخضر غابات فخم"),
   "look-4": hoodie("hoodie-chocolate", "لوك بوك - هودي موكا كاكاو فينتاج دافئ"),
-  "look-5": hoodie("hoodie-black", "لوك بوك - هودي أسود ملكي فانتوم ستريت وير"),
+  "look-5": hoodie("hoodie-black", "لوك بوك - هودي أسود ملكي فانتوم أوفر سايز"),
 
   // Legacy fallback slots
   "tee-black-1": hoodie("hoodie-black", "هودي أسود"),

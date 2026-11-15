@@ -300,7 +300,7 @@ export const translations: Record<Locale, Translations> = {
     products: {
       "phantom-obsidian-hoodie": {
         name: "هودي فانتوم أسود بريميوم",
-        description: "هودي ستريت وير أسود فاحم مصنوع من قطن مصري 100% ثقيل (450 GSM). غطاء رأس مزدوج، جيب كانغرو مبطن، وتطريز كوكبي فاخر عالي الكثافة على الصدر.",
+        description: "هودي أوفر سايز أسود فاحم مصنوع من قطن مصري 100% ثقيل (450 GSM). غطاء رأس مزدوج، جيب كانغرو مبطن، وتطريز كوكبي فاخر عالي الكثافة على الصدر.",
         category: "هوديز",
       },
       "dusty-cobalt-hoodie": {
@@ -375,7 +375,7 @@ export const translations: Record<Locale, Translations> = {
       phone: "+20 128 569 4670",
       email: "support@terra-hop.com",
       copyright: "جميع الحقوق محفوظة لـ TERRA HOP ©",
-      developedBy: "DEVELOPED & DESIGNED BY NASAQ",
+      developedBy: "DEVELOPED & DESIGNED BY TERRA HOP TEAM",
       columns: {
         shop: "المتجر",
         about: "عن البراند",
@@ -468,7 +468,7 @@ export const translations: Record<Locale, Translations> = {
     },
     about: {
       heading: "عن TERRA HOP",
-      intro: "ملابس ستريت وير أوفرسايز للشباب في مصر.",
+      intro: "براند مصري للأزياء والهوديز الأوفر سايز والتيشرتات للشباب في مصر.",
       body: [
         "تيرا هوب تقدم إصدارات حصرية بكميات محدودة. كل قطعة تُؤكد بالطلب المسبق قبل بدء الإنتاج لضمان الجودة والتميز.",
         "نحافظ على تشكيلة محددة وقصة أوفرسايز مدروسة. هدفنا بسيط: قطع ترتديها وتعتمد عليها كل يوم.",
@@ -711,7 +711,7 @@ export const translations: Record<Locale, Translations> = {
       phone: "+20 128 569 4670",
       email: "support@terra-hop.com",
       copyright: "© TERRA HOP",
-      developedBy: "DEVELOPED & DESIGNED BY NASAQ",
+      developedBy: "DEVELOPED & DESIGNED BY TERRA HOP TEAM",
       columns: {
         shop: "Shop",
         about: "About",

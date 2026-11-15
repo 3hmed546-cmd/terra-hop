@@ -13,7 +13,7 @@ import type { home } from "@/content/home";
 
 export const HERO_CAPTIONS = [
   {
-    ar: { prefix: "تميز", accent: "بأسلوبك", sub: "أصالة ستريت وير مصرية بهوية عصرية" },
+    ar: { prefix: "تميز", accent: "بأسلوبك", sub: "أصالة أزياء مصرية بهوية عصرية فريدة" },
     en: { prefix: "STAND", accent: "OUT", sub: "Egyptian streetwear culture redefined" },
   },
   {

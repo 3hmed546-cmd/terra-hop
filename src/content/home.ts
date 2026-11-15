@@ -25,8 +25,8 @@ const STANDIN = "/not-in-preview";
 export const home = {
   meta: {
     demo: true,
-    title: "TERRA HOP",
-    description: "Oversized streetwear for young men in Egypt. Small drops, confirmed by preorder.",
+    title: "TERRA HOP | تيرا هوب - براند مصري للأزياء والهوديز الأوفر سايز",
+    description: "موقع تيرا هوب (TERRA HOP) الرسمي - براند مصري للأزياء والهوديز الأوفر سايز والتيشرتات للشباب في مصر.",
   },
   header: {
     demo: true,

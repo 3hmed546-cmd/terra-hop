@@ -115,7 +115,7 @@ export const loginHoodies: LoginHoodie[] = [
       ar: {
         prefix: "طاقة",
         accent: "الشارع الحقيقية",
-        sub: "كولكشن ستريت وير صُمم ليعبر عنك",
+        sub: "كولكشن أزياء أوفرسايز صُمم ليعبر عنك",
       },
       en: {
         prefix: "THE RAW",

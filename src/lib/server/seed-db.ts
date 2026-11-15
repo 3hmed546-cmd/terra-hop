@@ -298,8 +298,8 @@ export function seedDatabaseIfNeeded(targetDb?: any, force = false): boolean {
       },
       {
         key: "story_desc",
-        ar: "قصة ملابس ستريت وير مخصصة لشباب مصر بأسلوب بسيط وتصميم أوفرسايز عصري ومريح لكل يوم.",
-        en: "Oversized streetwear crafted for Egypt. Small curated drops made for effortless comfort every day.",
+        ar: "قصة براند أزياء مخصصة لشباب مصر بأسلوب بسيط وتصميم أوفرسايز عصري ومريح لكل يوم.",
+        en: "Oversized fashion & hoodies crafted for Egypt. Small curated drops made for effortless comfort every day.",
       },
     ];
 

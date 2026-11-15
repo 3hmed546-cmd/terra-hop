@@ -156,7 +156,7 @@ export function Footer({ footer }: { footer: typeof home.footer }) {
           </div>
         </div>
 
-        {/* Bottom Bar: Copyright on left, Developed & Designed by NASAQ in center */}
+        {/* Bottom Bar: Copyright on left, Developed & Designed by TERRA HOP TEAM in center */}
         <div className="mt-12 border-t border-charcoal pt-6 grid grid-cols-1 md:grid-cols-3 items-center gap-4 text-sm text-(--fg-muted) text-left">
           <p className="text-left text-xs md:text-sm">
             &copy; {currentYear} {footer.copyright}
@@ -164,7 +164,7 @@ export function Footer({ footer }: { footer: typeof home.footer }) {
           <p className="text-center text-xs md:text-sm uppercase tracking-[0.14em]">
             Developed &amp; Designed by{" "}
             <span className="font-extrabold text-off-white tracking-[0.2em]">
-              NASAQ
+              TERRA HOP TEAM
             </span>
           </p>
           <div className="hidden md:block" aria-hidden="true" />

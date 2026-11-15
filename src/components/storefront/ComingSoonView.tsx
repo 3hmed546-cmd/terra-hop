@@ -103,7 +103,7 @@ export function ComingSoonView({
               TERRA HOP
             </span>
             <span className="font-mono text-[8.5px] sm:text-[9.5px] tracking-[0.28em] text-concrete/70 uppercase">
-              {locale === "ar" ? "براند ستريت وير مصري فاخر" : "LUXURY EGYPTIAN STREETWEAR"}
+              {locale === "ar" ? "براند مصري للأزياء والهوديز الأوفر سايز" : "EGYPTIAN OVERSIZED FASHION & HOODIES"}
             </span>
           </div>
         </Link>
@@ -112,9 +112,9 @@ export function ComingSoonView({
       {/* 3. Main Hero Poster Stage */}
       <div className="relative z-10 flex flex-col items-center justify-start w-full pt-0">
         {/* Semantic SEO Heading for Google Search Indexing */}
-        <h1 className="sr-only">TERRA HOP | تيرا هوب - براند ستريت وير مصري</h1>
+        <h1 className="sr-only">TERRA HOP | تيرا هوب - براند مصري للأزياء والهوديز الأوفر سايز</h1>
         <p className="sr-only">
-          موقع تيرا هوب (TERRA HOP) الرسمي - براند مصري للأزياء والستريت وير الأوفر سايز للشباب في مصر. هوديز وتيشيرتات بتصاميم عصرية وخامات فاخرة بحجز مسبق.
+          موقع تيرا هوب (TERRA HOP) الرسمي - براند مصري للأزياء والهوديز الأوفر سايز والتيشرتات للشباب في مصر. تشكيلات هوديز وتيشيرتات عصرية بخامات قطن فاخرة. تسوق أونلاين: تيراهوب، تيرا هوب، تيرهوب، TERRAHOP، TERA HOP، هودي TERRA HOP، ملابس شتوي وتيشيرتات أوفر سايز.
         </p>
 
         {/* Interactive 3D Tilt, Metallic Light Sheen & Bouncing Letters Poster */}

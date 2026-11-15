@@ -149,7 +149,7 @@ export function InteractiveComingSoonPoster({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={desktopImage}
-              alt={title || "TERRA HOP | تيرا هوب - براند ستريت وير مصري قريباً"}
+              alt={title || "TERRA HOP | تيرا هوب - براند مصري للأزياء والهوديز الأوفر سايز"}
               width={1920}
               height={1072}
               fetchPriority="high"
@@ -196,7 +196,7 @@ export function InteractiveComingSoonPoster({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={mobileImage}
-              alt={title || "TERRA HOP | تيرا هوب - براند ستريت وير مصري قريباً"}
+              alt={title || "TERRA HOP | تيرا هوب - براند مصري للأزياء والهوديز الأوفر سايز"}
               width={1080}
               height={1920}
               fetchPriority="high"
