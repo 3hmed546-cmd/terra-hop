@@ -46,8 +46,22 @@ export function Footer({ footer }: { footer: typeof home.footer }) {
         <div className="grid gap-12 md:grid-cols-12 text-left">
           {/* Brand & Tagline - Always on Left */}
           <div className="md:col-span-4 text-left">
-            <Logo className="w-56 sm:w-64 md:w-60 lg:w-72 max-w-full" />
-            <p className="mt-5 text-sm text-(--fg-muted)">{t.footer.tagline}</p>
+            <div className="w-56 sm:w-64 md:w-60 lg:w-72 max-w-full">
+              <Logo className="w-full" />
+              <p
+                className="mt-3.5 w-full flex justify-between items-center text-[10px] sm:text-[11px] md:text-xs font-semibold tracking-wider text-concrete/85 uppercase select-none font-mono"
+                aria-label="HIGHER ON PURPOSE"
+              >
+                <span className="sr-only">HIGHER ON PURPOSE</span>
+                <span className="w-full flex justify-between items-center" aria-hidden="true">
+                  {"HIGHER ON PURPOSE".split("").map((char, idx) => (
+                    <span key={idx} className={char === " " ? "w-2 sm:w-2.5" : ""}>
+                      {char}
+                    </span>
+                  ))}
+                </span>
+              </p>
+            </div>
 
             {/* Language Switcher in Footer */}
             <div className="mt-5 flex justify-start">

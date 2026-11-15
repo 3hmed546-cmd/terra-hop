@@ -370,7 +370,7 @@ export const translations: Record<Locale, Translations> = {
       directChat: "أو تواصل مع خدمة العملاء مباشرة",
     },
     footer: {
-      tagline: "Higher on Purpose. ارتقِ بأسلوبك اليومي.",
+      tagline: "HIGHER ON PURPOSE",
       contact: "خدمة العملاء",
       phone: "+20 128 569 4670",
       email: "support@terra-hop.com",
@@ -706,7 +706,7 @@ export const translations: Record<Locale, Translations> = {
       directChat: "Or chat with customer support directly",
     },
     footer: {
-      tagline: "Higher on Purpose.",
+      tagline: "HIGHER ON PURPOSE",
       contact: "Contact",
       phone: "+20 128 569 4670",
       email: "support@terra-hop.com",
