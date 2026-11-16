@@ -49,8 +49,8 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  eslint: {
-    ignoreDuringBuilds: true,
+  experimental: {
+    cpus: 1,
   },
   serverExternalPackages: ["better-sqlite3", "sharp"],
   cacheComponents: true,
