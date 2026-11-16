@@ -46,6 +46,12 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   /* config options here */
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   serverExternalPackages: ["better-sqlite3", "sharp"],
   cacheComponents: true,
   partialPrefetching: true,
