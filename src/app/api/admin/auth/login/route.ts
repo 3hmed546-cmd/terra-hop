@@ -77,6 +77,8 @@ export async function POST(request: NextRequest) {
         .get() as any;
     }
 
+    console.log("[LOGIN_DEBUG] user found:", !!user, "pass len:", password.length, "hash prefix:", user?.password_hash?.slice(0, 10));
+
     // Verify Supabase bcrypt cryptographic password hash (with legacy scrypt fallback)
     if (!user || !user.password_hash || !verifyPassword(password, user.password_hash)) {
       const fail = recordFailedLoginAttempt(ip);
