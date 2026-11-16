@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { checkDoSProtection, getClientIp } from "@/lib/rate-limit";
 import { verifySessionToken, verifyAmbassadorSessionToken } from "@/lib/server/security";
+import { REVERSE_VAULT_MAP } from "@/lib/admin/paths";
 
 // Hidden admin routes. The public URL is /<ADMIN_PATH> for login and /<ADMIN_PATH>/* for dashboard pages.
 // Direct visits to internal folders (/admin and /admin-login) fail closed and return 404.
@@ -132,7 +133,7 @@ export function proxy(request: NextRequest) {
     }
     // If authenticated admin: redirect /admin to secret dashboard
     if (pathname === "/admin" || pathname === "/admin/") {
-      const target = valid.test(secret) ? `/${secret}/dashboard` : "/admin/dashboard";
+      const target = valid.test(secret) ? `/${secret}/v-c9x2` : "/admin/dashboard";
       return NextResponse.redirect(new URL(target, request.url));
     }
   }
@@ -146,7 +147,7 @@ export function proxy(request: NextRequest) {
   const requested = pathname.replace(/\/+$/, "").slice(1);
   if (valid.test(secret) && requested === secret) {
     if (isAuthedSession) {
-      return NextResponse.redirect(new URL(`/${secret}/dashboard`, request.url));
+      return NextResponse.redirect(new URL(`/${secret}/v-c9x2`, request.url));
     }
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-pathname", pathname);
@@ -169,10 +170,19 @@ export function proxy(request: NextRequest) {
       res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
       return res;
     }
-    const subpath = pathname.slice(secret.length + 2);
+    const rawSubpath = pathname.slice(secret.length + 2);
+    const parts = rawSubpath.split("/").filter(Boolean);
+    const token = parts[0] || "";
+
+    // De-obfuscate tokenized route if present:
+    // e.g. "v-o7k1/123" -> "orders/123", "v-c9x2" -> "dashboard"
+    const realSegment = REVERSE_VAULT_MAP[token] || token;
+    const remainder = parts.slice(1).join("/");
+    const internalSubpath = remainder ? `${realSegment}/${remainder}` : realSegment;
+
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-pathname", pathname);
-    const res = NextResponse.rewrite(new URL(`/admin/${subpath}`, request.url), {
+    const res = NextResponse.rewrite(new URL(`/admin/${internalSubpath}`, request.url), {
       request: { headers: requestHeaders },
     });
     res.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
