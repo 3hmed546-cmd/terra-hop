@@ -1117,7 +1117,7 @@ export async function broadcastNewProductToConfirmedCustomers(opts: {
     throw new Error("بوت الواتساب غير متصل حالياً. يرجى مسح رمز QR من لوحة التحكم أولاً.");
   }
 
-  const appBaseUrl = (process.env.APP_BASE_URL || "https://terra-hop-production.up.railway.app").replace(/\/$/, "");
+  const appBaseUrl = (process.env.APP_BASE_URL || "https://terra-hop.com").replace(/\/$/, "");
 
   // Resolve product image buffer
   let imageBuffer: Buffer | null = resolveLocalImageBuffer(opts.product.imageUrl);

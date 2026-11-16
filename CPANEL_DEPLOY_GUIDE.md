@@ -33,6 +33,7 @@
      * `SESSION_SECRET` = `terra-hop-secure-jwt-secret-key-2026-v1`
      * `PROMO_CODES` = `TERRA10:10,VIP20:20,WELCOME50:50,DROP01:15`
      * `NODE_ENV` = `production`
+     * `APP_BASE_URL` = `https://terra-hop.com`
      * `STORAGE_DIR` = مسار دائم قابل للكتابة خارج مجلد النشر، مثل `/home/username/terra-hop-data`
 
    > مهم: لا تترك `STORAGE_DIR` داخل مجلد يبدله النشر أو إعادة البناء. هذا المسار يحتوي قاعدة SQLite والصور والبيانات الحية؛ بدونه قد تعود البيانات القديمة بعد إعادة تشغيل التطبيق أو نشر نسخة جديدة.

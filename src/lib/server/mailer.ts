@@ -9,7 +9,7 @@ const APP_BASE_URL =
   process.env.APP_BASE_URL ||
   (process.env.RAILWAY_PUBLIC_DOMAIN
     ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
-    : "https://terra-hop-production.up.railway.app");
+    : "https://terra-hop.com");
 
 /**
  * Retrieve Brevo API Key and sender settings from DB settings or process.env
