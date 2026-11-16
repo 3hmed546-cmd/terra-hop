@@ -2,7 +2,13 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { getDb, recordChange } from "./db";
-import { hashPassword, encryptCode, hashLookupCode } from "./security";
+import {
+  hashPassword,
+  encryptCode,
+  hashLookupCode,
+  hashBlindIndex,
+  encryptText,
+} from "./security";
 import { readVaultFile } from "./vault-sync";
 
 export function seedAmbassadorsIfNeeded(db: any, now = new Date().toISOString()) {
@@ -311,11 +317,18 @@ export function seedDatabaseIfNeeded(targetDb?: any, force = false): boolean {
     const adminEmail = (process.env.ADMIN_EMAIL || "admin@terrahop.com").trim().toLowerCase();
     const rawPass = process.env.ADMIN_PASSWORD || "A5eapu/8$e9Gwpf";
     const passwordHash = hashPassword(rawPass);
+    const emailHash = hashBlindIndex(adminEmail, "email");
+    const encryptedEmail = encryptText(adminEmail);
+    const usernameHash = hashBlindIndex("admin", "username");
+    const encryptedUsername = encryptText("admin");
 
     db.prepare(`
-      INSERT OR REPLACE INTO admin_users (id, email, password_hash, must_change_password, created_at)
-      VALUES ('admin-root', ?, ?, 0, ?)
-    `).run(adminEmail, passwordHash, now);
+      INSERT OR REPLACE INTO admin_users (
+        id, email, email_hash, encrypted_email, username_hash, encrypted_username,
+        password_hash, must_change_password, created_at
+      )
+      VALUES ('admin-root', ?, ?, ?, ?, ?, ?, 0, ?)
+    `).run(adminEmail, emailHash, encryptedEmail, usernameHash, encryptedUsername, passwordHash, now);
 
     // Helper to insert or get asset
     const insertAsset = db.prepare(`

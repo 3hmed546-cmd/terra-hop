@@ -19,6 +19,7 @@
     "@types/react-dom": "^19",
     "@types/three": "^0.187.0",
     "@whiskeysockets/baileys": "^7.0.0-rc14",
+    "bcryptjs": "^3.0.3",
     "better-sqlite3": "^13.0.3",
     "framer-motion": "^14.7.1",
     "jimp": "^1.6.1",
@@ -37,6 +38,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4",
     "@playwright/test": "^1",
+    "@types/bcryptjs": "^2.4.6",
     "@types/nodemailer": "^8.0.2",
     "@types/web-push": "^3.6.4",
     "eslint": "^9",

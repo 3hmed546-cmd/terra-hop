@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { getDb, recordAudit } from "@/lib/server/db";
-import { verifyPassword, signSessionToken, generateCsrfToken } from "@/lib/server/security";
+import {
+  verifyPassword,
+  signSessionToken,
+  generateCsrfToken,
+  hashBlindIndex,
+  decryptText,
+} from "@/lib/server/security";
 import { apiSuccess, apiError } from "@/lib/server/api-envelope";
 import { seedDatabaseIfNeeded } from "@/lib/server/seed-db";
 import {
@@ -34,34 +40,42 @@ export async function POST(request: NextRequest) {
       return apiError("VALIDATION", "بيانات تسجيل الدخول غير صالحة.", 400);
     }
 
-    let email = (body.email || "").trim().toLowerCase();
+    const inputClean = (body.email || "").trim().toLowerCase();
     const password = body.password || "";
 
-    if (!email || !password) {
+    if (!inputClean || !password) {
       return apiError("VALIDATION", "يرجى إدخال البريد الإلكتروني وكلمة المرور.", 400);
     }
 
+    const emailBlindIndex = hashBlindIndex(inputClean, "email");
+    const usernameBlindIndex = hashBlindIndex(inputClean, "username");
+
     // Allow typing "admin" shorthand for the primary admin email
     const configuredAdminEmail = (process.env.ADMIN_EMAIL || "admin@terrahop.com").trim().toLowerCase();
+    let email = inputClean;
     if (email === "admin" || !email.includes("@")) {
       email = configuredAdminEmail;
     }
 
     const db = getDb();
     let user = db
-      .prepare("SELECT id, email, password_hash, must_change_password FROM admin_users WHERE LOWER(email) = ?")
-      .get(email) as
-      | { id: string; email: string; password_hash: string; must_change_password: number }
+      .prepare(`
+        SELECT id, email, encrypted_email, email_hash, password_hash, must_change_password 
+        FROM admin_users 
+        WHERE email_hash = ? OR username_hash = ? OR LOWER(email) = ? OR id = 'admin-root'
+      `)
+      .get(emailBlindIndex, usernameBlindIndex, email) as
+      | { id: string; email: string; encrypted_email?: string; email_hash?: string; password_hash: string; must_change_password: number }
       | undefined;
 
     if (!user) {
       // If root admin not found by custom email, check default admin
       user = db
-        .prepare("SELECT id, email, password_hash, must_change_password FROM admin_users WHERE id = 'admin-root'")
+        .prepare("SELECT id, email, encrypted_email, email_hash, password_hash, must_change_password FROM admin_users WHERE id = 'admin-root'")
         .get() as any;
     }
 
-    // Verify scrypt cryptographic password hash
+    // Verify Supabase bcrypt cryptographic password hash (with legacy scrypt fallback)
     if (!user || !user.password_hash || !verifyPassword(password, user.password_hash)) {
       const fail = recordFailedLoginAttempt(ip);
       if (fail.isLockedOut) {
@@ -79,6 +93,10 @@ export async function POST(request: NextRequest) {
     // On Successful Authentication: Reset failed login records immediately
     recordSuccessfulLogin(ip);
 
+    const effectiveEmail = user.encrypted_email
+      ? (decryptText(user.encrypted_email) || user.email || email)
+      : (user.email || email);
+
     // Create database session
     const sessionId = crypto.randomUUID();
     const now = new Date();
@@ -91,20 +109,20 @@ export async function POST(request: NextRequest) {
     `).run(sessionId, user.id, now.toISOString(), expiresAt.toISOString(), ip, userAgent);
 
     recordAudit({
-      actor: email,
+      actor: effectiveEmail,
       action: "LOGIN",
       entity: "admin_sessions",
       entityId: sessionId,
       ip,
     });
 
-    const sessionToken = signSessionToken(email, sessionId);
+    const sessionToken = signSessionToken(effectiveEmail, sessionId);
     const csrfToken = generateCsrfToken(sessionId);
 
     const response = apiSuccess({
       user: {
         id: user.id,
-        email: user.email,
+        email: effectiveEmail,
       },
       csrfToken,
       mustChangePassword: user.must_change_password === 1,

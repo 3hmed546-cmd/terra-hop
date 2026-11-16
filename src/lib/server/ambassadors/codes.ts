@@ -230,8 +230,16 @@ export function lookupAndValidateCode(
     // -------------------------------------------------------------------------
     // 3. Fallback to promo_codes Table
     // -------------------------------------------------------------------------
-    const p = db.prepare("SELECT * FROM promo_codes WHERE code = ? AND active = 1").get(candidate) as any;
+    const p = db
+      .prepare("SELECT * FROM promo_codes WHERE (code_hash = ? OR code = ?) AND active = 1")
+      .get(codeHash, candidate) as any;
     if (p) {
+      if (p.encrypted_code) {
+        const decrypted = decryptCode(p.encrypted_code);
+        if (!decrypted || decrypted.toUpperCase() !== candidate) {
+          return { ok: false, message: "رمز كود الخصم غير صالح.", status: 400 };
+        }
+      }
       if (p.starts_at && p.starts_at > now) return { ok: false, message: "كود الخصم لم يبدأ بعد.", status: 400 };
       if (p.expires_at && p.expires_at < now) return { ok: false, message: "انتهى هذا العرض، ترقب عروضنا قريباً", status: 400 };
       if (p.max_uses && p.used >= p.max_uses) return { ok: false, message: "انتهى هذا العرض، ترقب عروضنا قريباً", status: 400 };

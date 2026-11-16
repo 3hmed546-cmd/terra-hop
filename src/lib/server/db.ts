@@ -3,7 +3,15 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import { seedDatabaseIfNeeded } from "./seed-db";
-import { hashPassword } from "./security";
+import {
+  hashPassword,
+  hashBlindIndex,
+  encryptText,
+  decryptText,
+  hashLookupCode,
+  encryptCode,
+  decryptCode,
+} from "./security";
 
 let dbInstance: Database.Database | null = null;
 
@@ -117,11 +125,18 @@ export function getDb(): Database.Database {
   initializeSchema(db);
   dbInstance = db;
 
-  // Sync admin credentials from environment variable ADMIN_PASSWORD securely into admin_users
+  // Sync admin credentials from environment variable ADMIN_PASSWORD securely into admin_users (Supabase bcrypt standard)
   try {
     syncAdminCredentials(db);
   } catch (err) {
     console.error("Auto sync admin credentials error:", err);
+  }
+
+  // Encrypt existing promo codes at rest (Supabase Vault AEAD AES-256-GCM standard)
+  try {
+    migratePromoCodesEncryption(db);
+  } catch (err) {
+    console.error("Auto migrate promo codes encryption error:", err);
   }
 
   // Automatically seed initial data if fresh database
@@ -138,26 +153,61 @@ export function syncAdminCredentials(db: Database.Database): void {
   try {
     const rawPass = process.env.ADMIN_PASSWORD || "A5eapu/8$e9Gwpf";
     const email = (process.env.ADMIN_EMAIL || "admin@terrahop.com").trim().toLowerCase();
-    const passwordHash = hashPassword(rawPass);
+    const passwordHash = hashPassword(rawPass); // Supabase bcrypt ($2b$10$)
+    const emailHash = hashBlindIndex(email, "email");
+    const encryptedEmail = encryptText(email);
+    const usernameHash = hashBlindIndex("admin", "username");
+    const encryptedUsername = encryptText("admin");
     const now = new Date().toISOString();
 
     db.prepare(`
-      INSERT INTO admin_users (id, email, password_hash, must_change_password, created_at)
-      VALUES ('admin-root', ?, ?, 0, ?)
+      INSERT INTO admin_users (
+        id, email, email_hash, encrypted_email, username_hash, encrypted_username,
+        password_hash, must_change_password, created_at
+      )
+      VALUES ('admin-root', ?, ?, ?, ?, ?, ?, 0, ?)
       ON CONFLICT(id) DO UPDATE SET
         email = excluded.email,
+        email_hash = excluded.email_hash,
+        encrypted_email = excluded.encrypted_email,
+        username_hash = excluded.username_hash,
+        encrypted_username = excluded.encrypted_username,
         password_hash = excluded.password_hash,
         must_change_password = 0
-    `).run(email, passwordHash, now);
+    `).run(email, emailHash, encryptedEmail, usernameHash, encryptedUsername, passwordHash, now);
 
     // Also update any existing admin user record matching either the configured email or default admin
     db.prepare(`
       UPDATE admin_users
-      SET password_hash = ?, must_change_password = 0
+      SET password_hash = ?,
+          email_hash = ?,
+          encrypted_email = ?,
+          username_hash = ?,
+          encrypted_username = ?,
+          must_change_password = 0
       WHERE LOWER(email) = LOWER(?) OR LOWER(email) = 'admin@terrahop.com' OR id = 'admin-root'
-    `).run(passwordHash, email);
+    `).run(passwordHash, emailHash, encryptedEmail, usernameHash, encryptedUsername, email);
   } catch (err) {
     console.error("[syncAdminCredentials] Error updating admin credentials:", err);
+  }
+}
+
+export function migratePromoCodesEncryption(db: Database.Database): void {
+  try {
+    const unencrypted = db
+      .prepare("SELECT code FROM promo_codes WHERE code_hash IS NULL OR encrypted_code IS NULL")
+      .all() as { code: string }[];
+    if (unencrypted && unencrypted.length > 0) {
+      const updateStmt = db.prepare("UPDATE promo_codes SET code_hash = ?, encrypted_code = ? WHERE code = ?");
+      for (const row of unencrypted) {
+        if (!row.code) continue;
+        const cHash = hashLookupCode(row.code);
+        const encCode = encryptCode(row.code);
+        updateStmt.run(cHash, encCode, row.code);
+      }
+    }
+  } catch (err) {
+    console.error("[migratePromoCodesEncryption] Error migrating promo codes:", err);
   }
 }
 
@@ -693,6 +743,47 @@ function initializeSchema(db: Database.Database): void {
   } catch {
     /* Column already exists */
   }
+
+  // Supabase-standard Vault encryption & blind index migrations for promo_codes
+  try {
+    db.exec("ALTER TABLE promo_codes ADD COLUMN code_hash TEXT;");
+  } catch {
+    /* Column already exists */
+  }
+  try {
+    db.exec("ALTER TABLE promo_codes ADD COLUMN encrypted_code TEXT;");
+  } catch {
+    /* Column already exists */
+  }
+  try {
+    db.exec("CREATE INDEX IF NOT EXISTS ix_promo_code_hash ON promo_codes(code_hash);");
+  } catch {}
+
+  // Supabase-standard Vault encryption & blind index migrations for admin_users
+  try {
+    db.exec("ALTER TABLE admin_users ADD COLUMN email_hash TEXT;");
+  } catch {
+    /* Column already exists */
+  }
+  try {
+    db.exec("ALTER TABLE admin_users ADD COLUMN encrypted_email TEXT;");
+  } catch {
+    /* Column already exists */
+  }
+  try {
+    db.exec("ALTER TABLE admin_users ADD COLUMN username_hash TEXT;");
+  } catch {
+    /* Column already exists */
+  }
+  try {
+    db.exec("ALTER TABLE admin_users ADD COLUMN encrypted_username TEXT;");
+  } catch {
+    /* Column already exists */
+  }
+  try {
+    db.exec("CREATE INDEX IF NOT EXISTS ix_admin_email_hash ON admin_users(email_hash);");
+    db.exec("CREATE INDEX IF NOT EXISTS ix_admin_username_hash ON admin_users(username_hash);");
+  } catch {}
 
   try {
     db.exec("ALTER TABLE orders ADD COLUMN idempotency_key TEXT;");

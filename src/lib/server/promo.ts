@@ -1,4 +1,5 @@
 import type Database from "better-sqlite3";
+import { hashLookupCode, decryptCode } from "./security";
 
 export type PromoResult =
   | { ok: true; code: string; kind: "percent" | "fixed"; discountCents: number; discountPercent?: number }
@@ -6,8 +7,18 @@ export type PromoResult =
 
 export function evaluatePromo(db: Database.Database, rawCode: string, subtotalCents: number): PromoResult {
   const code = rawCode.trim().toUpperCase();
-  const p = db.prepare("SELECT * FROM promo_codes WHERE code = ? AND active = 1").get(code) as any;
+  const codeHash = hashLookupCode(code);
+  const p = db
+    .prepare("SELECT * FROM promo_codes WHERE (code_hash = ? OR code = ?) AND active = 1")
+    .get(codeHash, code) as any;
   if (!p) return { ok: false, status: 404, message: "كود الخصم غير صحيح أو غير متاح حالياً" };
+
+  if (p.encrypted_code) {
+    const decrypted = decryptCode(p.encrypted_code);
+    if (!decrypted || decrypted.toUpperCase() !== code) {
+      return { ok: false, status: 404, message: "كود الخصم غير صالح أو تم التلاعب به" };
+    }
+  }
 
   const now = new Date().toISOString();
   if (p.starts_at && p.starts_at > now) return { ok: false, status: 400, message: "كود الخصم لم يبدأ بعد" };

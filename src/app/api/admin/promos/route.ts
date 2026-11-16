@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/server/auth-middleware";
 import { getDb, recordAudit } from "@/lib/server/db";
 import { apiSuccess, apiError } from "@/lib/server/api-envelope";
 import { seedDatabaseIfNeeded } from "@/lib/server/seed-db";
+import { hashLookupCode, encryptCode, decryptCode } from "@/lib/server/security";
 
 export async function GET(request: NextRequest) {
   const auth = requireAdmin(request);
@@ -32,8 +33,9 @@ export async function GET(request: NextRequest) {
 
   const items = rows.map((p) => {
     const productIds = productsByCode.get(p.code) || [];
+    const displayCode = p.encrypted_code ? (decryptCode(p.encrypted_code) || p.code) : p.code;
     return {
-      code: p.code,
+      code: displayCode,
       kind: p.kind || "percent",
       value: p.value,
       active: p.active === 1,
@@ -93,15 +95,18 @@ export async function POST(request: NextRequest) {
   }
 
   const db = getDb();
-
   const now = new Date().toISOString();
+  const codeHash = hashLookupCode(code);
+  const encryptedCode = encryptCode(code);
 
   db.transaction(() => {
     db.prepare(`
       INSERT INTO promo_codes (
-        code, kind, value, active, starts_at, expires_at, max_uses, used, min_subtotal_cents, applies_to
-      ) VALUES (?, ?, ?, 1, ?, ?, ?, 0, ?, ?)
+        code, code_hash, encrypted_code, kind, value, active, starts_at, expires_at, max_uses, used, min_subtotal_cents, applies_to
+      ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, 0, ?, ?)
       ON CONFLICT(code) DO UPDATE SET
+        code_hash = excluded.code_hash,
+        encrypted_code = excluded.encrypted_code,
         kind = excluded.kind,
         value = excluded.value,
         expires_at = excluded.expires_at,
@@ -109,7 +114,7 @@ export async function POST(request: NextRequest) {
         min_subtotal_cents = excluded.min_subtotal_cents,
         applies_to = excluded.applies_to,
         active = 1
-    `).run(code, kind, value, now, expiresAt, maxUses, minSubtotalCents, appliesTo);
+    `).run(code, codeHash, encryptedCode, kind, value, now, expiresAt, maxUses, minSubtotalCents, appliesTo);
 
     try {
       db.prepare("DELETE FROM promo_code_products WHERE promo_code = ?").run(code);
