@@ -160,33 +160,28 @@ export function syncAdminCredentials(db: Database.Database): void {
     const encryptedUsername = encryptText("admin");
     const now = new Date().toISOString();
 
-    db.prepare(`
-      INSERT INTO admin_users (
-        id, email, email_hash, encrypted_email, username_hash, encrypted_username,
-        password_hash, must_change_password, created_at
-      )
-      VALUES ('admin-root', ?, ?, ?, ?, ?, ?, 0, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        email = excluded.email,
-        email_hash = excluded.email_hash,
-        encrypted_email = excluded.encrypted_email,
-        username_hash = excluded.username_hash,
-        encrypted_username = excluded.encrypted_username,
-        password_hash = excluded.password_hash,
-        must_change_password = 0
-    `).run(email, emailHash, encryptedEmail, usernameHash, encryptedUsername, passwordHash, now);
-
-    // Also update any existing admin user record matching either the configured email or default admin
-    db.prepare(`
+    // 1. Ensure any existing admin user is updated with the Supabase bcrypt hash and encrypted fields
+    const updated = db.prepare(`
       UPDATE admin_users
-      SET password_hash = ?,
+      SET email = ?,
           email_hash = ?,
           encrypted_email = ?,
           username_hash = ?,
           encrypted_username = ?,
+          password_hash = ?,
           must_change_password = 0
-      WHERE LOWER(email) = LOWER(?) OR LOWER(email) = 'admin@terrahop.com' OR id = 'admin-root'
-    `).run(passwordHash, emailHash, encryptedEmail, usernameHash, encryptedUsername, email);
+    `).run(email, emailHash, encryptedEmail, usernameHash, encryptedUsername, passwordHash);
+
+    // 2. If no admin user exists, insert the root admin
+    if (updated.changes === 0) {
+      db.prepare(`
+        INSERT INTO admin_users (
+          id, email, email_hash, encrypted_email, username_hash, encrypted_username,
+          password_hash, must_change_password, created_at
+        )
+        VALUES ('admin-root', ?, ?, ?, ?, ?, ?, 0, ?)
+      `).run(email, emailHash, encryptedEmail, usernameHash, encryptedUsername, passwordHash, now);
+    }
   } catch (err) {
     console.error("[syncAdminCredentials] Error updating admin credentials:", err);
   }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { getDb, recordAudit } from "@/lib/server/db";
 import {
+  hashPassword,
   verifyPassword,
   signSessionToken,
   generateCsrfToken,
@@ -62,16 +63,17 @@ export async function POST(request: NextRequest) {
       .prepare(`
         SELECT id, email, encrypted_email, email_hash, password_hash, must_change_password 
         FROM admin_users 
-        WHERE email_hash = ? OR username_hash = ? OR LOWER(email) = ? OR id = 'admin-root'
+        WHERE email_hash = ? OR username_hash = ? OR LOWER(email) = ? OR LOWER(email) = 'admin@terrahop.com' OR id = 'admin-root'
+        ORDER BY CASE WHEN id = 'admin-root' THEN 0 ELSE 1 END
+        LIMIT 1
       `)
       .get(emailBlindIndex, usernameBlindIndex, email) as
       | { id: string; email: string; encrypted_email?: string; email_hash?: string; password_hash: string; must_change_password: number }
       | undefined;
 
     if (!user) {
-      // If root admin not found by custom email, check default admin
       user = db
-        .prepare("SELECT id, email, encrypted_email, email_hash, password_hash, must_change_password FROM admin_users WHERE id = 'admin-root'")
+        .prepare("SELECT id, email, encrypted_email, email_hash, password_hash, must_change_password FROM admin_users LIMIT 1")
         .get() as any;
     }
 
@@ -88,6 +90,14 @@ export async function POST(request: NextRequest) {
         );
       }
       return apiError("UNAUTHENTICATED", fail.message, 401);
+    }
+
+    // Seamless auto-upgrade legacy scrypt hash to Supabase bcrypt hash upon verified login
+    if (user.password_hash.includes(":")) {
+      try {
+        const upgradedBcrypt = hashPassword(password);
+        db.prepare("UPDATE admin_users SET password_hash = ? WHERE id = ?").run(upgradedBcrypt, user.id);
+      } catch {}
     }
 
     // On Successful Authentication: Reset failed login records immediately
