@@ -154,7 +154,6 @@ export function syncAdminCredentials(db: Database.Database): void {
     const rawPass = process.env.ADMIN_PASSWORD || "A5eapu/8$e9Gwpf";
     const email = (process.env.ADMIN_EMAIL || "admin@terrahop.com").trim().toLowerCase();
     const passwordHash = hashPassword(rawPass); // Supabase bcrypt ($2b$10$)
-    console.log("[syncAdminCredentials] pass length:", rawPass.length, "bcrypt prefix:", passwordHash.slice(0, 7));
     const emailHash = hashBlindIndex(email, "email");
     const encryptedEmail = encryptText(email);
     const usernameHash = hashBlindIndex("admin", "username");
