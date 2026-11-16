@@ -113,6 +113,22 @@ export function OrdersList() {
     { key: "total", header: S.columns.total, align: "end", cell: (o) => <span className="adm-num">{formatMoney(o.totalCents)}</span> },
     { key: "source", header: S.columns.source, cell: (o) => S.source[o.source] },
     { key: "status", header: S.columns.status, cell: (o) => <StatusBadge kind={o.status} /> },
+    {
+      key: "waybill",
+      header: "البوليصة",
+      cell: (o) => (
+        <a
+          href={`/api/admin/orders/${o.id}/waybill`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="adm-btn adm-btn-secondary"
+          style={{ padding: "4px 8px", fontSize: "11px", whiteSpace: "nowrap", textDecoration: "none" }}
+          title="طباعة بوليصة الشحن"
+        >
+          طباعة
+        </a>
+      ),
+    },
   ];
 
   const renderCard = (o: Order) => (
@@ -133,7 +149,18 @@ export function OrdersList() {
           <dd>{S.source[o.source]}</dd>
         </div>
       </dl>
-      <div className="adm-muted adm-small adm-num">{formatDateTime(o.createdAt)}</div>
+      <div style={{ marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div className="adm-muted adm-small adm-num">{formatDateTime(o.createdAt)}</div>
+        <a
+          href={`/api/admin/orders/${o.id}/waybill`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="adm-btn adm-btn-secondary"
+          style={{ padding: "4px 10px", fontSize: "11px", textDecoration: "none" }}
+        >
+          طباعة البوليصة
+        </a>
+      </div>
     </div>
   );
 

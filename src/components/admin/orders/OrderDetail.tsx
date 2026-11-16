@@ -213,7 +213,24 @@ export function OrderDetail({ orderId }: { orderId: string }) {
 
   return (
     <>
-      <PageHeader title={S.title(order.number)} description={placedLine(order)} actions={<StatusBadge kind={order.status} />} />
+      <PageHeader
+        title={S.title(order.number)}
+        description={placedLine(order)}
+        actions={
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <a
+              href={`/api/admin/orders/${order.id}/waybill`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="adm-btn adm-btn-secondary"
+              style={{ padding: "6px 12px", fontSize: "12px", textDecoration: "none" }}
+            >
+              طباعة البوليصة
+            </a>
+            <StatusBadge kind={order.status} />
+          </div>
+        }
+      />
       <p ref={statusRef} tabIndex={-1} role="status" className="adm-sr-focus">
         {S.statusLine(statusText(order))}
       </p>
@@ -343,6 +360,27 @@ export function OrderDetail({ orderId }: { orderId: string }) {
                   </Button>
                 </div>
               ) : null}
+
+              <div style={{ marginTop: "14px", paddingTop: "12px", borderTop: "1px dashed var(--adm-border)" }}>
+                <a
+                  href={`/api/admin/orders/${order.id}/waybill`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="adm-btn"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    backgroundColor: "#111111",
+                    color: "#ffffff",
+                    padding: "8px 16px",
+                    textDecoration: "none",
+                    fontWeight: 600,
+                  }}
+                >
+                  طباعة بوليصة الشحن وتفاصيل الأوردر
+                </a>
+              </div>
             </div>
           </section>
 
