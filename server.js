@@ -1,6 +1,13 @@
 // server.js - Production entry point for cPanel / Phusion Passenger / PM2 / VPS
 // This allows cPanel's "Setup Node.js App" to boot Next.js smoothly with dynamic PORT handling.
 
+try {
+  const { loadEnvConfig } = require("@next/env");
+  loadEnvConfig(process.cwd());
+} catch (e) {
+  // If @next/env cannot be loaded, environment variables should already be in process.env
+}
+
 const { createServer } = require("http");
 const { parse } = require("url");
 const next = require("next");

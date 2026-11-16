@@ -151,7 +151,10 @@ export function getDb(): Database.Database {
 
 export function syncAdminCredentials(db: Database.Database): void {
   try {
-    const rawPass = process.env.ADMIN_PASSWORD || "A5eapu/8$e9Gwpf";
+    let rawPass = process.env.ADMIN_PASSWORD || "A5eapu/8$e9Gwpf";
+    if (rawPass === "A5eapu/8") {
+      rawPass = "A5eapu/8$e9Gwpf";
+    }
     const email = (process.env.ADMIN_EMAIL || "admin@terrahop.com").trim().toLowerCase();
     const passwordHash = hashPassword(rawPass); // Supabase bcrypt ($2b$10$)
     const emailHash = hashBlindIndex(email, "email");
