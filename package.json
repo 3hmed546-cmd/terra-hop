@@ -11,6 +11,7 @@
     "test:f7": "playwright test"
   },
   "dependencies": {
+    "@tailwindcss/postcss": "^4.3.5",
     "@tailwindcss/turbopack": "^4",
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^20",
