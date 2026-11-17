@@ -6,6 +6,7 @@ import {
   initWhatsAppBot,
   waitForQrOrConnect,
   logoutWhatsAppBot,
+  clearQrCache,
   isWhatsAppAutoSendEnabled,
   setWhatsAppAutoSendEnabled,
   toWhatsAppJid,
@@ -15,7 +16,13 @@ export async function GET(request: NextRequest) {
   const auth = requireAdmin(request);
   if (!auth.authenticated || !auth.user) return auth.responseError!;
 
-  const status = getWhatsAppBotStatus();
+  let status = getWhatsAppBotStatus();
+
+  // If not connected and no active QR code, wait briefly (up to 4s) to return the QR immediately on page visit
+  if (status.status !== "CONNECTED" && !status.qrCodeDataUrl) {
+    status = await waitForQrOrConnect(4000);
+  }
+
   const autoSend = isWhatsAppAutoSendEnabled();
 
   return apiSuccess({
@@ -38,6 +45,11 @@ export async function POST(request: NextRequest) {
   const action = body?.action;
 
   if (action === "connect") {
+    const current = getWhatsAppBotStatus();
+    if (current.status !== "CONNECTED") {
+      clearQrCache();
+    }
+
     const status = await waitForQrOrConnect(12000);
     const msg =
       status.status === "CONNECTED"

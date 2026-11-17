@@ -27,11 +27,126 @@ interface GlobalWaHolder {
   state: WhatsAppBotState;
   connectingPromise: Promise<WASocket | null> | null;
   reconnectTimeout: NodeJS.Timeout | null;
+  lockHeartbeat: NodeJS.Timeout | null;
 }
 
 declare global {
   // eslint-disable-next-line no-var
   var __terra_wa_bot: GlobalWaHolder | undefined;
+}
+
+const WA_QR_CACHE_FILE = "wa-qr.json";
+const WA_BOT_LOCK_FILE = "wa-bot.lock";
+
+function getQrCacheFilePath(): string {
+  return path.join(getBaseStorageDir(), WA_QR_CACHE_FILE);
+}
+
+function getLockFilePath(): string {
+  return path.join(getBaseStorageDir(), WA_BOT_LOCK_FILE);
+}
+
+export function saveQrCache(state: {
+  status: "SCAN_QR" | "CONNECTED" | "DISCONNECTED";
+  phoneNumber?: string | null;
+  qrCodeDataUrl?: string | null;
+}): void {
+  try {
+    const file = getQrCacheFilePath();
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        status: state.status,
+        phoneNumber: state.phoneNumber || null,
+        qrCodeDataUrl: state.qrCodeDataUrl || null,
+        updatedAt: Date.now(),
+      }),
+      "utf8"
+    );
+  } catch {}
+}
+
+export function loadQrCache(): {
+  status: "SCAN_QR" | "CONNECTED" | "DISCONNECTED";
+  phoneNumber: string | null;
+  qrCodeDataUrl: string | null;
+  updatedAt: number;
+} | null {
+  try {
+    const file = getQrCacheFilePath();
+    if (!fs.existsSync(file)) return null;
+    return JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+export function clearQrCache(): void {
+  try {
+    const file = getQrCacheFilePath();
+    if (fs.existsSync(file)) fs.unlinkSync(file);
+  } catch {}
+}
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function isLockHeldByAnotherProcess(): boolean {
+  try {
+    const lockFile = getLockFilePath();
+    if (!fs.existsSync(lockFile)) return false;
+    const lock = JSON.parse(fs.readFileSync(lockFile, "utf8"));
+    if (lock?.pid === process.pid) return false;
+    const isAlive = typeof lock?.pid === "number" && isProcessAlive(lock.pid);
+    const isRecent = typeof lock?.time === "number" && Date.now() - lock.time < 90000;
+    return Boolean(isAlive && isRecent);
+  } catch {
+    return false;
+  }
+}
+
+export function acquireLock(): boolean {
+  try {
+    const lockFile = getLockFilePath();
+    if (isLockHeldByAnotherProcess()) return false;
+    fs.writeFileSync(
+      lockFile,
+      JSON.stringify({ pid: process.pid, time: Date.now() }),
+      "utf8"
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function touchLock(): void {
+  try {
+    const lockFile = getLockFilePath();
+    fs.writeFileSync(
+      lockFile,
+      JSON.stringify({ pid: process.pid, time: Date.now() }),
+      "utf8"
+    );
+  } catch {}
+}
+
+export function releaseLock(): void {
+  try {
+    const lockFile = getLockFilePath();
+    if (fs.existsSync(lockFile)) {
+      const lock = JSON.parse(fs.readFileSync(lockFile, "utf8"));
+      if (lock?.pid === process.pid) {
+        fs.unlinkSync(lockFile);
+      }
+    }
+  } catch {}
 }
 
 function getHolder(): GlobalWaHolder {
@@ -47,6 +162,7 @@ function getHolder(): GlobalWaHolder {
       },
       connectingPromise: null,
       reconnectTimeout: null,
+      lockHeartbeat: null,
     };
   }
   return globalThis.__terra_wa_bot;
@@ -80,7 +196,53 @@ export function toWhatsAppJid(phone: string): string {
 }
 
 export function getWhatsAppBotStatus(): WhatsAppBotState {
-  return getHolder().state;
+  const holder = getHolder();
+
+  // If memory state is CONNECTED and socket exists
+  if (holder.state.status === "CONNECTED" && holder.sock) {
+    return holder.state;
+  }
+
+  // Check if session directory has authenticated creds
+  if (hasSavedSession()) {
+    holder.state.status = "CONNECTED";
+    if (!holder.state.phoneNumber) {
+      try {
+        const sessionDir = getSessionDirectory();
+        const credsPath = path.join(sessionDir, "creds.json");
+        if (fs.existsSync(credsPath)) {
+          const creds = JSON.parse(fs.readFileSync(credsPath, "utf8"));
+          const myJid = creds?.me?.id || "";
+          holder.state.phoneNumber = myJid.split(":")[0]?.replace("@s.whatsapp.net", "") || null;
+        }
+      } catch {}
+    }
+    return holder.state;
+  }
+
+  // Check shared disk cache for multi-process consistency across LiteSpeed workers
+  const cached = loadQrCache();
+  if (cached) {
+    if (cached.status === "CONNECTED") {
+      holder.state.status = "CONNECTED";
+      holder.state.phoneNumber = cached.phoneNumber || holder.state.phoneNumber;
+      return holder.state;
+    }
+    if (cached.status === "SCAN_QR" && cached.qrCodeDataUrl) {
+      const age = Date.now() - (cached.updatedAt || 0);
+      if (age < 90000) {
+        return {
+          status: "SCAN_QR",
+          phoneNumber: null,
+          qrCodeDataUrl: cached.qrCodeDataUrl,
+          lastConnectedAt: null,
+          error: null,
+        };
+      }
+    }
+  }
+
+  return holder.state;
 }
 
 export function hasSavedSession(): boolean {
@@ -127,9 +289,23 @@ export async function initWhatsAppBot(): Promise<WASocket | null> {
     return holder.sock;
   }
 
+  // Check if another local process is already running the socket
+  if (isLockHeldByAnotherProcess()) {
+    console.log("[WA_BOT] Socket is held by another process; using shared state.");
+    return null;
+  }
+
   if (holder.connectingPromise) {
     return holder.connectingPromise;
   }
+
+  acquireLock();
+
+  // Setup heartbeat for the process lock
+  if (holder.lockHeartbeat) clearInterval(holder.lockHeartbeat);
+  holder.lockHeartbeat = setInterval(() => {
+    touchLock();
+  }, 25000);
 
   holder.connectingPromise = (async () => {
     try {
@@ -166,16 +342,23 @@ export async function initWhatsAppBot(): Promise<WASocket | null> {
 
       sock.ev.on("connection.update", async (update) => {
         const { connection, lastDisconnect, qr } = update;
+        touchLock();
 
         if (qr) {
           holder.state.status = "SCAN_QR";
           try {
-            holder.state.qrCodeDataUrl = await QRCode.toDataURL(qr, {
+            const dataUrl = await QRCode.toDataURL(qr, {
               margin: 2,
               scale: 8,
               color: { dark: "#000000", light: "#ffffff" },
             });
-            console.log("[WA_BOT:QR_READY] QR code data URL generated successfully.");
+            holder.state.qrCodeDataUrl = dataUrl;
+            saveQrCache({
+              status: "SCAN_QR",
+              phoneNumber: null,
+              qrCodeDataUrl: dataUrl,
+            });
+            console.log("[WA_BOT:QR_READY] QR code data URL generated and cached successfully.");
           } catch (qrErr) {
             console.error("[WA_BOT:QR_ERROR]", qrErr);
           }
@@ -191,6 +374,12 @@ export async function initWhatsAppBot(): Promise<WASocket | null> {
           holder.state.phoneNumber = myJid.split(":")[0]?.replace("@s.whatsapp.net", "") || null;
           console.log(`[WA_BOT:CONNECTED] Logged in as ${holder.state.phoneNumber}`);
 
+          saveQrCache({
+            status: "CONNECTED",
+            phoneNumber: holder.state.phoneNumber,
+            qrCodeDataUrl: null,
+          });
+
           // Self-heal and verify pending interactions (e.g. order TH-1017)
           selfHealPendingOrders(sock).catch((err) => {
             console.error("[WA_BOT:SELF_HEAL_RUN_ERROR]", err);
@@ -204,25 +393,38 @@ export async function initWhatsAppBot(): Promise<WASocket | null> {
 
           console.warn(`[WA_BOT:DISCONNECTED] Code: ${statusCode}, Registered: ${isRegistered}`);
 
-          holder.state.status = "DISCONNECTED";
           holder.sock = null;
           holder.connectingPromise = null;
+          releaseLock();
+          if (holder.lockHeartbeat) {
+            clearInterval(holder.lockHeartbeat);
+            holder.lockHeartbeat = null;
+          }
 
           if (isLoggedOut) {
-            // Logged out: clean session
+            holder.state.status = "DISCONNECTED";
+            holder.state.phoneNumber = null;
+            holder.state.qrCodeDataUrl = null;
             try {
               fs.rmSync(sessionDir, { recursive: true, force: true });
             } catch {}
-            holder.state.phoneNumber = null;
-            holder.state.qrCodeDataUrl = null;
+            clearQrCache();
           } else if (isRegistered) {
-            // Only auto-reconnect if already authenticated
+            // Auto-reconnect if already authenticated
             if (holder.reconnectTimeout) clearTimeout(holder.reconnectTimeout);
             holder.reconnectTimeout = setTimeout(() => {
               initWhatsAppBot().catch(() => {});
             }, 5000);
           } else {
-            // Not registered: wait for explicit user action or QR refresh
+            // Still in pairing/QR mode: preserve cached QR if recent to avoid UI flicker
+            const cached = loadQrCache();
+            if (cached?.qrCodeDataUrl && Date.now() - (cached.updatedAt || 0) < 60000) {
+              holder.state.status = "SCAN_QR";
+              holder.state.qrCodeDataUrl = cached.qrCodeDataUrl;
+            } else {
+              holder.state.status = "DISCONNECTED";
+              holder.state.qrCodeDataUrl = null;
+            }
           }
         }
       });
@@ -281,26 +483,41 @@ export async function initWhatsAppBot(): Promise<WASocket | null> {
  * Wait until QR code is generated or bot is connected (up to timeoutMs)
  */
 export async function waitForQrOrConnect(timeoutMs = 12000): Promise<WhatsAppBotState> {
-  const holder = getHolder();
-  if (holder.state.status === "CONNECTED") {
-    return holder.state;
+  const currentStatus = getWhatsAppBotStatus();
+  if (currentStatus.status === "CONNECTED" || hasSavedSession()) {
+    return currentStatus;
   }
 
-  // If currently disconnected or no active socket, initiate connection
-  if (holder.state.status === "DISCONNECTED" || !holder.sock) {
+  // If a valid QR code already exists in memory or disk cache (<45s old), return it immediately
+  const cached = loadQrCache();
+  if (cached && cached.status === "SCAN_QR" && cached.qrCodeDataUrl && Date.now() - (cached.updatedAt || 0) < 45000) {
+    return {
+      status: "SCAN_QR",
+      phoneNumber: null,
+      qrCodeDataUrl: cached.qrCodeDataUrl,
+      lastConnectedAt: null,
+      error: null,
+    };
+  }
+
+  // Trigger bot socket initialization if not locked by another process
+  const holder = getHolder();
+  if (!isLockHeldByAnotherProcess()) {
     holder.connectingPromise = null;
-    initWhatsAppBot().catch(() => {});
+    initWhatsAppBot().catch((err) => {
+      console.error("[WA_BOT:INIT_ERR]", err);
+    });
   }
 
   return new Promise((resolve) => {
     const start = Date.now();
     const interval = setInterval(() => {
-      const current = getHolder().state;
+      const current = getWhatsAppBotStatus();
       if (current.status === "CONNECTED" || current.qrCodeDataUrl || Date.now() - start >= timeoutMs) {
         clearInterval(interval);
         resolve(current);
       }
-    }, 200);
+    }, 250);
   });
 }
 
@@ -310,6 +527,10 @@ export async function waitForQrOrConnect(timeoutMs = 12000): Promise<WhatsAppBot
 export async function logoutWhatsAppBot(): Promise<void> {
   const holder = getHolder();
   if (holder.reconnectTimeout) clearTimeout(holder.reconnectTimeout);
+  if (holder.lockHeartbeat) {
+    clearInterval(holder.lockHeartbeat);
+    holder.lockHeartbeat = null;
+  }
   try {
     if (holder.sock) {
       await holder.sock.logout();
@@ -324,6 +545,8 @@ export async function logoutWhatsAppBot(): Promise<void> {
     error: null,
   };
   holder.connectingPromise = null;
+  releaseLock();
+  clearQrCache();
   const sessionDir = getSessionDirectory();
   try {
     fs.rmSync(sessionDir, { recursive: true, force: true });

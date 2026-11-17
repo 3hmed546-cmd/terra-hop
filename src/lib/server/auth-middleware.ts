@@ -10,6 +10,9 @@ export interface AdminAuthResult {
   user?: {
     id: string;
     email: string;
+    role?: "master" | "manager" | string;
+    username?: string;
+    avatar_url?: string;
   };
   sessionId?: string;
   responseError?: ReturnType<typeof apiError>;
@@ -43,28 +46,34 @@ export function requireAdmin(request: Request | NextRequest): AdminAuthResult {
 
   const db = getDb();
   let user = db
-    .prepare("SELECT id, email FROM admin_users WHERE email = ?")
-    .get(tokenVerification.email) as { id: string; email: string } | undefined;
+    .prepare("SELECT id, email, role, username, avatar_url FROM admin_users WHERE LOWER(email) = LOWER(?)")
+    .get(tokenVerification.email) as { id: string; email: string; role?: string; username?: string; avatar_url?: string } | undefined;
 
   if (!user) {
     try {
       seedDatabaseIfNeeded(db, false);
       user = db
-        .prepare("SELECT id, email FROM admin_users WHERE email = ?")
+        .prepare("SELECT id, email, role, username, avatar_url FROM admin_users WHERE LOWER(email) = LOWER(?)")
         .get(tokenVerification.email) as any;
     } catch {}
   }
 
+  const defaultEmail = (process.env.ADMIN_EMAIL || "admin@terrahop.com").trim().toLowerCase();
   if (!user) {
-    const defaultEmail = process.env.ADMIN_EMAIL || "admin@terrahop.com";
-    if (tokenVerification.email.toLowerCase() === defaultEmail.toLowerCase()) {
-      user = { id: "admin-root", email: defaultEmail };
+    if (tokenVerification.email.toLowerCase() === defaultEmail) {
+      user = { id: "admin-root", email: defaultEmail, role: "master", username: "admin" };
     } else {
       return {
         authenticated: false,
         responseError: apiError("UNAUTHENTICATED", "مستخدم الأدمن غير موجود.", 401),
       };
     }
+  }
+
+  if (user.id === "admin-root" || user.email.toLowerCase() === defaultEmail) {
+    user.role = "master";
+  } else if (!user.role) {
+    user.role = "manager";
   }
 
   const sessionId = tokenVerification.sessionId || `sess_${user.id}`;

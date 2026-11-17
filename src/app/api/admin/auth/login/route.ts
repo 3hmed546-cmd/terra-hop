@@ -50,31 +50,27 @@ export async function POST(request: NextRequest) {
 
     const emailBlindIndex = hashBlindIndex(inputClean, "email");
     const usernameBlindIndex = hashBlindIndex(inputClean, "username");
-
-    // Allow typing "admin" shorthand for the primary admin email
     const configuredAdminEmail = (process.env.ADMIN_EMAIL || "admin@terrahop.com").trim().toLowerCase();
-    let email = inputClean;
-    if (email === "admin" || !email.includes("@")) {
-      email = configuredAdminEmail;
-    }
 
     const db = getDb();
     let user = db
       .prepare(`
-        SELECT id, email, encrypted_email, email_hash, password_hash, must_change_password 
+        SELECT id, email, encrypted_email, email_hash, username, encrypted_username, password_hash, role, must_change_password 
         FROM admin_users 
-        WHERE email_hash = ? OR username_hash = ? OR LOWER(email) = ? OR LOWER(email) = 'admin@terrahop.com' OR id = 'admin-root'
-        ORDER BY CASE WHEN id = 'admin-root' THEN 0 ELSE 1 END
+        WHERE email_hash = ? 
+           OR username_hash = ? 
+           OR LOWER(email) = ? 
+           OR LOWER(username) = ?
         LIMIT 1
       `)
-      .get(emailBlindIndex, usernameBlindIndex, email) as
-      | { id: string; email: string; encrypted_email?: string; email_hash?: string; password_hash: string; must_change_password: number }
+      .get(emailBlindIndex, usernameBlindIndex, inputClean, inputClean) as
+      | { id: string; email: string; encrypted_email?: string; email_hash?: string; username?: string; encrypted_username?: string; password_hash: string; role?: string; must_change_password: number }
       | undefined;
 
-    if (!user) {
+    if (!user && (inputClean === "admin" || inputClean === configuredAdminEmail)) {
       user = db
-        .prepare("SELECT id, email, encrypted_email, email_hash, password_hash, must_change_password FROM admin_users LIMIT 1")
-        .get() as any;
+        .prepare("SELECT id, email, encrypted_email, email_hash, username, encrypted_username, password_hash, role, must_change_password FROM admin_users WHERE id = 'admin-root' OR LOWER(email) = ? LIMIT 1")
+        .get(configuredAdminEmail) as any;
     }
 
     // Verify Supabase bcrypt cryptographic password hash (with legacy scrypt fallback)
@@ -135,10 +131,17 @@ export async function POST(request: NextRequest) {
     const sessionToken = signSessionToken(effectiveEmail, sessionId);
     const csrfToken = generateCsrfToken(sessionId);
 
+    const effectiveRole = user.id === "admin-root" || effectiveEmail.toLowerCase() === configuredAdminEmail
+      ? "master"
+      : (user.role || "manager");
+    const effectiveUsername = user.username || (user.encrypted_username ? decryptText(user.encrypted_username) : "admin");
+
     const response = apiSuccess({
       user: {
         id: user.id,
         email: effectiveEmail,
+        username: effectiveUsername,
+        role: effectiveRole,
       },
       csrfToken,
       mustChangePassword: user.must_change_password === 1,

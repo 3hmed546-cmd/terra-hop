@@ -21,6 +21,7 @@ import { AdminPushToggle } from "../ui/AdminPushToggle";
 import { EmailSettingsSection } from "../ui/EmailSettingsSection";
 import { ComingSoonSection } from "./ComingSoonSection";
 import { SocialContactsSection } from "./SocialContactsSection";
+import { ManagersManager } from "./ManagersManager";
 import { Button, Checkbox, Dialog, NumberInput, Select, TextInput, useToast } from "../ui";
 
 const S = ADMIN_STRINGS.settings;
@@ -161,23 +162,6 @@ function SettingsEditor({ settings }: { settings: Settings }) {
           </div>
         </Section>
 
-        <Section id="account" title={S.sections.account} preview>
-          <Select
-            label={S.session}
-            hint={S.sessionHint}
-            value={String(form.sessionHours)}
-            options={sessionOptions}
-            onChange={(e) => patch({ sessionHours: Number(e.target.value) })}
-          />
-        </Section>
-
-        <Section id="keyboard" title={S.sections.keyboard}>
-          <Checkbox label={S.shortcuts.toggle} hint={S.shortcuts.toggleHint} checked={form.shortcuts} onChange={(e) => patch({ shortcuts: e.target.checked })} />
-          <div className="adm-row">
-            <Button variant="secondary" onClick={help.open}>{S.shortcuts.view}</Button>
-          </div>
-        </Section>
-
         <Section id="coming-soon" title="وضع الإطلاق (Coming Soon)">
           <ComingSoonSection />
         </Section>
@@ -190,8 +174,8 @@ function SettingsEditor({ settings }: { settings: Settings }) {
           <AdminPushToggle />
         </Section>
 
-        <Section id="email-system" title="نظام إرسال الإيميلات وفواتير الطلبات">
-          <EmailSettingsSection />
+        <Section id="managers-and-logs" title="إدارة مسؤولي المتجر وسجل العمليات">
+          <ManagersManager />
         </Section>
 
         <div className="adm-form-actions">
@@ -295,36 +279,12 @@ function SignOutAllSection() {
   );
 }
 
-function PathAndDemoSections() {
-  const toast = useToast();
-  const { actions, ready } = useAdminStore();
-  const [confirming, setConfirming] = useState(false);
+function PathSection() {
   return (
-    <>
-      <section className="adm-card adm-form-section" aria-labelledby="set-path">
-        <h2 className="adm-h2" id="set-path">{S.sections.path}</h2>
-        <p className="adm-muted adm-nomargin">{S.path.text}</p>
-      </section>
-      <section className="adm-card adm-form-section" aria-labelledby="set-demo">
-        <h2 className="adm-h2" id="set-demo">{S.sections.demo}</h2>
-        <p className="adm-muted adm-nomargin">{S.demo.text}</p>
-        <div className="adm-row">
-          <Button variant="secondary" disabled={!ready} onClick={() => setConfirming(true)}>{S.demo.reset}</Button>
-        </div>
-      </section>
-      <Dialog
-        open={confirming}
-        onClose={() => setConfirming(false)}
-        title={S.demo.dialogTitle}
-        description={S.demo.dialogText}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setConfirming(false)}>{ADMIN_STRINGS.common.cancel}</Button>
-            <Button onClick={() => { actions.resetDemo(); setConfirming(false); toast.push(S.demo.done); }}>{S.demo.reset}</Button>
-          </>
-        }
-      />
-    </>
+    <section className="adm-card adm-form-section" aria-labelledby="set-path">
+      <h2 className="adm-h2" id="set-path">{S.sections.path}</h2>
+      <p className="adm-muted adm-nomargin">{S.path.text}</p>
+    </section>
   );
 }
 
@@ -347,7 +307,7 @@ export function SettingsPage() {
         <SettingsEditor settings={data.settings} />
         <PasswordSection />
         <SignOutAllSection />
-        <PathAndDemoSections />
+        <PathSection />
       </div>
     </>
   );

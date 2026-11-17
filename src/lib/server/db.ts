@@ -149,6 +149,24 @@ export function getDb(): Database.Database {
   return db;
 }
 
+export function updateEnvAdminPassword(email: string, newRawPass: string): void {
+  try {
+    const envPath = path.join(process.cwd(), ".env.local");
+    if (fs.existsSync(envPath)) {
+      let content = fs.readFileSync(envPath, "utf-8");
+      if (content.includes("ADMIN_PASSWORD=")) {
+        content = content.replace(/ADMIN_PASSWORD=[^\r\n]*/g, `ADMIN_PASSWORD=${newRawPass}`);
+      } else {
+        content += `\nADMIN_PASSWORD=${newRawPass}\n`;
+      }
+      fs.writeFileSync(envPath, content, "utf-8");
+    }
+    process.env.ADMIN_PASSWORD = newRawPass;
+  } catch (err) {
+    console.error("[updateEnvAdminPassword] Error updating .env.local:", err);
+  }
+}
+
 export function syncAdminCredentials(db: Database.Database): void {
   try {
     let rawPass = process.env.ADMIN_PASSWORD || "A5eapu/8$e9Gwpf";
@@ -163,7 +181,7 @@ export function syncAdminCredentials(db: Database.Database): void {
     const encryptedUsername = encryptText("admin");
     const now = new Date().toISOString();
 
-    // 1. Ensure any existing admin user is updated with the Supabase bcrypt hash and encrypted fields
+    // 1. Ensure master admin user is updated with the Supabase bcrypt hash and master role
     const updated = db.prepare(`
       UPDATE admin_users
       SET email = ?,
@@ -172,17 +190,20 @@ export function syncAdminCredentials(db: Database.Database): void {
           username_hash = ?,
           encrypted_username = ?,
           password_hash = ?,
+          role = 'master',
+          username = COALESCE(username, 'admin'),
           must_change_password = 0
-    `).run(email, emailHash, encryptedEmail, usernameHash, encryptedUsername, passwordHash);
+      WHERE id = 'admin-root' OR LOWER(email) = ?
+    `).run(email, emailHash, encryptedEmail, usernameHash, encryptedUsername, passwordHash, email);
 
-    // 2. If no admin user exists, insert the root admin
+    // 2. If no root admin user exists, insert the root admin
     if (updated.changes === 0) {
       db.prepare(`
         INSERT INTO admin_users (
           id, email, email_hash, encrypted_email, username_hash, encrypted_username,
-          password_hash, must_change_password, created_at
+          password_hash, role, username, must_change_password, created_at
         )
-        VALUES ('admin-root', ?, ?, ?, ?, ?, ?, 0, ?)
+        VALUES ('admin-root', ?, ?, ?, ?, ?, ?, 'master', 'admin', 0, ?)
       `).run(email, emailHash, encryptedEmail, usernameHash, encryptedUsername, passwordHash, now);
     }
   } catch (err) {
@@ -781,6 +802,38 @@ function initializeSchema(db: Database.Database): void {
   try {
     db.exec("CREATE INDEX IF NOT EXISTS ix_admin_email_hash ON admin_users(email_hash);");
     db.exec("CREATE INDEX IF NOT EXISTS ix_admin_username_hash ON admin_users(username_hash);");
+  } catch {}
+
+  // Multi-manager & RBAC schema migrations
+  try {
+    db.exec("ALTER TABLE admin_users ADD COLUMN role TEXT DEFAULT 'manager';");
+  } catch {}
+  try {
+    db.exec("ALTER TABLE admin_users ADD COLUMN username TEXT;");
+  } catch {}
+  try {
+    db.exec("ALTER TABLE admin_users ADD COLUMN avatar_url TEXT;");
+  } catch {}
+  try {
+    db.exec("UPDATE admin_users SET role = 'master' WHERE id = 'admin-root' OR LOWER(email) = 'admin@terrahop.com';");
+  } catch {}
+
+  // Password reset OTP table (Rate-limited Brevo OTP)
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS admin_password_resets (
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL,
+        otp_hash TEXT NOT NULL,
+        reset_token TEXT,
+        attempts INTEGER DEFAULT 0,
+        locked_until TEXT,
+        expires_at TEXT NOT NULL,
+        used INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS ix_pw_resets_email ON admin_password_resets(email);
+    `);
   } catch {}
 
   try {
