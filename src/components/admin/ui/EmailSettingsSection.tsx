@@ -169,7 +169,7 @@ export function EmailSettingsSection() {
             className="w-full text-xs p-2.5 rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-black bg-white"
           />
           <p className="text-[11px] text-stone-500 mt-1">
-            يجب أن يكون نفس الإيميل الذي أنشأت به الحساب في Brevo (مثال: terr3hop@gmail.com).
+            البريد الرسمي للمتجر الذي تظهر منه الرسائل للعملاء (support@terra-hop.com).
           </p>
         </div>
 

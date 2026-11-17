@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import fs from "fs";
 import nodemailer from "nodemailer";
 import { getDb } from "./db";
 
@@ -39,7 +40,50 @@ export function getBrevoConfig(): {
 }
 
 /**
- * Fallback to Gmail SMTP via Nodemailer if Brevo fails or is unconfigured.
+ * Fallback to local server sendmail (/usr/sbin/sendmail) if Brevo is unavailable.
+ * Delivers directly as support@terra-hop.com from cPanel Exim with SPF/DKIM aligned.
+ */
+async function sendLocalSendmailFallback({
+  to,
+  subject,
+  html,
+  recipientName,
+}: {
+  to: string;
+  subject: string;
+  html: string;
+  recipientName?: string;
+}): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+  const sendmailPath = "/usr/sbin/sendmail";
+  try {
+    if (!fs.existsSync(sendmailPath)) {
+      return { ok: false, error: "sendmail binary not found" };
+    }
+
+    const transporter = nodemailer.createTransport({
+      sendmail: true,
+      newline: "unix",
+      path: sendmailPath,
+    });
+
+    const info = await transporter.sendMail({
+      from: `"TERRA HOP" <support@terra-hop.com>`,
+      to: recipientName ? `"${recipientName}" <${to}>` : to,
+      replyTo: "support@terra-hop.com",
+      subject,
+      html,
+    });
+
+    console.log(`[SENDMAIL_FALLBACK:SUCCESS] Sent email to ${to} via cPanel sendmail. MessageId: ${info.messageId}`);
+    return { ok: true, messageId: info.messageId };
+  } catch (err: any) {
+    console.warn(`[SENDMAIL_FALLBACK:ERROR] Failed to send email via cPanel sendmail:`, err?.message);
+    return { ok: false, error: err?.message || "Failed to send email via sendmail" };
+  }
+}
+
+/**
+ * Fallback to Gmail SMTP via Nodemailer if Brevo and sendmail fail.
  */
 async function sendGmailFallback({
   to,
@@ -69,6 +113,7 @@ async function sendGmailFallback({
     const info = await transporter.sendMail({
       from: `"TERRA HOP" <${user}>`,
       to: recipientName ? `"${recipientName}" <${to}>` : to,
+      replyTo: "support@terra-hop.com",
       subject,
       html,
     });
@@ -82,7 +127,7 @@ async function sendGmailFallback({
 }
 
 /**
- * Send email via Brevo REST API over HTTPS Port 443 with automatic Gmail fallback.
+ * Send email via Brevo REST API over HTTPS Port 443 with automatic server sendmail & Gmail fallback.
  */
 export async function sendBrevoEmail({
   to,
@@ -97,53 +142,57 @@ export async function sendBrevoEmail({
 }): Promise<{ ok: boolean; messageId?: string; error?: string }> {
   const config = getBrevoConfig();
 
-  if (!config.apiKey) {
-    console.warn(`[BREVO:WAITING_KEY] No Brevo API Key found. Falling back to Gmail SMTP...`);
-    return sendGmailFallback({ to, subject, html, recipientName });
-  }
-
-  try {
-    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "api-key": config.apiKey,
-        accept: "application/json",
-      },
-      body: JSON.stringify({
-        sender: {
-          name: config.senderName,
-          email: config.senderEmail,
+  if (config.apiKey) {
+    try {
+      const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "api-key": config.apiKey,
+          accept: "application/json",
         },
-        to: [
-          {
-            email: to,
-            name: recipientName || undefined,
+        body: JSON.stringify({
+          sender: {
+            name: config.senderName || DEFAULT_SENDER_NAME,
+            email: config.senderEmail || DEFAULT_SENDER_EMAIL,
           },
-        ],
-        subject,
-        htmlContent: html,
-      }),
-    });
+          to: [
+            {
+              email: to,
+              name: recipientName || undefined,
+            },
+          ],
+          replyTo: {
+            name: config.senderName || DEFAULT_SENDER_NAME,
+            email: "support@terra-hop.com",
+          },
+          subject,
+          htmlContent: html,
+        }),
+      });
 
-    const data = await res.json().catch(() => ({}));
+      const data = await res.json().catch(() => ({}));
 
-    if (res.ok) {
-      console.log(`[BREVO:SUCCESS] Sent email to ${to}. MessageId: ${data?.messageId}`);
-      return { ok: true, messageId: data?.messageId };
+      if (res.ok) {
+        console.log(`[BREVO:SUCCESS] Sent email to ${to}. MessageId: ${data?.messageId}`);
+        return { ok: true, messageId: data?.messageId };
+      }
+
+      const errDesc = data?.message || `Brevo API error (${res.status})`;
+      console.warn(`[BREVO:FAILED] ${errDesc}. Attempting server fallback...`);
+    } catch (err: any) {
+      console.warn(`[BREVO:NETWORK_ERROR] ${err?.message}. Attempting server fallback...`);
     }
-
-    const errDesc = data?.message || `Brevo API error (${res.status})`;
-    console.warn(`[BREVO:FAILED] ${errDesc}. Falling back to Gmail SMTP...`);
-    const fallbackRes = await sendGmailFallback({ to, subject, html, recipientName });
-    if (fallbackRes.ok) return fallbackRes;
-    return { ok: false, error: errDesc };
-  } catch (err: any) {
-    console.warn(`[BREVO:NETWORK_ERROR] ${err?.message}. Falling back to Gmail SMTP...`);
-    const fallbackRes = await sendGmailFallback({ to, subject, html, recipientName });
-    if (fallbackRes.ok) return fallbackRes;
-    return { ok: false, error: err?.message || "فشل الاتصال بخدمة Brevo." };
+  } else {
+    console.warn(`[BREVO:WAITING_KEY] No Brevo API Key found. Attempting server fallback...`);
   }
+
+  // Fallback 1: Try local cPanel sendmail as support@terra-hop.com
+  const sendmailRes = await sendLocalSendmailFallback({ to, subject, html, recipientName });
+  if (sendmailRes.ok) return sendmailRes;
+
+  // Fallback 2: Gmail SMTP
+  return sendGmailFallback({ to, subject, html, recipientName });
 }
 
 /**
