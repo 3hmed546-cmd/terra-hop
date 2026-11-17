@@ -162,8 +162,10 @@ export function WhatsAppManager() {
       });
       const json = await res.json();
       if (json.ok) {
-        toast.push(json.data.message || "جاري الاتصال وتوليد رمز QR...");
-        fetchStatus();
+        if (json.data?.status) {
+          setData(json.data.status);
+        }
+        toast.push(json.data.message || "تم تجهيز رمز QR بنجاح! امسح الرمز الآن.");
       } else {
         toast.push(json.message || "حدث خطأ أثناء الاتصال.");
       }

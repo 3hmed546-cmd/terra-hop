@@ -83,6 +83,18 @@ export function getWhatsAppBotStatus(): WhatsAppBotState {
   return getHolder().state;
 }
 
+export function hasSavedSession(): boolean {
+  try {
+    const sessionDir = getSessionDirectory();
+    const credsPath = path.join(sessionDir, "creds.json");
+    if (!fs.existsSync(credsPath)) return false;
+    const creds = JSON.parse(fs.readFileSync(credsPath, "utf8"));
+    return Boolean(creds?.registered && creds?.me?.id);
+  } catch {
+    return false;
+  }
+}
+
 export function isWhatsAppAutoSendEnabled(): boolean {
   try {
     const db = getDb();
@@ -121,6 +133,18 @@ export async function initWhatsAppBot(): Promise<WASocket | null> {
 
   holder.connectingPromise = (async () => {
     try {
+      // Clean up any stale socket instance
+      if (holder.sock) {
+        try {
+          holder.sock.ev.removeAllListeners("connection.update");
+          holder.sock.ev.removeAllListeners("creds.update");
+          holder.sock.ev.removeAllListeners("messages.upsert");
+          holder.sock.ev.removeAllListeners("messages.reaction");
+          holder.sock.end(undefined);
+        } catch {}
+        holder.sock = null;
+      }
+
       holder.state.status = "CONNECTING";
       holder.state.error = null;
 
@@ -151,6 +175,7 @@ export async function initWhatsAppBot(): Promise<WASocket | null> {
               scale: 8,
               color: { dark: "#000000", light: "#ffffff" },
             });
+            console.log("[WA_BOT:QR_READY] QR code data URL generated successfully.");
           } catch (qrErr) {
             console.error("[WA_BOT:QR_ERROR]", qrErr);
           }
@@ -174,25 +199,30 @@ export async function initWhatsAppBot(): Promise<WASocket | null> {
 
         if (connection === "close") {
           const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
-          const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-          console.warn(`[WA_BOT:DISCONNECTED] Code: ${statusCode}, Reconnecting: ${shouldReconnect}`);
+          const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+          const isRegistered = hasSavedSession();
+
+          console.warn(`[WA_BOT:DISCONNECTED] Code: ${statusCode}, Registered: ${isRegistered}`);
 
           holder.state.status = "DISCONNECTED";
           holder.sock = null;
           holder.connectingPromise = null;
 
-          if (shouldReconnect) {
-            if (holder.reconnectTimeout) clearTimeout(holder.reconnectTimeout);
-            holder.reconnectTimeout = setTimeout(() => {
-              initWhatsAppBot().catch(() => {});
-            }, 3000);
-          } else {
+          if (isLoggedOut) {
             // Logged out: clean session
             try {
               fs.rmSync(sessionDir, { recursive: true, force: true });
             } catch {}
             holder.state.phoneNumber = null;
             holder.state.qrCodeDataUrl = null;
+          } else if (isRegistered) {
+            // Only auto-reconnect if already authenticated
+            if (holder.reconnectTimeout) clearTimeout(holder.reconnectTimeout);
+            holder.reconnectTimeout = setTimeout(() => {
+              initWhatsAppBot().catch(() => {});
+            }, 5000);
+          } else {
+            // Not registered: wait for explicit user action or QR refresh
           }
         }
       });
@@ -245,6 +275,33 @@ export async function initWhatsAppBot(): Promise<WASocket | null> {
   })();
 
   return holder.connectingPromise;
+}
+
+/**
+ * Wait until QR code is generated or bot is connected (up to timeoutMs)
+ */
+export async function waitForQrOrConnect(timeoutMs = 12000): Promise<WhatsAppBotState> {
+  const holder = getHolder();
+  if (holder.state.status === "CONNECTED") {
+    return holder.state;
+  }
+
+  // If currently disconnected or no active socket, initiate connection
+  if (holder.state.status === "DISCONNECTED" || !holder.sock) {
+    holder.connectingPromise = null;
+    initWhatsAppBot().catch(() => {});
+  }
+
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const interval = setInterval(() => {
+      const current = getHolder().state;
+      if (current.status === "CONNECTED" || current.qrCodeDataUrl || Date.now() - start >= timeoutMs) {
+        clearInterval(interval);
+        resolve(current);
+      }
+    }, 200);
+  });
 }
 
 /**

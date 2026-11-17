@@ -4,6 +4,7 @@ import { apiSuccess, apiError } from "@/lib/server/api-envelope";
 import {
   getWhatsAppBotStatus,
   initWhatsAppBot,
+  waitForQrOrConnect,
   logoutWhatsAppBot,
   isWhatsAppAutoSendEnabled,
   setWhatsAppAutoSendEnabled,
@@ -16,11 +17,6 @@ export async function GET(request: NextRequest) {
 
   const status = getWhatsAppBotStatus();
   const autoSend = isWhatsAppAutoSendEnabled();
-
-  // If disconnected and never tried connecting, initiate connection to produce QR if needed
-  if (status.status === "DISCONNECTED" && !status.error) {
-    initWhatsAppBot().catch(() => {});
-  }
 
   return apiSuccess({
     ...status,
@@ -42,10 +38,17 @@ export async function POST(request: NextRequest) {
   const action = body?.action;
 
   if (action === "connect") {
-    await initWhatsAppBot();
+    const status = await waitForQrOrConnect(12000);
+    const msg =
+      status.status === "CONNECTED"
+        ? "بوت الواتساب متصل بنجاح!"
+        : status.qrCodeDataUrl
+        ? "تم تجهيز رمز QR بنجاح! امسح الرمز الآن من تطبيق واتساب."
+        : "جاري تجهيز اتصال الواتساب... يرجى إعادة المحاولة بعد ثوانٍ.";
+
     return apiSuccess({
-      message: "جاري تشغيل اتصال الواتساب وتجهيز رمز QR...",
-      status: getWhatsAppBotStatus(),
+      message: msg,
+      status,
     });
   }
 
