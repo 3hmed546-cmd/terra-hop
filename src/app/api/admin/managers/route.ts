@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import crypto from "crypto";
-import { getDb, recordAudit } from "@/lib/server/db";
+import { getDb, recordAudit, syncManagerToEnv } from "@/lib/server/db";
 import { requireAdmin } from "@/lib/server/auth-middleware";
 import {
   hashPassword,
@@ -36,8 +36,16 @@ export async function GET(request: NextRequest) {
     }>;
 
   const defaultAdminEmail = (process.env.ADMIN_EMAIL || "admin@terrahop.com").trim().toLowerCase();
+  const isOnlyOne = rows.length <= 1;
+
   const managers = rows.map((r) => {
-    const isRoot = r.id === "admin-root" || (r.email && r.email.toLowerCase() === defaultAdminEmail);
+    const isRoot =
+      r.id === "admin-root" ||
+      r.role === "master" ||
+      (r.username && r.username.toLowerCase() === "admin") ||
+      (r.email && r.email.toLowerCase() === defaultAdminEmail) ||
+      (r.email && r.email.toLowerCase().includes("admin@")) ||
+      isOnlyOne;
     const decryptedEmail = r.encrypted_email ? decryptText(r.encrypted_email) || r.email : r.email;
     const decryptedUsername = r.username || (r.encrypted_username ? decryptText(r.encrypted_username) : "admin");
     return {
@@ -51,10 +59,18 @@ export async function GET(request: NextRequest) {
     };
   });
 
+  const isCurrentMaster =
+    auth.user.role === "master" ||
+    auth.user.id === "admin-root" ||
+    (auth.user.username && auth.user.username.toLowerCase() === "admin") ||
+    (auth.user.email && auth.user.email.toLowerCase() === defaultAdminEmail) ||
+    (auth.user.email && auth.user.email.toLowerCase().includes("admin@")) ||
+    isOnlyOne;
+
   return apiSuccess({
     managers,
-    currentUserRole: auth.user.role || "manager",
-    isMaster: auth.user.role === "master",
+    currentUserRole: isCurrentMaster ? "master" : "manager",
+    isMaster: isCurrentMaster,
   });
 }
 
@@ -64,8 +80,16 @@ export async function POST(request: NextRequest) {
     return auth.responseError!;
   }
 
+  const defaultAdminEmail = (process.env.ADMIN_EMAIL || "admin@terrahop.com").trim().toLowerCase();
+  const isCurrentMaster =
+    auth.user.role === "master" ||
+    auth.user.id === "admin-root" ||
+    (auth.user.username && auth.user.username.toLowerCase() === "admin") ||
+    (auth.user.email && auth.user.email.toLowerCase() === defaultAdminEmail) ||
+    (auth.user.email && auth.user.email.toLowerCase().includes("admin@"));
+
   // Only the Master Admin is authorized to add other managers
-  if (auth.user.role !== "master") {
+  if (!isCurrentMaster) {
     return apiError("FORBIDDEN", "غير مصرح لك بإضافة مسؤولين. هذه الصلاحية للمسؤول الرئيسي فقط.", 403);
   }
 
@@ -136,6 +160,13 @@ export async function POST(request: NextRequest) {
     avatarUrl || null,
     now
   );
+
+  // Sync encrypted credentials into .env files securely
+  try {
+    syncManagerToEnv(email, username, passwordHash);
+  } catch (err) {
+    console.error("Failed to sync manager to env:", err);
+  }
 
   // Record in Audit Log
   recordAudit({

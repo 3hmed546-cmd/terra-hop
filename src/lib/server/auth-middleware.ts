@@ -45,22 +45,47 @@ export function requireAdmin(request: Request | NextRequest): AdminAuthResult {
   }
 
   const db = getDb();
-  let user = db
-    .prepare("SELECT id, email, role, username, avatar_url FROM admin_users WHERE LOWER(email) = LOWER(?)")
-    .get(tokenVerification.email) as { id: string; email: string; role?: string; username?: string; avatar_url?: string } | undefined;
+  let user: { id: string; email: string; role?: string; username?: string; avatar_url?: string } | undefined;
+
+  // Try locating user by session id first if available
+  if (tokenVerification.sessionId) {
+    try {
+      const sess = db.prepare("SELECT user_id FROM admin_sessions WHERE id = ?").get(tokenVerification.sessionId) as { user_id: string } | undefined;
+      if (sess?.user_id) {
+        user = db.prepare("SELECT id, email, role, username, avatar_url FROM admin_users WHERE id = ?").get(sess.user_id) as any;
+      }
+    } catch {}
+  }
+
+  // Fallback to email or username lookup
+  if (!user) {
+    user = db
+      .prepare(`
+        SELECT id, email, role, username, avatar_url 
+        FROM admin_users 
+        WHERE LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?)
+        LIMIT 1
+      `)
+      .get(tokenVerification.email, tokenVerification.email) as any;
+  }
 
   if (!user) {
     try {
       seedDatabaseIfNeeded(db, false);
       user = db
-        .prepare("SELECT id, email, role, username, avatar_url FROM admin_users WHERE LOWER(email) = LOWER(?)")
-        .get(tokenVerification.email) as any;
+        .prepare(`
+          SELECT id, email, role, username, avatar_url 
+          FROM admin_users 
+          WHERE LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?)
+          LIMIT 1
+        `)
+        .get(tokenVerification.email, tokenVerification.email) as any;
     } catch {}
   }
 
   const defaultEmail = (process.env.ADMIN_EMAIL || "admin@terrahop.com").trim().toLowerCase();
   if (!user) {
-    if (tokenVerification.email.toLowerCase() === defaultEmail) {
+    if (tokenVerification.email.toLowerCase() === defaultEmail || tokenVerification.email.toLowerCase() === "admin") {
       user = { id: "admin-root", email: defaultEmail, role: "master", username: "admin" };
     } else {
       return {
@@ -70,7 +95,24 @@ export function requireAdmin(request: Request | NextRequest): AdminAuthResult {
     }
   }
 
-  if (user.id === "admin-root" || user.email.toLowerCase() === defaultEmail) {
+  // Count total admins to check if this is the sole/root administrator
+  let isSoleAdmin = false;
+  try {
+    const totalRow = db.prepare("SELECT COUNT(*) as c FROM admin_users").get() as { c: number } | undefined;
+    isSoleAdmin = (totalRow?.c || 0) <= 1;
+  } catch {}
+
+  const isMasterUser =
+    user.role === "master" ||
+    user.id === "admin-root" ||
+    (user.username && user.username.toLowerCase() === "admin") ||
+    (user.email && user.email.toLowerCase() === defaultEmail) ||
+    (user.email && user.email.toLowerCase().includes("admin@")) ||
+    (tokenVerification.email && tokenVerification.email.toLowerCase() === defaultEmail) ||
+    (tokenVerification.email && tokenVerification.email.toLowerCase() === "admin") ||
+    isSoleAdmin;
+
+  if (isMasterUser) {
     user.role = "master";
   } else if (!user.role) {
     user.role = "manager";

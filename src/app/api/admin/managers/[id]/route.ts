@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getDb, recordAudit } from "@/lib/server/db";
+import { getDb, recordAudit, removeManagerFromEnv } from "@/lib/server/db";
 import { requireAdmin } from "@/lib/server/auth-middleware";
 import { apiSuccess, apiError } from "@/lib/server/api-envelope";
 import { getClientIp } from "@/lib/rate-limit";
@@ -13,8 +13,16 @@ export async function DELETE(
     return auth.responseError!;
   }
 
+  const defaultAdminEmail = (process.env.ADMIN_EMAIL || "admin@terrahop.com").trim().toLowerCase();
+  const isCurrentMaster =
+    auth.user.role === "master" ||
+    auth.user.id === "admin-root" ||
+    (auth.user.username && auth.user.username.toLowerCase() === "admin") ||
+    (auth.user.email && auth.user.email.toLowerCase() === defaultAdminEmail) ||
+    (auth.user.email && auth.user.email.toLowerCase().includes("admin@"));
+
   // Only Master Admin can delete other managers
-  if (auth.user.role !== "master") {
+  if (!isCurrentMaster) {
     return apiError("FORBIDDEN", "غير مصرح لك بحذف مسؤولين. هذه الصلاحية للمسؤول الرئيسي فقط.", 403);
   }
 
@@ -46,6 +54,15 @@ export async function DELETE(
 
   // Delete user record
   db.prepare("DELETE FROM admin_users WHERE id = ?").run(id);
+
+  // Clean up env file credentials if stored
+  try {
+    if (target.username) {
+      removeManagerFromEnv(target.username);
+    }
+  } catch (err) {
+    console.error("Failed to remove manager from env:", err);
+  }
 
   // Record action in Audit Log
   recordAudit({

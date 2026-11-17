@@ -22,6 +22,7 @@ const ITEMS = [
   { path: "/orders", label: N.orders },
   { path: "/promos", label: "أكواد الخصم" },
   { path: "/ambassadors", label: "أكواد الإحالة" },
+  { path: "/managers", label: "مسؤولين المتجر 👥" },
   { path: "/whatsapp", label: "بوت الواتساب 💬" },
   { path: "/settings", label: N.settings },
 ] as const;

@@ -21,7 +21,6 @@ import { AdminPushToggle } from "../ui/AdminPushToggle";
 import { EmailSettingsSection } from "../ui/EmailSettingsSection";
 import { ComingSoonSection } from "./ComingSoonSection";
 import { SocialContactsSection } from "./SocialContactsSection";
-import { ManagersManager } from "./ManagersManager";
 import { Button, Checkbox, Dialog, NumberInput, Select, TextInput, useToast } from "../ui";
 
 const S = ADMIN_STRINGS.settings;
@@ -172,10 +171,6 @@ function SettingsEditor({ settings }: { settings: Settings }) {
 
         <Section id="push-notifications" title="إشعارات الطلبات الفورية (Web Push)">
           <AdminPushToggle />
-        </Section>
-
-        <Section id="managers-and-logs" title="إدارة مسؤولي المتجر وسجل العمليات">
-          <ManagersManager />
         </Section>
 
         <div className="adm-form-actions">

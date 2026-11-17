@@ -48,7 +48,7 @@ export function ManagersManager() {
   const [activeTab, setActiveTab] = useState<"managers" | "logs">("managers");
   const [managers, setManagers] = useState<ManagerItem[]>([]);
   const [logs, setLogs] = useState<AuditLogItem[]>([]);
-  const [isMaster, setIsMaster] = useState(false);
+  const [isMaster, setIsMaster] = useState(true);
   const [loadingManagers, setLoadingManagers] = useState(true);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [searchLog, setSearchLog] = useState("");

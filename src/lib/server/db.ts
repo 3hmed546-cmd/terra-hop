@@ -151,8 +151,13 @@ export function getDb(): Database.Database {
 
 export function updateEnvAdminPassword(email: string, newRawPass: string): void {
   try {
-    const envPath = path.join(process.cwd(), ".env.local");
-    if (fs.existsSync(envPath)) {
+    const envFiles = [
+      path.join(process.cwd(), ".env.local"),
+      path.join(process.cwd(), ".env.production"),
+      path.join(process.cwd(), ".env"),
+    ];
+    for (const envPath of envFiles) {
+      if (!fs.existsSync(envPath)) continue;
       let content = fs.readFileSync(envPath, "utf-8");
       if (content.includes("ADMIN_PASSWORD=")) {
         content = content.replace(/ADMIN_PASSWORD=[^\r\n]*/g, `ADMIN_PASSWORD=${newRawPass}`);
@@ -163,7 +168,58 @@ export function updateEnvAdminPassword(email: string, newRawPass: string): void 
     }
     process.env.ADMIN_PASSWORD = newRawPass;
   } catch (err) {
-    console.error("[updateEnvAdminPassword] Error updating .env.local:", err);
+    console.error("[updateEnvAdminPassword] Error updating env files:", err);
+  }
+}
+
+export function syncManagerToEnv(email: string, username: string, passwordHash: string): void {
+  const envFiles = [
+    path.join(process.cwd(), ".env.local"),
+    path.join(process.cwd(), ".env.production"),
+    path.join(process.cwd(), ".env"),
+  ];
+  const safeUser = username.toUpperCase().replace(/[^A-Z0-9]/g, "_");
+  const envKey = `MANAGER_${safeUser}_HASH`;
+  const infoKey = `MANAGER_${safeUser}_EMAIL`;
+
+  for (const envPath of envFiles) {
+    try {
+      if (!fs.existsSync(envPath)) continue;
+      let content = fs.readFileSync(envPath, "utf-8");
+      if (content.includes(`${envKey}=`)) {
+        content = content.replace(new RegExp(`${envKey}=[^\r\n]*`), `${envKey}=${passwordHash}`);
+        content = content.replace(new RegExp(`${infoKey}=[^\r\n]*`), `${infoKey}=${email}`);
+      } else {
+        content += `\n# Store Manager: ${username} (${email})\n${infoKey}=${email}\n${envKey}=${passwordHash}\n`;
+      }
+      fs.writeFileSync(envPath, content, "utf-8");
+    } catch (err) {
+      console.error(`[syncManagerToEnv] Error writing ${envPath}:`, err);
+    }
+  }
+}
+
+export function removeManagerFromEnv(username: string): void {
+  const envFiles = [
+    path.join(process.cwd(), ".env.local"),
+    path.join(process.cwd(), ".env.production"),
+    path.join(process.cwd(), ".env"),
+  ];
+  const safeUser = username.toUpperCase().replace(/[^A-Z0-9]/g, "_");
+  const envKey = `MANAGER_${safeUser}_HASH`;
+  const infoKey = `MANAGER_${safeUser}_EMAIL`;
+
+  for (const envPath of envFiles) {
+    try {
+      if (!fs.existsSync(envPath)) continue;
+      let content = fs.readFileSync(envPath, "utf-8");
+      content = content.replace(new RegExp(`\n?# Store Manager: ${username}[^\r\n]*\n?`), "");
+      content = content.replace(new RegExp(`\n?${infoKey}=[^\r\n]*\n?`), "\n");
+      content = content.replace(new RegExp(`\n?${envKey}=[^\r\n]*\n?`), "\n");
+      fs.writeFileSync(envPath, content, "utf-8");
+    } catch (err) {
+      console.error(`[removeManagerFromEnv] Error writing ${envPath}:`, err);
+    }
   }
 }
 
@@ -193,7 +249,7 @@ export function syncAdminCredentials(db: Database.Database): void {
           role = 'master',
           username = COALESCE(username, 'admin'),
           must_change_password = 0
-      WHERE id = 'admin-root' OR LOWER(email) = ?
+      WHERE id = 'admin-root' OR LOWER(email) = ? OR LOWER(username) = 'admin' OR LOWER(email) LIKE '%admin%'
     `).run(email, emailHash, encryptedEmail, usernameHash, encryptedUsername, passwordHash, email);
 
     // 2. If no root admin user exists, insert the root admin
