@@ -836,6 +836,23 @@ function initializeSchema(db: Database.Database): void {
     `);
   } catch {}
 
+  // Single Active Device / Session enforcement columns
+  try {
+    db.exec("ALTER TABLE admin_sessions ADD COLUMN device_summary TEXT;");
+  } catch {}
+  try {
+    db.exec("ALTER TABLE admin_sessions ADD COLUMN superseded_by TEXT;");
+  } catch {}
+  try {
+    db.exec("ALTER TABLE admin_sessions ADD COLUMN superseded_device TEXT;");
+  } catch {}
+  try {
+    db.exec("ALTER TABLE admin_sessions ADD COLUMN superseded_at TEXT;");
+  } catch {}
+  try {
+    db.exec("ALTER TABLE admin_users ADD COLUMN active_session_id TEXT;");
+  } catch {}
+
   try {
     db.exec("ALTER TABLE orders ADD COLUMN idempotency_key TEXT;");
   } catch {
@@ -926,7 +943,7 @@ function initializeSchema(db: Database.Database): void {
  * Log a change into change_log for live SSE & polling updates
  */
 export function recordChange(
-  topic: "media" | "products" | "settings" | "content" | "orders" | "ambassadors",
+  topic: "media" | "products" | "settings" | "content" | "orders" | "ambassadors" | "auth",
   entity: string,
   entityId: string | null,
   revision: number
@@ -983,4 +1000,59 @@ export function recordAudit(entry: {
     entry.ip ?? null,
     new Date().toISOString()
   );
+}
+
+/**
+ * Parse user-agent string into a friendly device summary
+ * Example: "iPhone (Safari)", "Android (Chrome)", "Windows (Chrome)"
+ */
+export function parseDeviceSummary(ua: string): string {
+  if (!ua) return "جهاز غير معروف";
+  let os = "كمبيوتر";
+  if (/iphone/i.test(ua)) os = "iPhone";
+  else if (/ipad/i.test(ua)) os = "iPad";
+  else if (/android/i.test(ua)) os = "Android";
+  else if (/macintosh|mac os x/i.test(ua)) os = "Mac";
+  else if (/windows/i.test(ua)) os = "Windows";
+  else if (/linux/i.test(ua)) os = "Linux";
+
+  let browser = "متصفح";
+  if (/edg/i.test(ua)) browser = "Edge";
+  else if (/chrome|crios/i.test(ua)) browser = "Chrome";
+  else if (/safari/i.test(ua)) browser = "Safari";
+  else if (/firefox|fxios/i.test(ua)) browser = "Firefox";
+  else if (/opera|opr/i.test(ua)) browser = "Opera";
+
+  return `${os} (${browser})`;
+}
+
+/**
+ * Format timestamp into Arabic 12-hour format
+ * Example: "07:34 م", "2026/11/17"
+ */
+export function format12HourArabicTime(isoString: string): { time12: string; dateFormatted: string } {
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) {
+      return { time12: "--:--", dateFormatted: "--" };
+    }
+
+    let hours = d.getHours();
+    const minutes = String(d.getMinutes()).padStart(2, "0");
+    const ampm = hours >= 12 ? "م" : "ص";
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    const hoursStr = String(hours).padStart(2, "0");
+
+    const time12 = `${hoursStr}:${minutes} ${ampm}`;
+
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const dateFormatted = `${year}/${month}/${day}`;
+
+    return { time12, dateFormatted };
+  } catch {
+    return { time12: "--:--", dateFormatted: "--" };
+  }
 }

@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
     .get(emailHash, usernameHash, email, username.toLowerCase());
 
   if (existing) {
-    return apiError("CONFLICT", "البريد الإلكتروني أو اسم المستخدم مسجل بالفعل لمسؤول آخر.", 409);
+    return apiError("VALIDATION", "البريد الإلكتروني أو اسم المستخدم مسجل بالفعل لمسؤول آخر.", 409);
   }
 
   // Strong cryptographic hash (Supabase bcrypt $2b$10$)

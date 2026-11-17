@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import crypto from "crypto";
-import { getDb, recordAudit, updateEnvAdminPassword } from "@/lib/server/db";
+import { getDb, recordAudit, recordChange, updateEnvAdminPassword } from "@/lib/server/db";
 import { hashPassword, hashBlindIndex } from "@/lib/server/security";
 import { sendBrevoEmail } from "@/lib/server/mailer";
 import { apiSuccess, apiError } from "@/lib/server/api-envelope";
@@ -149,6 +149,8 @@ export async function POST(request: NextRequest) {
       await sendBrevoEmail({
         to: email,
         recipientName,
+        senderEmail: "support@terra-hop.com",
+        senderName: "TERRA HOP",
         subject: "TERRA HOP — رمز استعادة كلمة المرور (OTP)",
         html: emailHtml,
       });
@@ -204,7 +206,7 @@ export async function POST(request: NextRequest) {
 
       // Check expiry
       if (new Date(record.expires_at).getTime() < now.getTime()) {
-        return apiError("EXPIRED", "انتهت صلاحية رمز التحقق. يرجى طلب رمز جديد.", 400);
+        return apiError("VALIDATION", "انتهت صلاحية رمز التحقق. يرجى طلب رمز جديد.", 400);
       }
 
       const inputHash = hashOtp(otp);
@@ -273,7 +275,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (new Date(record.expires_at).getTime() < now.getTime()) {
-        return apiError("EXPIRED", "انتهت صلاحية جلسة الاستعادة. يرجى طلب رمز جديد.", 400);
+        return apiError("VALIDATION", "انتهت صلاحية جلسة الاستعادة. يرجى طلب رمز جديد.", 400);
       }
 
       // Strong Supabase Bcrypt hash ($2b$10$)
@@ -311,8 +313,18 @@ export async function POST(request: NextRequest) {
       // Mark reset record as used
       db.prepare("UPDATE admin_password_resets SET used = 1 WHERE id = ?").run(record.id);
 
-      // Invalidate all previous active sessions for this user so they must login with new password
-      db.prepare("UPDATE admin_sessions SET revoked_at = ? WHERE user_id = ?").run(now.toISOString(), user.id);
+      // Invalidate all active sessions for this user across all devices immediately
+      db.prepare(`
+        UPDATE admin_sessions 
+        SET revoked_at = ?,
+            superseded_device = 'تم إنهاء الجلسات بسبب تغيير كلمة المرور'
+        WHERE user_id = ?
+      `).run(now.toISOString(), user.id);
+
+      db.prepare("UPDATE admin_users SET active_session_id = NULL WHERE id = ?").run(user.id);
+
+      // Trigger instant SSE kick-out event to all open devices
+      recordChange("auth", "session_superseded", user.id, Date.now());
 
       // Record in Audit Log
       recordAudit({
@@ -325,7 +337,7 @@ export async function POST(request: NextRequest) {
 
       return apiSuccess({
         success: true,
-        message: "تم تحديث كلمة المرور بنجاح! يمكنك الآن تسجيل الدخول بكلمة المرور الجديدة.",
+        message: "تم تحديث كلمة المرور وتسجيل الخروج من كافة الأجهزة بنجاح! يمكنك الآن تسجيل الدخول.",
       });
     }
 

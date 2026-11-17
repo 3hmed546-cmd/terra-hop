@@ -158,6 +158,7 @@ export function WhatsAppManager() {
     try {
       const res = await apiFetch("/api/admin/whatsapp/status", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "connect" }),
       });
       const json = await res.json();
@@ -182,6 +183,7 @@ export function WhatsAppManager() {
     try {
       const res = await apiFetch("/api/admin/whatsapp/status", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "disconnect" }),
       });
       const json = await res.json();
@@ -203,6 +205,7 @@ export function WhatsAppManager() {
     try {
       const res = await apiFetch("/api/admin/whatsapp/status", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "toggle_auto_send", enabled: nextVal }),
       });
       const json = await res.json();
@@ -225,6 +228,7 @@ export function WhatsAppManager() {
     try {
       const res = await apiFetch("/api/admin/whatsapp/status", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "test_message",
           phone: testPhone,
@@ -336,21 +340,28 @@ export function WhatsAppManager() {
                     alt="WhatsApp QR Code"
                     width={240}
                     height={240}
-                    style={{ margin: "0 auto", display: "block", borderRadius: "8px" }}
+                    style={{ margin: "0 auto", display: "block", borderRadius: "8px", maxWidth: "100%", height: "auto" }}
                   />
-                  <div style={{ marginTop: "12px", fontSize: "13px", color: "#374151", fontWeight: 600 }}>
+                  <div style={{ marginTop: "12px", fontSize: "13px", color: "#374151", fontWeight: 600, lineHeight: "1.7" }}>
                     1. افتح تطبيق واتساب على هاتفك.<br />
                     2. اضغط على القائمة (أو الإعدادات) واختر <strong>الأجهزة المرتبطة</strong>.<br />
                     3. اضغط على <strong>ربط جهاز</strong> ووجّه الكاميرا نحو الرمز أعلاه.
+                  </div>
+                  <div style={{ marginTop: "16px" }}>
+                    <Button variant="secondary" onClick={handleConnect} disabled={actionLoading}>
+                      {actionLoading ? "جاري التحديث..." : "🔄 طلب رمز جديد"}
+                    </Button>
                   </div>
                 </div>
               ) : (
                 <div style={{ textAlign: "center", padding: "30px 20px", backgroundColor: "#f9fafb", borderRadius: "8px", border: "1px dashed #d1d5db" }}>
                   <p style={{ margin: "0 0 12px 0", color: "#6b7280" }}>
-                    {data.status === "CONNECTING" ? "جاري تجهيز اتصال الواتساب..." : "الرمز غير معروض حالياً."}
+                    {actionLoading || data.status === "CONNECTING"
+                      ? "جاري تجهيز اتصال الواتساب ورمز QR..."
+                      : "الرمز غير معروض حالياً."}
                   </p>
                   <Button onClick={handleConnect} disabled={actionLoading}>
-                    {actionLoading ? "جاري التحميل..." : "عرض رمز QR للربط"}
+                    {actionLoading ? "جاري التجهيز..." : "عرض رمز QR للربط"}
                   </Button>
                 </div>
               )}

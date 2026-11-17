@@ -134,11 +134,15 @@ export async function sendBrevoEmail({
   subject,
   html,
   recipientName,
+  senderEmail,
+  senderName,
 }: {
   to: string;
   subject: string;
   html: string;
   recipientName?: string;
+  senderEmail?: string;
+  senderName?: string;
 }): Promise<{ ok: boolean; messageId?: string; error?: string }> {
   const config = getBrevoConfig();
 
@@ -153,8 +157,8 @@ export async function sendBrevoEmail({
         },
         body: JSON.stringify({
           sender: {
-            name: config.senderName || DEFAULT_SENDER_NAME,
-            email: config.senderEmail || DEFAULT_SENDER_EMAIL,
+            name: senderName || config.senderName || DEFAULT_SENDER_NAME,
+            email: senderEmail || config.senderEmail || DEFAULT_SENDER_EMAIL,
           },
           to: [
             {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { getDb, recordAudit } from "@/lib/server/db";
+import { getDb, recordAudit, recordChange, parseDeviceSummary, format12HourArabicTime } from "@/lib/server/db";
+import { sendBrevoEmail } from "@/lib/server/mailer";
 import {
   hashPassword,
   verifyPassword,
@@ -106,19 +107,105 @@ export async function POST(request: NextRequest) {
     recordSuccessfulLogin(ip);
 
     const effectiveEmail = user.encrypted_email
-      ? (decryptText(user.encrypted_email) || user.email || email)
-      : (user.email || email);
+      ? (decryptText(user.encrypted_email) || user.email || inputClean)
+      : (user.email || inputClean);
 
     // Create database session
     const sessionId = crypto.randomUUID();
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours
     const userAgent = request.headers.get("user-agent") || "";
+    const currentDevice = parseDeviceSummary(userAgent);
 
+    const effectiveRole = user.id === "admin-root" || effectiveEmail.toLowerCase() === configuredAdminEmail
+      ? "master"
+      : (user.role || "manager");
+    const effectiveUsername = user.username || (user.encrypted_username ? decryptText(user.encrypted_username) : "admin");
+
+    // Single Active Session Enforcement:
+    // If user already has an active session on another device/browser, supersede it immediately!
+    const previousActiveSessions = db
+      .prepare(`
+        SELECT id, ip, ua, device_summary 
+        FROM admin_sessions 
+        WHERE user_id = ? AND revoked_at IS NULL AND expires_at > ?
+      `)
+      .all(user.id, now.toISOString()) as Array<{ id: string; ip: string; ua: string; device_summary?: string }>;
+
+    if (previousActiveSessions.length > 0) {
+      const supersededDesc = `${currentDevice} (IP: ${ip})`;
+      db.prepare(`
+        UPDATE admin_sessions 
+        SET revoked_at = ?,
+            superseded_by = ?,
+            superseded_device = ?,
+            superseded_at = ?
+        WHERE user_id = ? AND revoked_at IS NULL
+      `).run(now.toISOString(), sessionId, supersededDesc, now.toISOString(), user.id);
+
+      // Trigger instant SSE kick-out event to the other device without refresh
+      recordChange("auth", "session_superseded", user.id, Date.now());
+
+      // Send security alert email via Brevo from support@terra-hop.com
+      try {
+        const { time12, dateFormatted } = format12HourArabicTime(now.toISOString());
+        const alertHtml = `
+          <!DOCTYPE html>
+          <html dir="rtl" lang="ar">
+          <head><meta charset="UTF-8"></head>
+          <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f7f7f8; padding: 24px; color: #111;">
+            <div style="max-width: 500px; margin: 0 auto; background: #ffffff; border-radius: 16px; border: 1px solid #e5e5e5; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.06);">
+              <div style="background: #080808; padding: 24px; text-align: center;">
+                <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 900; letter-spacing: 2px;">TERRA HOP</h1>
+                <p style="color: #ef4444; margin: 6px 0 0; font-size: 13px; font-weight: bold;">⚠️ تنبيه أمان: تسجيل دخول جديد</p>
+              </div>
+              <div style="padding: 24px 28px;">
+                <p style="font-size: 15px; margin: 0 0 16px;">مرحباً <strong>${effectiveUsername}</strong>،</p>
+                <p style="font-size: 13px; color: #52525b; line-height: 1.6;">تم رصد تسجيل دخول جديد لحسابك في لوحة تحكم المتجر من جهاز آخر:</p>
+                
+                <div style="background: #f4f4f5; border: 1px solid #e4e4e7; border-radius: 10px; padding: 14px 18px; margin: 16px 0; font-size: 13px; line-height: 1.8;">
+                  <div>📱 <strong>الجهاز:</strong> ${currentDevice}</div>
+                  <div>🌐 <strong>عنوان الـ IP:</strong> <span style="font-family: monospace;">${ip}</span></div>
+                  <div>⏰ <strong>التوقيت:</strong> ${time12} | ${dateFormatted}</div>
+                </div>
+
+                <p style="font-size: 12px; color: #71717a; line-height: 1.6;">
+                  تم إنهاء الجلسة القديمة تلقائياً حيث لا يسمح بفتح الحساب من جهازين في نفس الوقت لحماية المتجر.
+                </p>
+
+                <div style="background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 12px 16px; border-radius: 8px; font-size: 12px; margin-top: 18px;">
+                  🔒 <strong>إذا لم تكن أنت:</strong> قم بتغيير كلمة المرور فوراً عبر زر "نسيت كلمة السر" في صفحة الدخول لحظر أي وصول غير مصرح به.
+                </div>
+              </div>
+              <div style="padding: 16px 24px; background: #fafafa; border-top: 1px solid #f0f0f0; text-align: center; font-size: 12px; color: #71717a;">
+                TERRA HOP Security &copy; 2026 — support@terra-hop.com
+              </div>
+            </div>
+          </body>
+          </html>
+        `;
+
+        sendBrevoEmail({
+          to: effectiveEmail,
+          recipientName: effectiveUsername,
+          senderEmail: "support@terra-hop.com",
+          senderName: "TERRA HOP",
+          subject: "⚠️ تنبيه أمان: تم تسجيل الدخول لحسابك من جهاز جديد (TERRA HOP)",
+          html: alertHtml,
+        }).catch(() => {});
+      } catch (err) {
+        console.error("Failed to send login alert email:", err);
+      }
+    }
+
+    // Insert new session with device summary
     db.prepare(`
-      INSERT INTO admin_sessions (id, user_id, created_at, expires_at, ip, ua)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(sessionId, user.id, now.toISOString(), expiresAt.toISOString(), ip, userAgent);
+      INSERT INTO admin_sessions (id, user_id, device_summary, created_at, expires_at, ip, ua)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(sessionId, user.id, currentDevice, now.toISOString(), expiresAt.toISOString(), ip, userAgent);
+
+    // Update user active session id
+    db.prepare("UPDATE admin_users SET active_session_id = ? WHERE id = ?").run(sessionId, user.id);
 
     recordAudit({
       actor: effectiveEmail,
@@ -130,11 +217,6 @@ export async function POST(request: NextRequest) {
 
     const sessionToken = signSessionToken(effectiveEmail, sessionId);
     const csrfToken = generateCsrfToken(sessionId);
-
-    const effectiveRole = user.id === "admin-root" || effectiveEmail.toLowerCase() === configuredAdminEmail
-      ? "master"
-      : (user.role || "manager");
-    const effectiveUsername = user.username || (user.encrypted_username ? decryptText(user.encrypted_username) : "admin");
 
     const response = apiSuccess({
       user: {

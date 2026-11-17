@@ -12,6 +12,7 @@ import type { ShortcutAction } from "@/lib/admin/shortcuts";
 import { useShortcuts } from "@/lib/admin/use-shortcuts";
 import { ShortcutHelpProvider, ShortcutsDialog } from "./ShortcutsDialog";
 import { Button, Dialog, ToastProvider } from "./ui";
+import { SessionSupersededModal, type SupersededInfo } from "./ui/SessionSupersededModal";
 
 const N = ADMIN_STRINGS.nav;
 const ITEMS = [
@@ -81,6 +82,26 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const { data, storageProblem } = useAdminStore();
   const router = useRouter();
   const [authed, setAuthed] = useState<boolean | null>(null);
+  const [supersededInfo, setSupersededInfo] = useState<SupersededInfo | null>(null);
+
+  const checkSessionStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/auth/session-status", {
+        cache: "no-store",
+        headers: { "X-Requested-With": "terra-admin" },
+      });
+      if (!res.ok) return;
+      const json = await res.json();
+      if (json.ok && json.data?.superseded) {
+        setSupersededInfo({
+          summary: json.data.newDevice?.summary || "هاتف آخر",
+          time: json.data.newDevice?.time || "--:--",
+          date: json.data.newDevice?.date || "",
+          userEmail: json.data.userEmail || "",
+        });
+      }
+    } catch {}
+  }, []);
 
   useEffect(() => {
     const isAuthed = isAuthenticated();
@@ -97,6 +118,31 @@ export function AdminShell({ children }: { children: ReactNode }) {
         .catch(() => {});
     }
   }, [router]);
+
+  useEffect(() => {
+    if (!authed) return;
+    checkSessionStatus();
+
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource("/api/public/stream");
+      es.addEventListener("change", (e: MessageEvent) => {
+        try {
+          const payload = JSON.parse(e.data);
+          if (payload.topic === "auth" || payload.entity === "session_superseded") {
+            checkSessionStatus();
+          }
+        } catch {}
+      });
+    } catch {}
+
+    const timer = setInterval(checkSessionStatus, 3500);
+
+    return () => {
+      if (es) es.close();
+      clearInterval(timer);
+    };
+  }, [authed, checkSessionStatus]);
 
   const needsAction = data ? countNeedsAction(data.orders) : 0;
   const [menuOpen, setMenuOpen] = useState(false);
@@ -161,6 +207,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
           </div>
         </Dialog>
         <ShortcutsDialog open={helpOpen} onClose={() => setHelpOpen(false)} enabled={shortcutsOn} />
+        {supersededInfo && <SessionSupersededModal info={supersededInfo} />}
       </div>
       </ShortcutHelpProvider>
     </ToastProvider>
