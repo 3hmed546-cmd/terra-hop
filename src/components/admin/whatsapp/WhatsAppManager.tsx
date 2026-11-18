@@ -19,7 +19,7 @@ interface BotStatus {
 export function WhatsAppManager() {
   const toast = useToast();
   const [data, setData] = useState<BotStatus>({
-    status: "CONNECTING",
+    status: "DISCONNECTED",
     phoneNumber: null,
     qrCodeDataUrl: null,
     lastConnectedAt: null,

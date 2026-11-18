@@ -6,6 +6,8 @@
     "dev": "next dev",
     "build": "next build --webpack",
     "start": "next start",
+    "desktop": "node desktop/server.js",
+    "desktop:app": "npx electron desktop/main.js",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test:f7": "playwright test"

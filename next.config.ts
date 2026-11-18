@@ -53,7 +53,14 @@ const nextConfig: NextConfig = {
     cpus: 1,
     agentUpgrade: "security",
   },
-  serverExternalPackages: ["better-sqlite3", "sharp"],
+  serverExternalPackages: [
+    "better-sqlite3",
+    "sharp",
+    "@whiskeysockets/baileys",
+    "ws",
+    "qrcode",
+    "pino",
+  ],
   cacheComponents: true,
   partialPrefetching: true,
   async headers() {

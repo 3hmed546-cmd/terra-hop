@@ -91,6 +91,7 @@ export const home = {
     whatsappNumber: "+20 128 569 4670",
     directChatUrl: "https://wa.me/201285694670",
     instagramUrl: "https://www.instagram.com/terr3hop/",
+    tiktokUrl: "https://www.tiktok.com/@terr3hop",
   },
   footer: {
     demo: true,

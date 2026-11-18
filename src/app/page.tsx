@@ -16,8 +16,6 @@ export const metadata: Metadata = { title: { absolute: home.meta.title }, descri
 export default function Page() {
   return (
     <>
-      <link rel="preload" as="image" href="/coming-soon-mobile.jpg" media="(max-width: 639px)" fetchPriority="high" />
-      <link rel="preload" as="image" href="/coming-soon.jpg" media="(min-width: 640px)" fetchPriority="high" />
       <div className="relative">
         <Header header={home.header} overlay />
         <main id="main">

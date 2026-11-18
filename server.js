@@ -1,6 +1,29 @@
 // server.js - Production entry point for cPanel / Phusion Passenger / PM2 / VPS
 // This allows cPanel's "Setup Node.js App" to boot Next.js smoothly with dynamic PORT handling.
 
+// Auto-extract update bundle if present
+try {
+  const fs = require("fs");
+  const path = require("path");
+  const { execSync } = require("child_process");
+  const bundle = path.join(__dirname, "update_bundle.tar.gz");
+  if (fs.existsSync(bundle)) {
+    console.log("[AUTO-UPDATER] Found update_bundle.tar.gz. Cleaning old .next directory...");
+    const nextDir = path.join(__dirname, ".next");
+    if (fs.existsSync(nextDir)) {
+      try {
+        execSync(`rm -rf "${nextDir}"`);
+      } catch (e) {}
+    }
+    console.log("[AUTO-UPDATER] Extracting fresh build...");
+    execSync(`tar -xzf "${bundle}" -C "${__dirname}"`);
+    fs.unlinkSync(bundle);
+    console.log("[AUTO-UPDATER] Clean extraction complete and bundle removed.");
+  }
+} catch (updaterErr) {
+  console.error("[AUTO-UPDATER] Extraction error:", updaterErr);
+}
+
 try {
   const { loadEnvConfig } = require("@next/env");
   loadEnvConfig(process.cwd());

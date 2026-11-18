@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Suspense, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { verifySessionToken } from "@/lib/server/security";
@@ -21,9 +21,5 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     redirect(`/${secret}`);
   }
 
-  return (
-    <Suspense fallback={null}>
-      <AdminShell>{children}</AdminShell>
-    </Suspense>
-  );
+  return <AdminShell>{children}</AdminShell>;
 }
