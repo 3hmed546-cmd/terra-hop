@@ -344,7 +344,7 @@ export function recordFailedLoginAttempt(ip: string): {
     isLockedOut: false,
     remainingAttempts: remaining,
     retryAfterSeconds: 0,
-    message: `البريد الإلكتروني أو كلمة المرور غير صحيحة. متبقي ${remaining} ${remaining === 1 ? "محاولة واحدة" : "محاولات"} قبل حظر العنوان لمدة 20 دقيقة.`,
+    message: "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
   };
 }
 

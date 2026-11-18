@@ -324,10 +324,10 @@ export function seedDatabaseIfNeeded(targetDb?: any, force = false): boolean {
 
     db.prepare(`
       INSERT OR REPLACE INTO admin_users (
-        id, email, email_hash, encrypted_email, username_hash, encrypted_username,
-        password_hash, must_change_password, created_at
+        id, email, email_hash, encrypted_email, username, username_hash, encrypted_username,
+        password_hash, role, must_change_password, created_at
       )
-      VALUES ('admin-root', ?, ?, ?, ?, ?, ?, 0, ?)
+      VALUES ('admin-root', ?, ?, ?, 'admin', ?, ?, ?, 'master', 0, ?)
     `).run(adminEmail, emailHash, encryptedEmail, usernameHash, encryptedUsername, passwordHash, now);
 
     // Helper to insert or get asset

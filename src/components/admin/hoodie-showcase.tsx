@@ -19,11 +19,13 @@ export function HoodieShowcase() {
 
   const hoodiesList = useMemo<LoginHoodie[]>(() => {
     const slots = liveSite?.slots;
-    const placements = slots?.login_showcase || slots?.hero_carousel;
+    const placements = (Array.isArray(slots?.hero_carousel) && slots.hero_carousel.length > 0)
+      ? slots.hero_carousel
+      : slots?.login_showcase;
     if (Array.isArray(placements) && placements.length > 0) {
       return placements.map((p: any) => ({
         src: p.url,
-        name: p.alt?.ar || p.alt?.en || "هودي",
+        name: p.alt?.ar || p.alt?.en || p.meta?.name || "هودي",
         glow: p.meta?.glow || "#232323",
         caption: p.meta?.caption || {
           ar: { prefix: "تميز", accent: "بأسلوبك", sub: p.alt?.ar || "" },

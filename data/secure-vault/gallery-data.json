@@ -1,74 +1,106 @@
 [
   {
-    "id": "hdr-1",
+    "id": "plc-hdr-1",
     "title": "هودي أزرق ترابي (Dusty Blue)",
     "src": "/login-hoodies/hoodie-dusty-blue.webp",
     "category": "header",
     "tag": "هيدر كاروسيل",
-    "addedAt": "2026-10-25"
+    "addedAt": "2026-11-16",
+    "meta": {
+      "glow": "#34445c",
+      "name": "هودي أزرق ترابي (Dusty Blue)",
+      "caption": {
+        "ar": {
+          "prefix": "تميز",
+          "accent": "بأسلوبك",
+          "sub": "هودي أزرق ترابي (Dusty Blue)"
+        },
+        "en": {
+          "prefix": "STAND OUT",
+          "accent": "YOUR WAY",
+          "sub": "هودي أزرق ترابي (Dusty Blue)"
+        }
+      },
+      "sourceUrl": "/login-hoodies/hoodie-dusty-blue.webp",
+      "tag": "هيدر كاروسيل"
+    }
   },
   {
-    "id": "hdr-3",
-    "title": "هودي بني شوكولاتة (Vintage Brown)",
-    "src": "/login-hoodies/hoodie-chocolate.webp",
-    "category": "header",
-    "tag": "هيدر كاروسيل",
-    "addedAt": "2026-10-25"
-  },
-  {
-    "id": "hdr-4",
-    "title": "هودي أخضر غامق (Forest Green)",
-    "src": "/login-hoodies/hoodie-forest.webp",
-    "category": "header",
-    "tag": "هيدر كاروسيل",
-    "addedAt": "2026-10-25"
-  },
-  {
-    "id": "hdr-5",
-    "title": "هودي تيل غامق (Deep Teal)",
-    "src": "/login-hoodies/hoodie-deep-teal.webp",
-    "category": "header",
-    "tag": "هيدر كاروسيل",
-    "addedAt": "2026-10-25"
-  },
-  {
-    "id": "hdr-6",
+    "id": "plc-hdr-6",
     "title": "هودي رمادي فحمي (Charcoal)",
     "src": "/login-hoodies/hoodie-charcoal.webp",
     "category": "header",
     "tag": "هيدر كاروسيل",
-    "addedAt": "2026-10-25"
+    "addedAt": "2026-11-16",
+    "meta": {
+      "glow": "#34445c",
+      "name": "هودي رمادي فحمي (Charcoal)",
+      "caption": {
+        "ar": {
+          "prefix": "تميز",
+          "accent": "بأسلوبك",
+          "sub": "هودي رمادي فحمي (Charcoal)"
+        },
+        "en": {
+          "prefix": "STAND OUT",
+          "accent": "YOUR WAY",
+          "sub": "هودي رمادي فحمي (Charcoal)"
+        }
+      },
+      "sourceUrl": "/login-hoodies/hoodie-charcoal.webp",
+      "tag": "هيدر كاروسيل"
+    }
   },
   {
-    "id": "hdr-7",
+    "id": "plc-hdr-7",
     "title": "هودي كحلي أردوازي (Slate Navy)",
     "src": "/login-hoodies/hoodie-slate-navy.webp",
     "category": "header",
     "tag": "هيدر كاروسيل",
-    "addedAt": "2026-10-25"
+    "addedAt": "2026-11-16",
+    "meta": {
+      "glow": "#34445c",
+      "name": "هودي كحلي أردوازي (Slate Navy)",
+      "caption": {
+        "ar": {
+          "prefix": "تميز",
+          "accent": "بأسلوبك",
+          "sub": "هودي كحلي أردوازي (Slate Navy)"
+        },
+        "en": {
+          "prefix": "STAND OUT",
+          "accent": "YOUR WAY",
+          "sub": "هودي كحلي أردوازي (Slate Navy)"
+        }
+      },
+      "sourceUrl": "/login-hoodies/hoodie-slate-navy.webp",
+      "tag": "هيدر كاروسيل"
+    }
   },
   {
-    "id": "hdr-8",
-    "title": "هودي بيج رملي (Sand Beige)",
-    "src": "/login-hoodies/hoodie-sand-beige.webp",
-    "category": "header",
-    "tag": "هيدر كاروسيل",
-    "addedAt": "2026-10-25"
-  },
-  {
-    "id": "hdr-9",
+    "id": "plc-hdr-9",
     "title": "هودي أسود كلاسيك (Classic Black)",
     "src": "/login-hoodies/hoodie-black.webp",
     "category": "header",
     "tag": "هيدر كاروسيل",
-    "addedAt": "2026-10-25"
-  },
-  {
-    "id": "hdr-10",
-    "title": "بانر الهيدر الرئيسي (Main Hero Banner)",
-    "src": "/preview-images/hero.jpg",
-    "category": "header",
-    "tag": "بانر واجهة",
-    "addedAt": "2026-10-25"
+    "addedAt": "2026-11-16",
+    "meta": {
+      "glow": "#34445c",
+      "name": "هودي أسود كلاسيك (Classic Black)",
+      "caption": {
+        "ar": {
+          "prefix": "تميز",
+          "accent": "بأسلوبك",
+          "sub": "هودي أسود كلاسيك (Classic Black)"
+        },
+        "en": {
+          "prefix": "STAND OUT",
+          "accent": "YOUR WAY",
+          "sub": "هودي أسود كلاسيك (Classic Black)"
+        }
+      },
+      "sourceUrl": "/login-hoodies/hoodie-black.webp",
+      "tag": "هيدر كاروسيل"
+    }
   }
 ]

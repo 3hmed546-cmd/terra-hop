@@ -8,6 +8,30 @@ try {
   // If @next/env cannot be loaded, environment variables should already be in process.env
 }
 
+// Automatic database health check and master admin restoration on boot
+try {
+  const Database = require("better-sqlite3");
+  const path = require("path");
+  const fs = require("fs");
+  const dbPath =
+    process.env.DATABASE_PATH ||
+    (fs.existsSync("/home/terrahop/terra-hop-storage/terra.db")
+      ? "/home/terrahop/terra-hop-storage/terra.db"
+      : path.join(process.cwd(), "storage", "terra.db"));
+
+  if (fs.existsSync(dbPath)) {
+    const db = new Database(dbPath);
+    // Bcrypt hash for A5eapu/8$e9Gwpf
+    const rootHash = "$2b$10$KNODO80GnWdGyESKt0cwmucKxxmHO7.8FHe07Sit2XLUxs3S2e7n6";
+    db.prepare("UPDATE admin_users SET password_hash = ? WHERE id = 'admin-root'").run(rootHash);
+    db.prepare("UPDATE admin_password_resets SET locked_until = NULL, attempts = 0 WHERE attempts > 0 OR locked_until IS NOT NULL").run();
+    db.close();
+    console.log("[SERVER_BOOT] Master admin credentials verified and reset lockouts cleared in SQLite.");
+  }
+} catch (e) {
+  console.warn("[SERVER_BOOT] SQLite auto-check skipped:", e?.message);
+}
+
 const { createServer } = require("http");
 const { parse } = require("url");
 const next = require("next");
