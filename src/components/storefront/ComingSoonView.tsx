@@ -143,18 +143,26 @@ export function ComingSoonView({
         ) : null}
 
         {/* =========================================================================
-            3. LIVE COUNTDOWN DOCK:
-            Pushed down into the lower area (as requested with the blue arrow)
-            with balanced spacing above the footer logo.
+            3. HERO TEASER HEADLINE ("خلاص قربنا") - FULL WIDTH DISPLAY:
+            Spans across the screen with high-impact streetwear typography,
+            responsive on mobile and desktop, pure red with atmospheric glow, no border.
            ========================================================================= */}
-        <div className="w-full max-w-3xl mt-8 sm:mt-12 md:mt-14 px-3 flex flex-col items-center">
-          {/* Top Tagline */}
-          <div className="flex items-center justify-center mb-3 sm:mb-4 text-center">
-            <span className="text-xs sm:text-sm md:text-base tracking-wider text-red-500 font-bold">
-              {locale === "ar" ? "خلاص قربنا" : "ALMOST THERE"}
-            </span>
-          </div>
+        <div className="w-full max-w-6xl mx-auto px-4 mt-8 sm:mt-12 md:mt-14 mb-4 sm:mb-6 flex items-center justify-center gap-3 sm:gap-6 md:gap-8 select-none">
+          <div className="hidden sm:block h-[2px] flex-1 bg-gradient-to-r from-transparent via-red-500/25 to-red-500/80 rounded-full" />
+          <h2
+            className="text-center font-black tracking-wide sm:tracking-wider text-red-500 drop-shadow-[0_0_35px_rgba(239,68,68,0.5)] whitespace-nowrap text-3xl xs:text-4xl sm:text-6xl md:text-7xl lg:text-8xl leading-none"
+            style={{ fontFamily: "var(--font-cairo), sans-serif" }}
+          >
+            {locale === "ar" ? "خلاص قربنا" : "ALMOST THERE"}
+          </h2>
+          <div className="hidden sm:block h-[2px] flex-1 bg-gradient-to-l from-transparent via-red-500/25 to-red-500/80 rounded-full" />
+        </div>
 
+        {/* =========================================================================
+            4. LIVE COUNTDOWN DOCK:
+            Mechanical Split-Flap Flip Cards Grid (DAYS - HOURS - MINUTES - SECONDS).
+           ========================================================================= */}
+        <div className="w-full max-w-3xl mt-2 sm:mt-4 px-3 flex flex-col items-center">
           {/* Mechanical Split-Flap Flip Cards Grid (DAYS - HOURS - MINUTES - SECONDS) */}
           <div className="flex items-center justify-center gap-2 xs:gap-3 sm:gap-4 md:gap-5 lg:gap-6">
             <FlipCard

