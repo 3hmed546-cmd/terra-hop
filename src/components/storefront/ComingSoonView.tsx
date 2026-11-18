@@ -150,8 +150,8 @@ export function ComingSoonView({
         <div className="w-full max-w-3xl mt-8 sm:mt-12 md:mt-14 px-3 flex flex-col items-center">
           {/* Top Tagline */}
           <div className="flex items-center justify-center mb-3 sm:mb-4 text-center">
-            <span className="font-mono text-[10px] sm:text-xs uppercase tracking-[0.25em] text-neutral-400 font-semibold bg-white/[0.04] px-4 py-1.5 rounded-full border border-white/10 shadow-xs">
-              {locale === "ar" ? "العد التنازلي لموعد الإطلاق الرسمي" : "OFFICIAL DROP LAUNCH COUNTDOWN"}
+            <span className="text-xs sm:text-sm md:text-base tracking-wider text-red-500 font-bold">
+              {locale === "ar" ? "خلاص قربنا" : "ALMOST THERE"}
             </span>
           </div>
 
@@ -191,7 +191,7 @@ export function ComingSoonView({
       <footer className="relative z-10 w-full flex flex-col items-center justify-center pt-8 sm:pt-10 text-concrete/70">
         <div className="flex flex-col items-center gap-1.5 cursor-pointer opacity-80 hover:opacity-100 transition-opacity">
           <span className="font-mono text-[11px] sm:text-xs tracking-wider">
-            {locale === "ar" ? "مرر للأسفل لمعلومات المتجر والتواصل" : "SCROLL DOWN FOR STORE INFO & CONTACT"}
+            {locale === "ar" ? "انزل لتحت عشان تشوف معلومات التواصل" : "SCROLL DOWN FOR STORE INFO & CONTACT"}
           </span>
           <ChevronDown className="w-4 h-4 animate-bounce text-off-white" />
         </div>
