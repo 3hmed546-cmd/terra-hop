@@ -25,9 +25,20 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const response = apiSuccess({ loggedOut: true });
+  const secret = (process.env.ADMIN_PATH || process.env.ADMIN_LOGIN_PATH || "k7q2-vault-9xm4").replace(/^\/+|\/+$/g, "");
+  const loginUrl = `/${secret}`;
+
+  const response = apiSuccess({ loggedOut: true, loginUrl });
   response.cookies.set("terra_admin_session", "", {
     httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+
+  response.cookies.set("terra_admin_logged_in", "", {
+    httpOnly: false,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",

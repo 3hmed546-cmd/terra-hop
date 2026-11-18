@@ -149,6 +149,29 @@ export function getDb(): Database.Database {
   return db;
 }
 
+export function updateEnvAdminEmail(newEmail: string): void {
+  try {
+    const envFiles = [
+      path.join(process.cwd(), ".env.local"),
+      path.join(process.cwd(), ".env.production"),
+      path.join(process.cwd(), ".env"),
+    ];
+    for (const envPath of envFiles) {
+      if (!fs.existsSync(envPath)) continue;
+      let content = fs.readFileSync(envPath, "utf-8");
+      if (content.includes("ADMIN_EMAIL=")) {
+        content = content.replace(/ADMIN_EMAIL=[^\r\n]*/g, `ADMIN_EMAIL=${newEmail}`);
+      } else {
+        content += `\nADMIN_EMAIL=${newEmail}\n`;
+      }
+      fs.writeFileSync(envPath, content, "utf-8");
+    }
+    process.env.ADMIN_EMAIL = newEmail;
+  } catch (err) {
+    console.error("[updateEnvAdminEmail] Error updating env files:", err);
+  }
+}
+
 export function updateEnvAdminPassword(email: string, newRawPass: string): void {
   try {
     const envFiles = [
@@ -237,31 +260,29 @@ export function syncAdminCredentials(db: Database.Database): void {
     const encryptedUsername = encryptText("admin");
     const now = new Date().toISOString();
 
-    // 1. Ensure master admin user is updated with the Supabase bcrypt hash and master role
-    const updated = db.prepare(`
-      UPDATE admin_users
-      SET email = ?,
-          email_hash = ?,
-          encrypted_email = ?,
-          username_hash = ?,
-          encrypted_username = ?,
-          password_hash = ?,
-          role = 'master',
-          username = COALESCE(username, 'admin'),
-          must_change_password = 0
-      WHERE id = 'admin-root' OR LOWER(email) = ? OR LOWER(username) = 'admin' OR LOWER(email) LIKE '%admin%'
-    `).run(email, emailHash, encryptedEmail, usernameHash, encryptedUsername, passwordHash, email);
+    // Check if root admin already exists
+    const existingRoot = db
+      .prepare("SELECT id, email, username, password_hash FROM admin_users WHERE id = 'admin-root'")
+      .get() as { id: string; email: string; username?: string; password_hash?: string } | undefined;
 
-    // 2. If no root admin user exists, insert the root admin
-    if (updated.changes === 0) {
-      db.prepare(`
-        INSERT INTO admin_users (
-          id, email, email_hash, encrypted_email, username_hash, encrypted_username,
-          password_hash, role, username, must_change_password, created_at
-        )
-        VALUES ('admin-root', ?, ?, ?, ?, ?, ?, 'master', 'admin', 0, ?)
-      `).run(email, emailHash, encryptedEmail, usernameHash, encryptedUsername, passwordHash, now);
+    if (existingRoot) {
+      // Root admin already exists. Preserve their custom email and username; do not overwrite with static env defaults!
+      if (!existingRoot.password_hash) {
+        db.prepare("UPDATE admin_users SET password_hash = ?, role = 'master' WHERE id = 'admin-root'").run(
+          passwordHash
+        );
+      }
+      return;
     }
+
+    // If no root admin user exists, insert the initial root admin
+    db.prepare(`
+      INSERT INTO admin_users (
+        id, email, email_hash, encrypted_email, username_hash, encrypted_username,
+        password_hash, role, username, must_change_password, created_at
+      )
+      VALUES ('admin-root', ?, ?, ?, ?, ?, ?, 'master', 'admin', 0, ?)
+    `).run(email, emailHash, encryptedEmail, usernameHash, encryptedUsername, passwordHash, now);
   } catch (err) {
     console.error("[syncAdminCredentials] Error updating admin credentials:", err);
   }
@@ -992,6 +1013,27 @@ function initializeSchema(db: Database.Database): void {
     } catch {}
   } catch (err) {
     console.error("Ambassador levels seed error:", err);
+  }
+
+  // === Speed Engineer: High-Performance Database Indexes ===
+  try {
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS ix_orders_status_created ON orders(status, created_at DESC);
+      CREATE INDEX IF NOT EXISTS ix_orders_created ON orders(created_at DESC);
+      CREATE INDEX IF NOT EXISTS ix_orders_number ON orders(number);
+      CREATE INDEX IF NOT EXISTS ix_order_items_order_id ON order_items(order_id);
+      CREATE INDEX IF NOT EXISTS ix_order_items_product_id ON order_items(product_id);
+      CREATE INDEX IF NOT EXISTS ix_products_status_pos ON products(status, position ASC, created_at DESC);
+      CREATE INDEX IF NOT EXISTS ix_products_category ON products(category);
+      CREATE INDEX IF NOT EXISTS ix_variants_prod_color ON variants(product_id, color_id);
+      CREATE INDEX IF NOT EXISTS ix_stock_mov_var ON stock_movements(variant_id, at DESC);
+      CREATE INDEX IF NOT EXISTS ix_pl_slot_active ON image_placements(slot_key, active, position);
+      CREATE INDEX IF NOT EXISTS ix_pl_asset ON image_placements(asset_id);
+      CREATE INDEX IF NOT EXISTS ix_audit_at ON audit_log(at DESC);
+      CREATE INDEX IF NOT EXISTS ix_change_at ON change_log(at DESC);
+    `);
+  } catch (err) {
+    console.error("Speed Engineer indexes creation error:", err);
   }
 }
 

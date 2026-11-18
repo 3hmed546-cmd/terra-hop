@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import crypto from "crypto";
-import { getDb, recordAudit, recordChange, updateEnvAdminPassword } from "@/lib/server/db";
+import { getDb, recordAudit, recordChange, updateEnvAdminPassword, syncManagerToEnv } from "@/lib/server/db";
 import { hashPassword, hashBlindIndex } from "@/lib/server/security";
 import { sendBrevoEmail } from "@/lib/server/mailer";
 import { apiSuccess, apiError } from "@/lib/server/api-envelope";
@@ -65,14 +65,21 @@ export async function POST(request: NextRequest) {
       const emailBlindIndex = hashBlindIndex(email, "email");
       const defaultAdminEmail = (process.env.ADMIN_EMAIL || "admin@terrahop.com").trim().toLowerCase();
 
-      const user = db
-        .prepare(`
-          SELECT id, email, username 
-          FROM admin_users 
-          WHERE email_hash = ? OR LOWER(email) = ? OR LOWER(email) = ?
-          LIMIT 1
-        `)
-        .get(emailBlindIndex, email, defaultAdminEmail) as { id: string; email: string; username?: string } | undefined;
+      let user: { id: string; email: string; username?: string } | undefined;
+      if (email === "admin" || email === defaultAdminEmail || email === "admin@terra-hop.com") {
+        user = db
+          .prepare("SELECT id, email, username FROM admin_users WHERE id = 'admin-root' OR LOWER(email) = ? LIMIT 1")
+          .get(defaultAdminEmail) as any;
+      } else {
+        user = db
+          .prepare(`
+            SELECT id, email, username 
+            FROM admin_users 
+            WHERE email_hash = ? OR LOWER(email) = ?
+            LIMIT 1
+          `)
+          .get(emailBlindIndex, email) as any;
+      }
 
       if (!user) {
         // Record failed attempt for unknown email to protect against brute-force probing
@@ -122,9 +129,9 @@ export async function POST(request: NextRequest) {
         </head>
         <body>
           <div class="container">
-            <div class="header">
-              <h1>TERRA HOP</h1>
-              <p>لوحة التحكم الإدارية — استعادة كلمة المرور</p>
+            <div class="header" style="background: #080808; padding: 28px 24px; text-align: center;">
+              <img src="https://terra-hop.com/logo/terra-hop-logo-white.png" alt="TERRA HOP" width="140" style="display: block; width: 140px; max-width: 100%; height: auto; margin: 0 auto 10px;" />
+              <p style="color: #a1a1aa; margin: 0; font-size: 13px; font-weight: 500;">لوحة التحكم الإدارية — استعادة كلمة المرور</p>
             </div>
             <div class="content">
               <h2 style="font-size: 18px; margin: 0 0 12px; color: #18181b;">مرحباً ${recipientName}،</h2>
@@ -146,7 +153,7 @@ export async function POST(request: NextRequest) {
         </html>
       `;
 
-      await sendBrevoEmail({
+      const mailRes = await sendBrevoEmail({
         to: email,
         recipientName,
         senderEmail: "support@terra-hop.com",
@@ -154,6 +161,11 @@ export async function POST(request: NextRequest) {
         subject: "TERRA HOP — رمز استعادة كلمة المرور (OTP)",
         html: emailHtml,
       });
+
+      if (!mailRes.ok) {
+        console.error("[FORGOT_PASSWORD:ERROR] Could not send OTP:", mailRes.error);
+        return apiError("INTERNAL_ERROR", "تعذر إرسال رمز التحقق عبر البريد حالياً. يرجى مراجعة إعدادات البريد أو المحاولة لاحقاً.", 500);
+      }
 
       return apiSuccess({
         message: "تم إرسال رمز التحقق (OTP) بنجاح إلى بريدك الإلكتروني.",
@@ -227,8 +239,7 @@ export async function POST(request: NextRequest) {
         }
 
         db.prepare("UPDATE admin_password_resets SET attempts = ? WHERE id = ?").run(newAttempts, record.id);
-        const remaining = MAX_ATTEMPTS - newAttempts;
-        return apiError("VALIDATION", `رمز التحقق (OTP) غير صحيح. متبقي لك ${remaining} محاولات قبل الحظر.`, 400);
+        return apiError("VALIDATION", "فشل التحقق، حاول مرة أخرى", 400);
       }
 
       // Correct OTP! Generate Reset Token
@@ -264,11 +275,11 @@ export async function POST(request: NextRequest) {
         .prepare(`
           SELECT id, email, expires_at 
           FROM admin_password_resets 
-          WHERE email = ? AND reset_token = ? AND used = 0 
+          WHERE (reset_token = ? OR (LOWER(email) = ? AND reset_token = ?)) AND used = 0 
           ORDER BY created_at DESC 
           LIMIT 1
         `)
-        .get(email, resetToken) as { id: string; email: string; expires_at: string } | undefined;
+        .get(resetToken, email.toLowerCase(), resetToken) as { id: string; email: string; expires_at: string } | undefined;
 
       if (!record) {
         return apiError("VALIDATION", "رمز استعادة كلمة المرور غير صالح أو تم استخدامه مسبقاً.", 400);
@@ -285,14 +296,21 @@ export async function POST(request: NextRequest) {
       const defaultAdminEmail = (process.env.ADMIN_EMAIL || "admin@terrahop.com").trim().toLowerCase();
       const emailBlindIndex = hashBlindIndex(email, "email");
 
-      const user = db
-        .prepare(`
-          SELECT id, email 
-          FROM admin_users 
-          WHERE email_hash = ? OR LOWER(email) = ? OR LOWER(email) = ?
-          LIMIT 1
-        `)
-        .get(emailBlindIndex, email, defaultAdminEmail) as { id: string; email: string } | undefined;
+      let user: { id: string; email: string; username?: string } | undefined;
+      if (email === "admin" || email === defaultAdminEmail || email === "admin@terra-hop.com") {
+        user = db
+          .prepare("SELECT id, email, username FROM admin_users WHERE id = 'admin-root' OR LOWER(email) = ? LIMIT 1")
+          .get(defaultAdminEmail) as any;
+      } else {
+        user = db
+          .prepare(`
+            SELECT id, email, username 
+            FROM admin_users 
+            WHERE email_hash = ? OR LOWER(email) = ?
+            LIMIT 1
+          `)
+          .get(emailBlindIndex, email) as any;
+      }
 
       if (!user) {
         return apiError("NOT_FOUND", "المسؤول غير موجود في قاعدة البيانات.", 404);
@@ -308,6 +326,8 @@ export async function POST(request: NextRequest) {
       // If master root admin, update .env.local as requested
       if (user.id === "admin-root" || email.toLowerCase() === defaultAdminEmail) {
         updateEnvAdminPassword(email, newPassword);
+      } else {
+        syncManagerToEnv(user.email || email, user.username || "manager", newHash);
       }
 
       // Mark reset record as used

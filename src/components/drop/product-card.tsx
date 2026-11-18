@@ -87,6 +87,7 @@ export function ProductCard({ product }: { product: Product }) {
           alt=""
           width={900}
           height={1100}
+          loading="lazy"
           unoptimized={secondSrc.startsWith("data:")}
           sizes={sizes}
           className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-200 group-hover:opacity-100"

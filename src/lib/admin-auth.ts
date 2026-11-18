@@ -132,24 +132,44 @@ export async function apiFetch(input: string, init: RequestInit = {}) {
 }
 
 export async function logout() {
-  try {
-    await fetch("/api/admin/auth/logout", {
-      method: "POST",
-      headers: {
-        ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
-        "X-Requested-With": "terra-admin",
-      },
-      credentials: "same-origin",
-    });
-  } catch {
-    // Ignore network error on logout
+  let targetUrl = "/k7q2-vault-9xm4";
+  if (typeof window !== "undefined") {
+    const segments = window.location.pathname.split("/").filter(Boolean);
+    if (segments.length > 0 && segments[0] !== "admin" && segments[0] !== "admin-login") {
+      targetUrl = `/${segments[0]}`;
+    }
   }
 
+  // Clear client session immediately so no UI lag occurs
   isSessionActive = false;
   adminUser = null;
   csrfToken = null;
 
+  if (typeof document !== "undefined") {
+    document.cookie = "terra_admin_session=; Path=/; Max-Age=0";
+    document.cookie = "terra_admin_logged_in=; Path=/; Max-Age=0";
+  }
+
+  try {
+    const res = await fetch("/api/admin/auth/logout", {
+      method: "POST",
+      headers: {
+        "X-Requested-With": "terra-admin",
+      },
+      credentials: "same-origin",
+      keepalive: true,
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.data?.loginUrl) {
+        targetUrl = data.data.loginUrl;
+      }
+    }
+  } catch {
+    // Ignore network error on logout
+  }
+
   if (typeof window !== "undefined") {
-    window.location.replace("/admin");
+    window.location.replace(targetUrl);
   }
 }

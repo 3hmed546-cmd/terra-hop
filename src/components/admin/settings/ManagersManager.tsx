@@ -18,6 +18,7 @@ import {
   Loader2,
   History,
   Lock,
+  Pencil,
 } from "lucide-react";
 import { apiFetch } from "@/lib/admin-auth";
 
@@ -63,6 +64,18 @@ export function ManagersManager() {
   const [submitting, setSubmitting] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
+
+  // Edit Manager Modal state
+  const [editTarget, setEditTarget] = useState<ManagerItem | null>(null);
+  const [editUsername, setEditUsername] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editPassword, setEditPassword] = useState("");
+  const [editAvatar, setEditAvatar] = useState("");
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [uploadingEditAvatar, setUploadingEditAvatar] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
 
   // Delete Confirmation state
   const [deleteTarget, setDeleteTarget] = useState<ManagerItem | null>(null);
@@ -177,6 +190,85 @@ export function ManagersManager() {
       setModalError(err?.message || "حدث خطأ أثناء إضافة المسؤول.");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  // Handle Edit Modal Open
+  function openEditModal(mgr: ManagerItem) {
+    setEditTarget(mgr);
+    setEditUsername(mgr.username || "");
+    setEditEmail(mgr.email || "");
+    setEditPassword("");
+    setEditAvatar(mgr.avatarUrl || "");
+    setShowEditPassword(false);
+    setEditError(null);
+  }
+
+  // Handle Edit Avatar Upload
+  async function handleEditAvatarUpload(file: File) {
+    setUploadingEditAvatar(true);
+    setEditError(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await apiFetch("/api/admin/assets", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok || !data.data?.url) {
+        throw new Error(data?.error?.message || data?.error || "فشل رفع الصورة.");
+      }
+      setEditAvatar(data.data.url);
+    } catch (err: any) {
+      setEditError(err?.message || "حدث خطأ أثناء رفع الصورة.");
+    } finally {
+      setUploadingEditAvatar(false);
+      if (editFileInputRef.current) editFileInputRef.current.value = "";
+    }
+  }
+
+  // Handle Save Edit Submit
+  async function handleSaveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editTarget) return;
+    setSavingEdit(true);
+    setEditError(null);
+
+    try {
+      const payload: any = {
+        username: editUsername.trim(),
+        email: editEmail.trim(),
+        avatarUrl: editAvatar.trim(),
+      };
+      if (editPassword) {
+        if (editPassword.length < 8) {
+          throw new Error("يجب ألا تقل كلمة المرور عن 8 أحرف.");
+        }
+        payload.password = editPassword;
+      }
+
+      const res = await apiFetch(`/api/admin/managers/${editTarget.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data?.error?.message || data?.error || "فشل تحديث البيانات.");
+      }
+
+      setNotification({
+        type: "success",
+        text: `تم تحديث بيانات المسؤول (${editUsername}) بنجاح!`,
+      });
+      setEditTarget(null);
+      fetchManagers();
+    } catch (err: any) {
+      setEditError(err?.message || "حدث خطأ أثناء حفظ التعديلات.");
+    } finally {
+      setSavingEdit(false);
     }
   }
 
@@ -391,16 +483,27 @@ export function ManagersManager() {
                   </div>
 
                   {/* Actions */}
-                  {isMaster && !mgr.isMaster && (
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
-                      onClick={() => setDeleteTarget(mgr)}
-                      className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer shrink-0"
-                      title="حذف المسؤول"
+                      onClick={() => openEditModal(mgr)}
+                      className="p-2 text-neutral-500 hover:text-black hover:bg-neutral-100 rounded-lg transition-colors cursor-pointer"
+                      title="تعديل بيانات الحساب"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Pencil className="w-4 h-4" />
                     </button>
-                  )}
+
+                    {isMaster && !mgr.isMaster && (
+                      <button
+                        type="button"
+                        onClick={() => setDeleteTarget(mgr)}
+                        className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                        title="حذف المسؤول"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -619,7 +722,7 @@ export function ManagersManager() {
                   </button>
                 </div>
                 <p className="text-[11px] text-neutral-500">
-                  🔒 يتم تشفير كلمة المرور فورياً بأعلى معايير الأمان (Bcrypt $2b$10$) لحماية الحساب.
+                  تنبيه أمان: يتم تشفير كلمة المرور فورياً بأعلى معايير الأمان (Bcrypt $2b$10$) لحماية الحساب.
                 </p>
               </div>
 
@@ -639,6 +742,165 @@ export function ManagersManager() {
                 >
                   {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
                   تأكيد وإضافة المسؤول
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL: EDIT MANAGER / ADMIN */}
+      {/* ============================================================== */}
+      {editTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white border border-neutral-300 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200 text-neutral-900 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-neutral-200 pb-3">
+              <h3 className="font-bold text-base sm:text-lg flex items-center gap-2">
+                <Pencil className="w-5 h-5 text-neutral-800" />
+                تعديل بيانات الحساب ({editTarget.username || editTarget.email})
+              </h3>
+              <button
+                type="button"
+                onClick={() => setEditTarget(null)}
+                className="text-neutral-400 hover:text-black font-bold p-1 text-base cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {editError && (
+              <div className="p-3 rounded-lg bg-red-50 border border-red-300 text-red-900 text-xs font-semibold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                <span>{editError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              {/* Avatar Upload */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-neutral-800">
+                  صورة المسؤول (Avatar)
+                </label>
+                <div className="flex items-center gap-3">
+                  {editAvatar ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={editAvatar}
+                      alt="معاينة"
+                      className="w-14 h-14 rounded-full object-cover border border-neutral-300 shadow-2xs"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-full bg-neutral-100 border border-dashed border-neutral-300 flex items-center justify-center text-neutral-400 text-xs">
+                      بدون صورة
+                    </div>
+                  )}
+
+                  <div className="space-y-1">
+                    <input
+                      type="file"
+                      ref={editFileInputRef}
+                      accept="image/*"
+                      onChange={(e) => e.target.files?.[0] && handleEditAvatarUpload(e.target.files[0])}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => editFileInputRef.current?.click()}
+                      disabled={uploadingEditAvatar}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-semibold border border-neutral-300 transition-colors cursor-pointer"
+                    >
+                      {uploadingEditAvatar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                      {uploadingEditAvatar ? "جاري الرفع..." : "تغيير الصورة"}
+                    </button>
+                    {editAvatar && (
+                      <button
+                        type="button"
+                        onClick={() => setEditAvatar("")}
+                        className="block text-[11px] text-red-600 hover:underline cursor-pointer"
+                      >
+                        إزالة الصورة
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Username */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-neutral-800">
+                  اسم المستخدم (Username) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editUsername}
+                  onChange={(e) => setEditUsername(e.target.value)}
+                  placeholder="مثال: ahmed_ops أو mohamed"
+                  className="w-full bg-white border border-neutral-300 rounded-lg px-3.5 py-2 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:border-black focus:ring-1 focus:ring-black shadow-xs"
+                />
+              </div>
+
+              {/* Email */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-neutral-800">
+                  البريد الإلكتروني (Email) *
+                </label>
+                <input
+                  type="email"
+                  required
+                  dir="ltr"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  placeholder="manager@terra-hop.com"
+                  className="w-full bg-white border border-neutral-300 rounded-lg px-3.5 py-2 text-xs sm:text-sm text-neutral-900 font-mono focus:outline-none focus:border-black focus:ring-1 focus:ring-black shadow-xs"
+                />
+              </div>
+
+              {/* New Password (Optional) */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-neutral-800">
+                  كلمة المرور الجديدة (اختياري)
+                </label>
+                <div className="relative">
+                  <input
+                    type={showEditPassword ? "text" : "password"}
+                    minLength={8}
+                    dir="ltr"
+                    value={editPassword}
+                    onChange={(e) => setEditPassword(e.target.value)}
+                    placeholder="اتركها فارغة للإبقاء على كلمة المرور الحالية..."
+                    className="w-full bg-white border border-neutral-300 rounded-lg px-3.5 py-2 pl-9 text-xs sm:text-sm text-neutral-900 font-mono focus:outline-none focus:border-black focus:ring-1 focus:ring-black shadow-xs placeholder:text-neutral-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEditPassword(!showEditPassword)}
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-black p-1 cursor-pointer"
+                  >
+                    {showEditPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-[11px] text-neutral-500">
+                  ملاحظة أمان: اترك هذا الحقل فارغاً إذا كنت لا ترغب بتغيير كلمة المرور. إذا قمت بإدخال كلمة مرور جديدة فسيتم تشفيرها وتحديثها فورياً.
+                </p>
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-neutral-200">
+                <button
+                  type="button"
+                  onClick={() => setEditTarget(null)}
+                  className="px-4 py-2 rounded-lg border border-neutral-300 text-neutral-700 text-xs font-bold hover:bg-neutral-100 transition-colors cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-neutral-900 hover:bg-black text-white text-xs sm:text-sm font-bold shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {savingEdit && <Loader2 className="w-4 h-4 animate-spin" />}
+                  حفظ التعديلات
                 </button>
               </div>
             </form>

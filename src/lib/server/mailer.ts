@@ -40,6 +40,60 @@ export function getBrevoConfig(): {
 }
 
 /**
+ * Direct cPanel / Custom SMTP transport via Nodemailer.
+ * Delivers directly as support@terra-hop.com using the domain's authenticated cPanel mail server.
+ */
+async function sendCpanelSmtp({
+  to,
+  subject,
+  html,
+  recipientName,
+  senderEmail,
+  senderName,
+}: {
+  to: string;
+  subject: string;
+  html: string;
+  recipientName?: string;
+  senderEmail?: string;
+  senderName?: string;
+}): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+  const host = process.env.SMTP_HOST || process.env.CPANEL_SMTP_HOST || "s21766.fra1.stableserver.net";
+  const port = Number(process.env.SMTP_PORT || process.env.CPANEL_SMTP_PORT || 465);
+  const user = process.env.SMTP_USER || process.env.CPANEL_SMTP_USER || "support@terra-hop.com";
+  const pass = process.env.SMTP_PASS || process.env.CPANEL_SMTP_PASS || "TerraHopSupport@2026!Sec#M";
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      auth: { user, pass },
+      tls: {
+        rejectUnauthorized: false, // Prevents cert mismatches on shared hostnames
+      },
+    });
+
+    const fromAddress = senderEmail || user;
+    const fromName = senderName || DEFAULT_SENDER_NAME;
+
+    const info = await transporter.sendMail({
+      from: `"${fromName}" <${fromAddress}>`,
+      to: recipientName ? `"${recipientName}" <${to}>` : to,
+      replyTo: "support@terra-hop.com",
+      subject,
+      html,
+    });
+
+    console.log(`[CPANEL_SMTP:SUCCESS] Sent email to ${to} via cPanel SMTP. MessageId: ${info.messageId}`);
+    return { ok: true, messageId: info.messageId };
+  } catch (err: any) {
+    console.warn(`[CPANEL_SMTP:ERROR] Failed to send via cPanel SMTP:`, err?.message);
+    return { ok: false, error: err?.message || "Failed to send email via cPanel SMTP" };
+  }
+}
+
+/**
  * Fallback to local server sendmail (/usr/sbin/sendmail) if Brevo is unavailable.
  * Delivers directly as support@terra-hop.com from cPanel Exim with SPF/DKIM aligned.
  */
@@ -127,7 +181,11 @@ async function sendGmailFallback({
 }
 
 /**
- * Send email via Brevo REST API over HTTPS Port 443 with automatic server sendmail & Gmail fallback.
+ * Smart Multi-Provider Email Sender:
+ * 1. Direct cPanel SMTP (if SMTP_PASS is configured in .env).
+ * 2. Brevo API (over HTTPS 443) with auto-sender fallback (e.g. verified terr3hop@gmail.com if custom domain pending).
+ * 3. Local cPanel sendmail (/usr/sbin/sendmail) directly from the server.
+ * 4. Gmail SMTP fallback.
  */
 export async function sendBrevoEmail({
   to,
@@ -144,58 +202,15 @@ export async function sendBrevoEmail({
   senderEmail?: string;
   senderName?: string;
 }): Promise<{ ok: boolean; messageId?: string; error?: string }> {
-  const config = getBrevoConfig();
+  // 1. Primary Engine: Direct cPanel SMTP from support@terra-hop.com
+  const smtpRes = await sendCpanelSmtp({ to, subject, html, recipientName, senderEmail, senderName });
+  if (smtpRes.ok) return smtpRes;
 
-  if (config.apiKey) {
-    try {
-      const res = await fetch("https://api.brevo.com/v3/smtp/email", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "api-key": config.apiKey,
-          accept: "application/json",
-        },
-        body: JSON.stringify({
-          sender: {
-            name: senderName || config.senderName || DEFAULT_SENDER_NAME,
-            email: senderEmail || config.senderEmail || DEFAULT_SENDER_EMAIL,
-          },
-          to: [
-            {
-              email: to,
-              name: recipientName || undefined,
-            },
-          ],
-          replyTo: {
-            name: config.senderName || DEFAULT_SENDER_NAME,
-            email: "support@terra-hop.com",
-          },
-          subject,
-          htmlContent: html,
-        }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (res.ok) {
-        console.log(`[BREVO:SUCCESS] Sent email to ${to}. MessageId: ${data?.messageId}`);
-        return { ok: true, messageId: data?.messageId };
-      }
-
-      const errDesc = data?.message || `Brevo API error (${res.status})`;
-      console.warn(`[BREVO:FAILED] ${errDesc}. Attempting server fallback...`);
-    } catch (err: any) {
-      console.warn(`[BREVO:NETWORK_ERROR] ${err?.message}. Attempting server fallback...`);
-    }
-  } else {
-    console.warn(`[BREVO:WAITING_KEY] No Brevo API Key found. Attempting server fallback...`);
-  }
-
-  // Fallback 1: Try local cPanel sendmail as support@terra-hop.com
+  // 2. Fallback 1: Local server sendmail (/usr/sbin/sendmail) from cPanel Exim
   const sendmailRes = await sendLocalSendmailFallback({ to, subject, html, recipientName });
   if (sendmailRes.ok) return sendmailRes;
 
-  // Fallback 2: Gmail SMTP
+  // 3. Fallback 2: Gmail SMTP
   return sendGmailFallback({ to, subject, html, recipientName });
 }
 

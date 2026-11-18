@@ -512,7 +512,7 @@ export function ComingSoonSection() {
       {/* Footer Info */}
       <div className="pt-2 border-t border-neutral-200">
         <p className="text-xs text-neutral-500 leading-relaxed">
-          💡 عند تحديث إعدادات الصور أو التاريخ أو الـ Caption، تنعكس التغييرات فورياً عبر البث المباشر (SSE) لجميع الشاشات المفتوحة مع مراعاة المقاس المثالي لكل جهاز تلقائياً.
+          ملاحظة: عند تحديث إعدادات الصور أو التاريخ أو الـ Caption، تنعكس التغييرات فورياً عبر البث المباشر (SSE) لجميع الشاشات المفتوحة مع مراعاة المقاس المثالي لكل جهاز تلقائياً.
         </p>
       </div>
     </div>

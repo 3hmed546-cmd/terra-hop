@@ -22,8 +22,8 @@ const ITEMS = [
   { path: "/orders", label: N.orders },
   { path: "/promos", label: "أكواد الخصم" },
   { path: "/ambassadors", label: "أكواد الإحالة" },
-  { path: "/managers", label: "مسؤولين المتجر 👥" },
-  { path: "/whatsapp", label: "بوت الواتساب 💬" },
+  { path: "/managers", label: "مسؤولين المتجر" },
+  { path: "/whatsapp", label: "بوت الواتساب" },
   { path: "/settings", label: N.settings },
 ] as const;
 
@@ -57,6 +57,8 @@ function NavList({ relativePath, needsAction, onNavigate }: { relativePath: stri
 }
 
 function FootLinks({ onNavigate, onShortcuts }: { onNavigate?: () => void; onShortcuts: () => void }) {
+  const [loggingOut, setLoggingOut] = useState(false);
+
   return (
     <div className="adm-sidebar-foot">
       <button type="button" className="adm-nav-link adm-nav-button" onClick={() => { onNavigate?.(); onShortcuts(); }}>
@@ -65,14 +67,16 @@ function FootLinks({ onNavigate, onShortcuts }: { onNavigate?: () => void; onSho
       <Link href="/" className="adm-nav-link" onClick={onNavigate}>{N.viewStore}</Link>
       <button
         type="button"
+        disabled={loggingOut}
         className="adm-nav-link adm-nav-button"
-        style={{ color: "#DC2626", textAlign: "inherit", cursor: "pointer" }}
+        style={{ color: "#DC2626", textAlign: "inherit", cursor: "pointer", opacity: loggingOut ? 0.6 : 1 }}
         onClick={() => {
+          setLoggingOut(true);
           onNavigate?.();
           logout();
         }}
       >
-        {N.signOut}
+        {loggingOut ? "جاري تسجيل الخروج…" : N.signOut}
       </button>
     </div>
   );
@@ -124,23 +128,23 @@ export function AdminShell({ children }: { children: ReactNode }) {
     if (!authed) return;
     checkSessionStatus();
 
-    let es: EventSource | null = null;
-    try {
-      es = new EventSource("/api/public/stream");
-      es.addEventListener("change", (e: MessageEvent) => {
-        try {
-          const payload = JSON.parse(e.data);
-          if (payload.topic === "auth" || payload.entity === "session_superseded") {
-            checkSessionStatus();
-          }
-        } catch {}
-      });
-    } catch {}
+    const handleVis = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        checkSessionStatus();
+      }
+    };
+    window.addEventListener("visibilitychange", handleVis);
+    window.addEventListener("focus", handleVis);
 
-    const timer = setInterval(checkSessionStatus, 3500);
+    const timer = setInterval(() => {
+      if (typeof document !== "undefined" && !document.hidden) {
+        checkSessionStatus();
+      }
+    }, 15000);
 
     return () => {
-      if (es) es.close();
+      window.removeEventListener("visibilitychange", handleVis);
+      window.removeEventListener("focus", handleVis);
       clearInterval(timer);
     };
   }, [authed, checkSessionStatus]);

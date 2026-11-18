@@ -316,8 +316,9 @@ export function DashboardOverview() {
 
                       {/* Customer Notes */}
                       {o.notes && (
-                        <div className="text-xs italic bg-white/70 border border-line-light/60 p-2 rounded text-obsidian">
-                          💬 &quot;{o.notes}&quot;
+                        <div className="text-xs italic bg-white/70 border border-line-light/60 p-2 rounded text-obsidian flex items-center gap-1.5">
+                          <MessageCircle className="w-3.5 h-3.5 flex-shrink-0 text-stone-400" />
+                          <span>&quot;{o.notes}&quot;</span>
                         </div>
                       )}
                     </div>

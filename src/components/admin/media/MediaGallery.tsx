@@ -346,7 +346,7 @@ export function MediaGallery() {
             <div className="flex items-center gap-2">
               <span className="inline-block w-3 h-3 bg-obsidian rounded-full"></span>
               <h3 className="text-lg font-bold text-obsidian tracking-wide">
-                🖼️ صور الهيدرز والواجهة الرئيسية (Header & Hero Images)
+                صور الهيدرز والواجهة الرئيسية (Header & Hero Images)
               </h3>
               <span className="text-xs font-mono px-2 py-0.5 bg-obsidian text-off-white rounded">
                 {headerImages.length} صورة
@@ -446,7 +446,7 @@ export function MediaGallery() {
             <div className="flex items-center gap-2">
               <span className="inline-block w-3 h-3 bg-red-600 rounded-full"></span>
               <h3 className="text-lg font-bold text-obsidian tracking-wide">
-                👕 ألبومات صور المنتجات والهوديز (Product Photo Albums)
+                ألبومات صور المنتجات والهوديز (Product Photo Albums)
               </h3>
               <span className="text-xs font-mono px-2 py-0.5 bg-red-600 text-white rounded font-bold">
                 {products.length} منتجات

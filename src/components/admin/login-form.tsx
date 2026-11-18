@@ -381,20 +381,9 @@ export function LoginForm() {
                     initial={reduce ? false : { opacity: 0, y: -4 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
-                    className="p-3.5 rounded-control flex items-center gap-2.5 text-xs font-semibold"
-                    style={{
-                      border: "1.5px solid #DC2626",
-                      backgroundColor: "#FEF2F2",
-                      color: "#DC2626",
-                    }}
+                    className="text-center text-xs sm:text-sm font-semibold text-red-600 py-1"
                   >
-                    <AlertCircle
-                      size={17}
-                      className="shrink-0"
-                      style={{ color: "#DC2626", stroke: "#DC2626" }}
-                      aria-hidden="true"
-                    />
-                    <span style={{ color: "#DC2626", fontWeight: 600 }}>{error}</span>
+                    {error}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -456,9 +445,8 @@ export function LoginForm() {
             </div>
 
             {forgotError && (
-              <div className="p-3.5 rounded-lg bg-red-50 border border-red-300 text-red-900 text-xs font-semibold flex items-center gap-2.5">
-                <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-                <span>{forgotError}</span>
+              <div className="text-center text-xs sm:text-sm font-semibold text-red-600 py-1">
+                {forgotError}
               </div>
             )}
 
@@ -480,7 +468,7 @@ export function LoginForm() {
                       dir="ltr"
                       value={forgotEmail}
                       onChange={(e) => setForgotEmail(e.target.value)}
-                      placeholder="admin@terra-hop.com"
+                      placeholder="Your Email"
                       className="w-full bg-white border border-neutral-300 rounded-lg px-3.5 py-2 pl-9 text-xs sm:text-sm text-neutral-900 font-mono focus:outline-none focus:border-black focus:ring-1 focus:ring-black shadow-xs"
                     />
                     <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
@@ -510,9 +498,12 @@ export function LoginForm() {
             {/* STEP 2: Enter 6-digit OTP */}
             {forgotStep === 2 && (
               <form onSubmit={handleVerifyOtp} className="space-y-4">
-                <div className="p-3 bg-neutral-50 rounded-lg border border-neutral-200 text-xs text-neutral-700 space-y-1">
-                  <div>تم إرسال رمز التحقق إلى: <strong className="font-mono">{forgotEmail}</strong></div>
-                  <div className="text-[11px] text-neutral-500">⏱️ الرمز صالح لمدة 15 دقيقة. الحد الأقصى 5 محاولات قبل حظر الحساب مؤقتاً.</div>
+                <div className="flex flex-col items-center justify-center py-2">
+                  <img
+                    src="/logo/terra-hop-logo-black.png"
+                    alt="TERRA HOP"
+                    className="h-10 w-auto object-contain"
+                  />
                 </div>
 
                 <div className="space-y-1.5">
@@ -554,7 +545,15 @@ export function LoginForm() {
             {/* STEP 3: Enter New Password */}
             {forgotStep === 3 && (
               <form onSubmit={handleResetPassword} className="space-y-4">
-                <p className="text-xs text-neutral-600 leading-relaxed">
+                <div className="flex flex-col items-center justify-center py-2">
+                  <img
+                    src="/logo/terra-hop-logo-black.png"
+                    alt="TERRA HOP"
+                    className="h-10 w-auto object-contain"
+                  />
+                </div>
+
+                <p className="text-xs text-neutral-600 leading-relaxed text-center">
                   تم تأكيد هويتك بنجاح! أدخل الآن كلمة المرور الجديدة لحسابك:
                 </p>
 
@@ -599,10 +598,6 @@ export function LoginForm() {
                   />
                 </div>
 
-                <p className="text-[11px] text-neutral-500">
-                  🔒 سيتم تشفير كلمة المرور فورياً بمعيار Supabase Bcrypt ($2b$10$) المشفر.
-                </p>
-
                 <div className="flex items-center justify-end gap-3 pt-2">
                   <button
                     type="submit"
@@ -619,8 +614,12 @@ export function LoginForm() {
             {/* STEP 4: Success confirmation */}
             {forgotStep === 4 && (
               <div className="text-center py-4 space-y-4">
-                <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full mx-auto flex items-center justify-center">
-                  <CheckCircle2 className="w-8 h-8" />
+                <div className="flex flex-col items-center justify-center py-2">
+                  <img
+                    src="/logo/terra-hop-logo-black.png"
+                    alt="TERRA HOP"
+                    className="h-12 w-auto object-contain"
+                  />
                 </div>
                 <div>
                   <h4 className="font-bold text-base text-neutral-900">تم تحديث كلمة المرور بنجاح!</h4>

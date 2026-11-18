@@ -51,6 +51,7 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     cpus: 1,
+    agentUpgrade: "security",
   },
   serverExternalPackages: ["better-sqlite3", "sharp"],
   cacheComponents: true,

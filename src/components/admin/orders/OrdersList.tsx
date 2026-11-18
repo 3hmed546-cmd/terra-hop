@@ -36,11 +36,11 @@ function CustomerCell({ order }: { order: Order }) {
       <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: 4 }}>
         {order.waConfirmedAt ? (
           <span className="adm-badge" style={{ backgroundColor: "#15803d", color: "#fff", fontSize: "10px" }}>
-            مؤكد واتساب 🟢
+            مؤكد واتساب
           </span>
         ) : order.emailConfirmedAt ? (
           <span className="adm-badge" style={{ backgroundColor: "#0284c7", color: "#fff", fontSize: "10px" }}>
-            مؤكد إيميل 📧
+            مؤكد إيميل
           </span>
         ) : null}
         {order.ambassadorCode ? (

@@ -32,8 +32,26 @@ export async function GET(request: NextRequest) {
   }
   query += " ORDER BY created_at DESC";
 
+  const limitParam = url.searchParams.get("limit");
+  const offsetParam = url.searchParams.get("offset");
+  if (limitParam) {
+    const limit = Math.min(Math.max(parseInt(limitParam, 10) || 50, 1), 500);
+    const offset = Math.max(parseInt(offsetParam || "0", 10) || 0, 0);
+    query += " LIMIT ? OFFSET ?";
+    params.push(limit, offset);
+  }
+
   const orders = db.prepare(query).all(...params) as any[];
-  const orderItems = db.prepare("SELECT * FROM order_items").all() as any[];
+
+  // Speed Engineer: Never fetch the whole order_items table! Only fetch items for the retrieved orders.
+  let orderItems: any[] = [];
+  if (orders.length > 0) {
+    const placeholders = orders.map(() => "?").join(",");
+    const orderIds = orders.map((o) => o.id);
+    orderItems = db
+      .prepare(`SELECT * FROM order_items WHERE order_id IN (${placeholders})`)
+      .all(...orderIds) as any[];
+  }
 
   const itemsByOrder = new Map<string, any[]>();
   for (const item of orderItems) {

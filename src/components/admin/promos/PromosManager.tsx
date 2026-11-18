@@ -368,7 +368,7 @@ export function PromosManager() {
                         ) : (
                           <button
                             type="button"
-                            className="inline-flex items-center gap-1 text-xs font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-md border border-purple-200"
+                            className="inline-flex items-center gap-1 text-xs font-bold text-stone-800 bg-stone-100 hover:bg-stone-200 px-2.5 py-1 rounded-md border border-stone-300 transition-colors"
                             onClick={() => setViewProductsTarget(item)}
                           >
                             محددة ({item.selectedProductIds?.length || 0})

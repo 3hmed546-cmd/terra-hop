@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense, type ReactNode } from "react";
 import { cookies } from "next/headers";
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import { verifySessionToken } from "@/lib/server/security";
 import { AdminShell } from "@/components/admin/AdminShell";
 import "./admin.css";
@@ -17,7 +17,8 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const isAuthed = verifySessionToken(sessionCookie).valid;
 
   if (!isAuthed) {
-    notFound();
+    const secret = (process.env.ADMIN_PATH || process.env.ADMIN_LOGIN_PATH || "k7q2-vault-9xm4").replace(/^\/+|\/+$/g, "");
+    redirect(`/${secret}`);
   }
 
   return (

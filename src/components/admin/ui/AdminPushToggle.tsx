@@ -178,7 +178,7 @@ export function AdminPushToggle({ compact = false }: { compact?: boolean }) {
             ) : (
               <BellRing className="w-3.5 h-3.5" />
             )}
-            <span>{subscribed ? "إلغاء التفعيل" : "🔔 تفعيل الإشعارات على هذا الجهاز"}</span>
+            <span>{subscribed ? "إلغاء التفعيل" : "تفعيل الإشعارات على هذا الجهاز"}</span>
           </button>
         </div>
       </div>
@@ -187,7 +187,7 @@ export function AdminPushToggle({ compact = false }: { compact?: boolean }) {
         <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-medium text-amber-800">
           <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
           <span>
-            تم حظر الإشعارات لهذا الموقع سابقاً في المتصفح. لتفعيلها، اضغط على علامة القفل 🔒 بجانب رابط الموقع في شريط العناوين واسمح بالإشعارات (Allow Notifications).
+            تم حظر الإشعارات لهذا الموقع سابقاً في المتصفح. لتفعيلها، اضغط على أيقونة القفل وإعدادات الموقع بجانب رابط الموقع في شريط العناوين واسمح بالإشعارات (Allow Notifications).
           </span>
         </div>
       )}

@@ -81,83 +81,42 @@ function initLiveEngine() {
   fetchSiteData();
   fetchProductsData();
 
-  let sseRetryCount = 0;
-
-  function connectSSE() {
-    try {
-      if (eventSource) {
-        try {
-          eventSource.close();
-        } catch {}
-      }
-      const es = new EventSource("/api/public/stream");
-      eventSource = es;
-
-      es.addEventListener("ready", (e: MessageEvent) => {
-        try {
-          const parsed = JSON.parse(e.data);
-          state.connected = true;
-          sseRetryCount = 0;
-          if (parsed.revisions) {
-            Object.assign(state.revisions, parsed.revisions);
-          }
-          notify();
-        } catch {}
-      });
-
-      es.addEventListener("change", (e: MessageEvent) => {
-        try {
-          const change = JSON.parse(e.data);
-          if (change.topic && typeof change.revision === "number") {
-            handleTopicChange(change.topic as Topic, change.revision);
-          }
-        } catch {}
-      });
-
-      es.onerror = () => {
-        state.connected = false;
-        notify();
-        try {
-          es.close();
-        } catch {}
-        sseRetryCount++;
-        // If SSE repeatedly drops (e.g. edge proxy HTTP/2 timeout or device emulation),
-        // pause SSE reconnect to prevent console spam and let silent polling handle updates.
-        if (sseRetryCount <= 3) {
-          setTimeout(connectSSE, 15000);
-        }
-      };
-    } catch {
-      // If SSE not supported, rely on polling
-    }
-  }
-
-  connectSSE();
-
-  // Polling fallback check every 20 seconds
-  pollTimer = setInterval(async () => {
+  async function checkVersion() {
     try {
       const res = await fetch("/api/public/version", { cache: "no-store" });
       if (res.ok) {
         const payload = await res.json();
         if (payload.ok && payload.data) {
+          state.connected = true;
           const v = payload.data;
           for (const key of ["media", "products", "settings", "content"] as Topic[]) {
             if (typeof v[key] === "number" && v[key] > state.revisions[key]) {
               handleTopicChange(key, v[key]);
             }
           }
+          notify();
         }
       }
     } catch {}
-  }, 20000);
+  }
 
-  // When tab becomes visible again, check version immediately
+  // Lightweight, non-blocking check every 12 seconds.
+  // Releases the Passenger worker instantly (2ms execution) without hogging server concurrency.
+  pollTimer = setInterval(() => {
+    if (typeof document !== "undefined" && !document.hidden) {
+      checkVersion();
+    }
+  }, 12000);
+
+  // When tab becomes visible or focused, check version immediately
   window.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
-      fetchSiteData();
-      fetchProductsData();
+      checkVersion();
     }
+  });
+
+  window.addEventListener("focus", () => {
+    checkVersion();
   });
 }
 

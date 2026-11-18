@@ -125,7 +125,7 @@ function Editor({ initial, existing, isNew, tab, onTab, focusLogRef }: EditorPro
     }
     setSaved(true);
     if (isNew && notifyConfirmed) {
-      toast.push(`تم حفظ المنتج ${product.name} وجاري إرسال إشعار الواتساب للعملاء المؤكدين! 🚀`);
+      toast.push(`تم حفظ المنتج ${product.name} وجاري إرسال إشعار الواتساب للعملاء المؤكدين`);
     } else {
       toast.push(status === "draft" ? F.savedDraft(product.name) : F.saved(product.name));
     }
@@ -244,7 +244,7 @@ function Editor({ initial, existing, isNew, tab, onTab, focusLogRef }: EditorPro
         </Section>
 
         {isNew ? (
-          <Section id="broadcast" title="إشعار العملاء المؤكدين عبر الواتساب (VIP Broadcast) 💬">
+          <Section id="broadcast" title="إشعار العملاء المؤكدين عبر الواتساب (VIP Broadcast)">
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
                 <input
@@ -269,7 +269,7 @@ function Editor({ initial, existing, isNew, tab, onTab, focusLogRef }: EditorPro
                   }}
                   style={{ width: 18, height: 18, cursor: "pointer" }}
                 />
-                <span>إرسال إشعار بهذه القطعة الجديدة لجميع العملاء المؤكدين في الخزنة تلقائياً 🚀</span>
+                <span>إرسال إشعار بهذه القطعة الجديدة لجميع العملاء المؤكدين في الخزنة تلقائياً</span>
               </label>
               {notifyConfirmed ? (
                 <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -302,7 +302,7 @@ function Editor({ initial, existing, isNew, tab, onTab, focusLogRef }: EditorPro
                         cursor: "pointer",
                       }}
                     >
-                      🔄 توليد النموذج الافتراضي ببيانات هذا المنتج
+                      توليد النموذج الافتراضي ببيانات هذا المنتج
                     </button>
                   </div>
                   <Textarea
@@ -315,7 +315,7 @@ function Editor({ initial, existing, isNew, tab, onTab, focusLogRef }: EditorPro
                     }}
                   />
                   <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>
-                    💡 يتم إرسال صورة المنتج مع نص الرسالة بالصيغة الراقية لجميع عملائك المسجلين بأعلى معايير الأمان.
+                    ملاحظة: يتم إرسال صورة المنتج مع نص الرسالة بالصيغة الراقية لجميع عملائك المسجلين بأعلى معايير الأمان.
                   </p>
                 </div>
               ) : null}

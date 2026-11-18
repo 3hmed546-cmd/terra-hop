@@ -211,7 +211,7 @@ export function SessionSupersededModal({ info }: SessionSupersededModalProps) {
             </div>
 
             <p className="text-[11px] text-neutral-400">
-              🔒 نظام حماية الجلسة الموحدة (Single Active Session) — TERRA HOP Security
+              نظام حماية الجلسة الموحدة (Single Active Session) — TERRA HOP Security
             </p>
           </div>
         )}

@@ -29,7 +29,7 @@ export function WhatsAppManager() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [testPhone, setTestPhone] = useState("");
-  const [testMsg, setTestMsg] = useState("أهلاً بك! هذه رسالة تجريبية من بوت واتساب متجر TERRA HOP 🖤");
+  const [testMsg, setTestMsg] = useState("أهلاً بك! هذه رسالة تجريبية من بوت واتساب متجر TERRA HOP.");
   const [sendingTest, setSendingTest] = useState(false);
 
   // Broadcast & Confirmed Customers State
@@ -142,7 +142,7 @@ export function WhatsAppManager() {
       });
       const json = await res.json();
       if (json.ok) {
-        toast.push(json.data?.message || "تم إرسال البث للعملاء بنجاح! 🎉");
+        toast.push(json.data?.message || "تم إرسال البث للعملاء بنجاح!");
       } else {
         toast.push(json.message || "فشل إرسال البث.");
       }
@@ -282,15 +282,15 @@ export function WhatsAppManager() {
             <span>حالة اتصال البوت</span>
             {isConnected ? (
               <span className="adm-badge" style={{ backgroundColor: "#15803d", color: "#fff", fontSize: "12px", padding: "4px 8px", borderRadius: "6px" }}>
-                متصل 🟢
+                متصل
               </span>
             ) : data.status === "SCAN_QR" ? (
               <span className="adm-badge" style={{ backgroundColor: "#ca8a04", color: "#fff", fontSize: "12px", padding: "4px 8px", borderRadius: "6px" }}>
-                بانتظار المسح 🟡
+                بانتظار المسح
               </span>
             ) : (
               <span className="adm-badge" style={{ backgroundColor: "#b91c1c", color: "#fff", fontSize: "12px", padding: "4px 8px", borderRadius: "6px" }}>
-                غير متصل 🔴
+                غير متصل
               </span>
             )}
           </h2>
@@ -349,7 +349,7 @@ export function WhatsAppManager() {
                   </div>
                   <div style={{ marginTop: "16px" }}>
                     <Button variant="secondary" onClick={handleConnect} disabled={actionLoading}>
-                      {actionLoading ? "جاري التحديث..." : "🔄 طلب رمز جديد"}
+                      {actionLoading ? "جاري التحديث..." : "طلب رمز جديد"}
                     </Button>
                   </div>
                 </div>
@@ -397,16 +397,16 @@ export function WhatsAppManager() {
               disabled={sendingTest || !isConnected}
               style={{ alignSelf: "flex-start", marginTop: "4px" }}
             >
-              {sendingTest ? "جاري الإرسال..." : isConnected ? "إرسال رسالة تجريبية 🚀" : "البوت غير متصل"}
+              {sendingTest ? "جاري الإرسال..." : isConnected ? "إرسال رسالة تجريبية" : "البوت غير متصل"}
             </Button>
           </form>
 
           {/* Workflow explanation */}
           <div style={{ marginTop: "24px", paddingTop: "16px", borderTop: "1px solid #e5e7eb", fontSize: "12px", color: "#4b5563", lineHeight: "1.6" }}>
-            <strong>💡 كيف يعمل النظام تلقائياً؟</strong>
+            <strong>كيف يعمل النظام تلقائياً؟</strong>
             <ul style={{ paddingRight: "16px", margin: "6px 0 0 0" }}>
               <li>عند إتمام العميل للطلب: تصله صورة الهودي والمقاس واللون والعنوان والمبلغ المطلوب.</li>
-              <li>عند تفاعل العميل بـ (👍) أو رده بكلمة (تأكيد): تتغير حالة الطلب فوراً إلى مؤكد في لوحة التحكم.</li>
+              <li>عند تفاعل العميل بـ الموافقة (Like) أو رده بكلمة (تأكيد): تتغير حالة الطلب فوراً إلى مؤكد في لوحة التحكم.</li>
               <li>عند رد العميل بـ (إلغاء): يتم إلغاء الطلب تلقائياً وتنبيهك في لوحة التحكم.</li>
               <li>عند تأكيد الشحن وتحديد أيام التوصيل من لوحة التحكم: تصله رسالة تفاصيل الشحن والموعد المتوقع على الواتساب.</li>
               <li>عند تأكيد الاستلام: يُحفظ العميل مشفراً في الخزنة وتصله رسالة شكر وترحيب في عائلة VIP.</li>
@@ -422,7 +422,7 @@ export function WhatsAppManager() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px", marginBottom: "16px" }}>
             <div>
               <h2 className="adm-h2" style={{ margin: "0 0 6px 0", display: "flex", alignItems: "center", gap: "10px" }}>
-                <span>📢 بث المنتجات الجديدة للعملاء المؤكدين</span>
+                <span>بث المنتجات الجديدة للعملاء المؤكدين</span>
                 <span className="adm-badge" style={{ backgroundColor: "#0284c7", color: "#fff", fontSize: "12px", padding: "4px 8px", borderRadius: "6px" }}>
                   VIP Broadcast
                 </span>
@@ -433,7 +433,7 @@ export function WhatsAppManager() {
             </div>
 
             <div style={{ padding: "8px 16px", backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "8px", textAlign: "center" }}>
-              <div style={{ fontSize: "11px", color: "#166534", fontWeight: 600 }}>العملاء المؤكدين في الخزنة 🔒</div>
+              <div style={{ fontSize: "11px", color: "#166534", fontWeight: 600 }}>العملاء المؤكدين في الخزنة</div>
               <div style={{ fontSize: "18px", fontWeight: 800, color: "#15803d" }}>
                 {broadcastData.confirmedCustomersCount} عميل
               </div>
@@ -485,7 +485,7 @@ export function WhatsAppManager() {
                       gap: "4px",
                     }}
                   >
-                    🔄 استعادة النموذج الافتراضي
+                    استعادة النموذج الافتراضي
                   </button>
                 </div>
 
@@ -538,12 +538,12 @@ export function WhatsAppManager() {
                   placeholder="اكتب أو عدل نص رسالة الواتساب هنا..."
                 />
                 <p style={{ fontSize: "11px", color: "#6b7280", margin: "4px 0 0 0" }}>
-                  💡 يمكنك تعديل أي سطر في الرسالة كما تشاء. وسيتم وضع تفاصيل المنتج والأسعار والألوان والمقاسات تلقائياً.
+                  ملاحظة: يمكنك تعديل أي سطر في الرسالة كما تشاء. وسيتم وضع تفاصيل المنتج والأسعار والألوان والمقاسات تلقائياً.
                 </p>
               </div>
 
               <div style={{ padding: "14px", backgroundColor: "#f9fafb", borderRadius: "8px", border: "1px solid #e5e7eb", fontSize: "12px", color: "#4b5563", lineHeight: "1.7" }}>
-                <strong>🛡️ حماية وضمانات البث:</strong>
+                <strong>معايير وضمانات أمان البث:</strong>
                 <div>• يُرسل بفاصل زمني هادئ (1.5 ثانية) لحماية رقم الواتساب من القيود.</div>
                 <div>• يصل فقط للعملاء الذين أكدوا واستلموا أوردرات سابقة من المتجر.</div>
                 <div>• المعاينة على اليسار تُظهر لك بالضبط كيف ستظهر الرسالة في محادثة الواتساب.</div>
@@ -564,7 +564,7 @@ export function WhatsAppManager() {
               >
                 {broadcasting
                   ? "جاري إرسال البث للعملاء عبر الواتساب... ⏳"
-                  : `إرسال الإشعار لجميع العملاء المؤكدين (${broadcastData.confirmedCustomersCount} عميل) 🚀`}
+                  : `إرسال الإشعار لجميع العملاء المؤكدين (${broadcastData.confirmedCustomersCount} عميل)`}
               </Button>
             </div>
 
@@ -674,9 +674,9 @@ export function WhatsAppManager() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
             <div>
               <h2 className="adm-h2" style={{ margin: "0 0 4px 0", display: "flex", alignItems: "center", gap: "8px" }}>
-                <span>👥 سجل العملاء المؤكدين</span>
+                <span>سجل العملاء المؤكدين</span>
                 <span className="adm-badge" style={{ backgroundColor: "#15803d", color: "#fff", fontSize: "11px", padding: "2px 8px" }}>
-                  مشفر عسكرياً AES-256-GCM 🔒
+                  مشفر بنظام AES-256-GCM
                 </span>
               </h2>
               <p style={{ margin: 0, fontSize: "13px", color: "#6b7280" }}>
@@ -718,7 +718,7 @@ export function WhatsAppManager() {
                       </td>
                       <td style={{ padding: "10px 12px", textAlign: "center" }}>
                         <span style={{ fontSize: "11px", backgroundColor: "#f0fdf4", color: "#166534", padding: "3px 8px", borderRadius: "4px", border: "1px solid #bbf7d0" }}>
-                          مشفر وآمن 🔒
+                          مشفر وآمن
                         </span>
                       </td>
                     </tr>
