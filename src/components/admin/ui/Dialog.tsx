@@ -24,8 +24,25 @@ export function Dialog({ open, onClose, title, description, children, footer, va
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    if (open && !el.open) el.showModal();
-    if (!open && el.open) el.close();
+    try {
+      if (open && !el.open) {
+        if (typeof el.showModal === "function") {
+          el.showModal();
+        } else {
+          el.setAttribute("open", "");
+        }
+      }
+      if (!open && el.open) {
+        if (typeof el.close === "function") {
+          el.close();
+        } else {
+          el.removeAttribute("open");
+        }
+      }
+    } catch {
+      if (open) el.setAttribute("open", "");
+      else el.removeAttribute("open");
+    }
   }, [open]);
 
   return (

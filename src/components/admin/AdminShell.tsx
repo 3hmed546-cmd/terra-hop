@@ -13,6 +13,7 @@ import { useShortcuts } from "@/lib/admin/use-shortcuts";
 import { ShortcutHelpProvider, ShortcutsDialog } from "./ShortcutsDialog";
 import { Button, Dialog, ToastProvider } from "./ui";
 import { SessionSupersededModal, type SupersededInfo } from "./ui/SessionSupersededModal";
+import { Menu, X } from "lucide-react";
 
 const N = ADMIN_STRINGS.nav;
 const ITEMS = [
@@ -188,10 +189,43 @@ export function AdminShell({ children }: { children: ReactNode }) {
           <div>
             <header className="adm-topbar">
               <Link href={adminHref("/dashboard")} className="adm-brand">{ADMIN_STRINGS.brand}</Link>
-              <Button variant="light" onClick={() => setMenuOpen(true)} aria-haspopup="dialog">
-                {N.menu}
-                {needsAction > 0 ? <span className="adm-sr"> ({N.needsAction(needsAction)})</span> : null}
-              </Button>
+              <button
+                type="button"
+                className="adm-btn adm-btn-light"
+                onClick={() => setMenuOpen((prev) => !prev)}
+                aria-label={menuOpen ? N.closeMenu : N.menu}
+                aria-haspopup="dialog"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  minHeight: 40,
+                  padding: "0 14px",
+                  borderRadius: 4,
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  fontSize: 13,
+                }}
+              >
+                {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                <span>{menuOpen ? N.closeMenu : N.menu}</span>
+                {needsAction > 0 ? (
+                  <span
+                    style={{
+                      backgroundColor: "#c8102e",
+                      color: "#fff",
+                      fontSize: 10,
+                      fontWeight: 800,
+                      borderRadius: 999,
+                      padding: "1px 6px",
+                      marginRight: 4,
+                    }}
+                  >
+                    {needsAction}
+                  </span>
+                ) : null}
+              </button>
             </header>
             {storageProblem ? (
               <div className="adm-banner" role="status">
