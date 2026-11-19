@@ -69,13 +69,13 @@ export function Header({ header, overlay = false }: Props) {
 
           {/* Center: Brand Logo - Shown ONLY on non-overlay pages (hidden on homepage hero to let animated logo shine) */}
           {!overlay && (
-            <Link
-              href={header.homeHref}
+            <a
+              href="/"
               aria-label={t.common.brand}
-              className="w-20 sm:w-24 md:w-28 text-current absolute left-1/2 -translate-x-1/2 flex items-center justify-center transition-transform duration-200 hover:scale-105"
+              className="z-30 cursor-pointer w-20 sm:w-24 md:w-28 text-current absolute left-1/2 -translate-x-1/2 flex items-center justify-center transition-transform duration-200 hover:scale-105 pointer-events-auto"
             >
               <Logo className="w-full h-auto" />
-            </Link>
+            </a>
           )}
 
           {/* Right: Social Media Icons (on homepage overlay) OR Cart & Language (on other pages) */}
@@ -183,20 +183,20 @@ export function Header({ header, overlay = false }: Props) {
               </div>
 
               {/* Center: Brand Logo with Smooth Compress / Scale Animation on scroll */}
-              <Link
-                href={header.homeHref}
+              <a
+                href="/"
                 aria-label={t.common.brand}
-                className="w-20 sm:w-24 md:w-28 text-obsidian absolute left-1/2 -translate-x-1/2 flex items-center justify-center transition-transform duration-200 hover:scale-105"
+                className="z-30 cursor-pointer w-20 sm:w-24 md:w-28 text-obsidian absolute left-1/2 -translate-x-1/2 flex items-center justify-center transition-transform duration-200 hover:scale-105 pointer-events-auto"
               >
                 <motion.div
                   initial={{ scale: 0.75, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                  className="w-full flex items-center justify-center"
+                  className="w-full flex items-center justify-center pointer-events-none"
                 >
                   <Logo className="w-full h-auto" />
                 </motion.div>
-              </Link>
+              </a>
 
               {/* Right: Language Switcher & Cart Link (Cart replaces social icons on scroll) */}
               <div className="flex items-center gap-2 sm:gap-3">

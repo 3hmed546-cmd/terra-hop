@@ -75,14 +75,14 @@ export function MobileMenu({ links, labels }: Props) {
             </button>
 
             {/* Center: Brand Logo */}
-            <Link
+            <a
               href="/"
               onClick={close}
               aria-label={t.common.brand}
-              className="w-24 sm:w-28 text-obsidian flex items-center justify-center transition hover:opacity-80"
+              className="w-24 sm:w-28 text-obsidian flex items-center justify-center transition hover:opacity-80 cursor-pointer"
             >
               <Logo className="w-full h-auto" />
-            </Link>
+            </a>
 
             {/* Left side in RTL: Cart Bag & Search Icons (matching Testa Toro header) */}
             <div className="flex items-center gap-1 sm:gap-2">
@@ -114,13 +114,13 @@ export function MobileMenu({ links, labels }: Props) {
           {/* 2. Menu Links - Identical font size, sleek typography, zero green color */}
           <nav aria-label={labels.nav} className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-1">
             {/* Home Link - Highlighted with soft gray background block matching Testa Toro Image 2 */}
-            <Link
+            <a
               href="/"
               onClick={close}
               className="block rounded bg-stone-100/90 px-4 py-3.5 text-base sm:text-lg font-bold text-stone-900 transition-colors"
             >
               الصفحة الرئيسية
-            </Link>
+            </a>
 
             {/* Shop / Products */}
             <Link
