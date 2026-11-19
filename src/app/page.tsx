@@ -8,7 +8,7 @@ import { Signup } from "@/components/sections/signup";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { home } from "@/content/home";
-import { getCatalogProducts } from "@/lib/server/catalog";
+import { getCatalogProducts, getHeroPlacements } from "@/lib/server/catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -19,13 +19,14 @@ export const metadata: Metadata = {
 
 export default function Page() {
   const initialProducts = getCatalogProducts();
+  const initialHoodies = getHeroPlacements();
 
   return (
     <>
       <div className="relative">
         <Header header={home.header} overlay />
         <main id="main">
-          <Hero hero={home.hero} />
+          <Hero hero={home.hero} initialHoodies={initialHoodies} />
           <OffersTicker ticker={home.ticker} />
           <Drop drop={home.drop} initialProducts={initialProducts} />
           <BrandStory story={home.brandStory} />

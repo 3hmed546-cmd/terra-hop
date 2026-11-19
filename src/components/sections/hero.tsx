@@ -6,7 +6,7 @@ import { Play, Pause } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { ButtonLink } from "@/components/ui/button";
 import { AnimatedLogo } from "@/components/motion/animated-logo";
-import { loginHoodieIntervalMs } from "@/content/login-hoodies";
+import { loginHoodieIntervalMs, loginHoodies } from "@/content/login-hoodies";
 import { useLive } from "@/lib/use-live";
 import { useLocale } from "@/lib/locale-context";
 import type { home } from "@/content/home";
@@ -54,9 +54,18 @@ export const HERO_CAPTIONS = [
   },
 ];
 
-type HeroProps = { hero: typeof home.hero };
+export interface HeroHoodieItem {
+  src: string;
+  name: string;
+  glow: string;
+}
 
-export function Hero({ hero }: HeroProps) {
+type HeroProps = {
+  hero: typeof home.hero;
+  initialHoodies?: HeroHoodieItem[];
+};
+
+export function Hero({ hero, initialHoodies }: HeroProps) {
   const [index, setIndex] = useState(0);
   const [step, setStep] = useState(0);
   const [playing, setPlaying] = useState(true);
@@ -64,13 +73,22 @@ export function Hero({ hero }: HeroProps) {
   const [mounted, setMounted] = useState(false);
   const { t, locale } = useLocale();
 
+  const defaultList = useMemo<HeroHoodieItem[]>(() => {
+    if (initialHoodies && initialHoodies.length > 0) return initialHoodies;
+    return loginHoodies.map((h) => ({
+      src: h.src,
+      name: h.name,
+      glow: h.glow,
+    }));
+  }, [initialHoodies]);
+
   // Real-time live data from SSE stream (/api/public/stream & /api/public/site)
   const { data: liveSite } = useLive("media");
 
-  // Derive active hero hoodies from server database live slots
-  const hoodiesList = useMemo<{ src: string; name: string; glow: string }[]>(() => {
+  // Derive active hero hoodies from server database live slots, immediately defaulting to defaultList
+  const hoodiesList = useMemo<HeroHoodieItem[]>(() => {
     const heroPlacements = liveSite?.slots?.hero_carousel;
-    if (Array.isArray(heroPlacements)) {
+    if (Array.isArray(heroPlacements) && heroPlacements.length > 0) {
       return heroPlacements.map((p: any) => {
         const meta = p.meta || {};
         return {
@@ -81,8 +99,8 @@ export function Hero({ hero }: HeroProps) {
       });
     }
 
-    return [];
-  }, [liveSite]);
+    return defaultList;
+  }, [liveSite, defaultList]);
 
   useEffect(() => {
     setMounted(true);
@@ -130,6 +148,16 @@ export function Hero({ hero }: HeroProps) {
       dir="ltr"
       className="on-dark relative isolate flex min-h-[620px] h-svh flex-col justify-between overflow-hidden w-full max-w-full bg-obsidian text-off-white text-left select-none"
     >
+      {/* High-priority preload for the first hero image */}
+      {hoodiesList[0]?.src && (
+        <link
+          rel="preload"
+          as="image"
+          href={hoodiesList[0].src}
+          fetchPriority="high"
+        />
+      )}
+
       {/* Background Spotlight Glows */}
       <div className="absolute inset-0 pointer-events-none -z-20 overflow-hidden" aria-hidden="true">
         {hoodiesList.map((h, i) => (
@@ -153,18 +181,19 @@ export function Hero({ hero }: HeroProps) {
             <img
               key={h.src}
               src={h.src}
-              alt=""
+              alt={h.name || "TERRA HOP Hoodie"}
               aria-hidden="true"
               width={900}
               height={965}
-              decoding="async"
+              decoding={i === 0 ? "sync" : "async"}
+              loading={i === 0 ? "eager" : "lazy"}
               fetchPriority={i === 0 ? "high" : "auto"}
               style={{
                 WebkitMaskImage: "linear-gradient(to bottom, #000 82%, transparent 98%)",
                 maskImage: "linear-gradient(to bottom, #000 82%, transparent 98%)",
               }}
               className={`absolute inset-0 h-full w-full object-contain object-bottom transition-[opacity,transform] duration-1000 ease-out ${
-                i === index ? "translate-y-0 scale-100 opacity-100" : "translate-y-3 scale-95 opacity-0"
+                i === index ? "translate-y-0 scale-100 opacity-100" : "translate-y-3 scale-95 opacity-0 pointer-events-none"
               }`}
             />
           ))}
@@ -179,14 +208,15 @@ export function Hero({ hero }: HeroProps) {
             <img
               key={`m-${h.src}`}
               src={h.src}
-              alt=""
+              alt={h.name || "TERRA HOP Hoodie"}
               aria-hidden="true"
               width={900}
               height={965}
-              decoding="async"
+              decoding={i === 0 ? "sync" : "async"}
+              loading={i === 0 ? "eager" : "lazy"}
               fetchPriority={i === 0 ? "high" : "auto"}
               className={`absolute inset-0 h-full w-full object-contain object-bottom transition-[opacity,transform] duration-1000 ease-out ${
-                i === index ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
+                i === index ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0 pointer-events-none"
               }`}
             />
           ))}

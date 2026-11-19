@@ -97,3 +97,53 @@ export function getCatalogProducts(): Product[] {
     return [];
   }
 }
+
+export interface HeroPlacement {
+  src: string;
+  name: string;
+  glow: string;
+}
+
+export function getHeroPlacements(): HeroPlacement[] {
+  try {
+    const db = getDb();
+    const placements = db
+      .prepare(`
+        SELECT p.*, a.sha256 
+        FROM image_placements p 
+        JOIN assets a ON p.asset_id = a.id 
+        WHERE p.slot_key = 'hero_carousel' AND p.active = 1 
+        ORDER BY p.position ASC
+      `)
+      .all() as any[];
+
+    if (Array.isArray(placements) && placements.length > 0) {
+      return placements.map((p) => {
+        let meta: any = {};
+        try {
+          meta = JSON.parse(p.meta || "{}");
+        } catch {}
+        const url = meta.sourceUrl || `/media/${p.sha256}.webp`;
+        return {
+          src: url,
+          name: p.alt_ar || p.alt_en || meta.name || "TERRA HOP",
+          glow: meta.glow || "#34445c",
+        };
+      });
+    }
+  } catch (err) {
+    console.error("getHeroPlacements error:", err);
+  }
+
+  // Fallback to static list
+  return [
+    { src: "/login-hoodies/hoodie-dusty-blue.webp", name: "Dusty Blue", glow: "#34445c" },
+    { src: "/login-hoodies/hoodie-offwhite.webp", name: "Off-White", glow: "#4a3b30" },
+    { src: "/login-hoodies/hoodie-black.webp", name: "Black", glow: "#8a8680" },
+    { src: "/login-hoodies/hoodie-charcoal.webp", name: "Charcoal", glow: "#a39a8f" },
+    { src: "/login-hoodies/hoodie-chocolate.webp", name: "Chocolate", glow: "#c2b29c" },
+    { src: "/login-hoodies/hoodie-forest.webp", name: "Forest Green", glow: "#a7b3a3" },
+    { src: "/login-hoodies/hoodie-washed-black.webp", name: "Washed Black", glow: "#8f949a" },
+    { src: "/login-hoodies/hoodie-deep-teal.webp", name: "Deep Teal", glow: "#b9ab97" },
+  ];
+}

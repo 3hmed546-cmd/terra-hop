@@ -2,7 +2,7 @@
 
 import { Reveal } from "@/components/motion/reveal";
 import { Container } from "@/components/ui/container";
-import { WhatsAppIcon, InstagramIcon, TikTokIcon } from "@/components/ui/social-icons";
+import { InstagramIcon, TikTokIcon } from "@/components/ui/social-icons";
 import { useLocale } from "@/lib/locale-context";
 import { useLive } from "@/lib/use-live";
 import type { home } from "@/content/home";
@@ -99,8 +99,8 @@ export function Signup({ signup }: { signup: typeof home.signup }) {
               </p>
               <p className="text-xs sm:text-sm text-graphite leading-relaxed">
                 {isAr
-                  ? "متستناش لما يفوتك العرض.. انضم لينا دلوقتي وكون جزء من رحلتنا."
-                  : "Don't miss out on the next drop.. join now and be part of our journey."}
+                  ? "انضم لينا دلوقتي وكون جزء من رحلتنا."
+                  : "Join now and be part of our journey."}
               </p>
             </div>
 
@@ -111,9 +111,8 @@ export function Signup({ signup }: { signup: typeof home.signup }) {
                 href={whatsappGroupUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2.5 rounded-xl bg-[#16a34a] hover:bg-[#15803d] px-7 py-3.5 text-sm sm:text-base font-bold text-white shadow-sm transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                className="inline-flex items-center justify-center rounded-xl bg-[#16a34a] hover:bg-[#15803d] px-7 py-3.5 text-sm sm:text-base font-bold text-white shadow-sm transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
               >
-                <WhatsAppIcon className="h-5 w-5 fill-current" />
                 <span>{isAr ? "انضم الآن" : "Join Now"}</span>
               </a>
 
@@ -122,9 +121,8 @@ export function Signup({ signup }: { signup: typeof home.signup }) {
                 href={directChatUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-line-light bg-transparent hover:bg-black/5 px-5 py-3.5 text-xs sm:text-sm font-semibold text-obsidian transition-all cursor-pointer"
+                className="inline-flex items-center justify-center rounded-xl border border-line-light bg-transparent hover:bg-black/5 px-5 py-3.5 text-xs sm:text-sm font-semibold text-obsidian transition-all cursor-pointer"
               >
-                <WhatsAppIcon className="h-4 w-4 fill-current text-[#16a34a]" />
                 <span>{isAr ? "أو تواصل معنا مباشرة" : "Chat with Support"}</span>
               </a>
             </div>
