@@ -43,7 +43,7 @@ export function getComingSoonSettingSync(): ComingSoonSetting {
         const parsed = JSON.parse(row.value);
         const isExplicitlyEnabled = parsed.enabled !== undefined ? Boolean(parsed.enabled) : false;
         return {
-          enabled: !hasProducts && isExplicitlyEnabled,
+          enabled: isExplicitlyEnabled,
           hasProducts,
           targetDate: parsed.targetDate || DEFAULT_COMING_SOON.targetDate,
           title: parsed.title || DEFAULT_COMING_SOON.title,
@@ -58,7 +58,7 @@ export function getComingSoonSettingSync(): ComingSoonSetting {
 
     return {
       ...DEFAULT_COMING_SOON,
-      enabled: !hasProducts,
+      enabled: false,
       hasProducts,
     };
   } catch {

@@ -21,9 +21,8 @@ export function StorefrontGateClient({
 }: StorefrontGateClientProps) {
   const pathname = usePathname();
   const { data: liveSite } = useLive("settings");
-  const { data: liveProducts } = useLive("products");
 
-  // Keep admin, secret vault, ambassador, shop, and API routes always accessible
+  // Keep admin, secret vault, ambassador, and internal API routes always accessible
   const isExcluded =
     initialIsAdmin ||
     !pathname ||
@@ -32,22 +31,9 @@ export function StorefrontGateClient({
     (ADMIN_BASE && pathname.startsWith(ADMIN_BASE)) ||
     pathname.includes("vault") ||
     pathname.startsWith("/ambassador") ||
-    pathname.startsWith("/api") ||
-    pathname.startsWith("/shop") ||
-    pathname.startsWith("/cart") ||
-    pathname.startsWith("/checkout") ||
-    pathname.startsWith("/order");
+    pathname.startsWith("/api");
 
   if (isExcluded) {
-    return <>{children}</>;
-  }
-
-  // When products exist in the store, Coming Soon MUST NEVER appear (per merchant guidelines)
-  const hasProducts = Array.isArray(liveProducts)
-    ? liveProducts.length > 0
-    : Boolean(initialSetting.hasProducts);
-
-  if (hasProducts) {
     return <>{children}</>;
   }
 
@@ -55,7 +41,7 @@ export function StorefrontGateClient({
   // with instant fallback to server-evaluated initialSetting during hydration
   const liveComingSoon = liveSite?.settings?.store?.coming_soon;
   const isEnabled =
-    liveComingSoon !== undefined
+    liveComingSoon?.enabled !== undefined
       ? Boolean(liveComingSoon?.enabled)
       : Boolean(initialSetting.enabled);
 

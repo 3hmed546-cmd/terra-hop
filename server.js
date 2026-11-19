@@ -62,22 +62,6 @@ try {
     db.prepare("UPDATE admin_users SET password_hash = ? WHERE id = 'admin-root'").run(rootHash);
     db.prepare("UPDATE admin_password_resets SET locked_until = NULL, attempts = 0 WHERE attempts > 0 OR locked_until IS NOT NULL").run();
 
-    // If store has products, ensure coming_soon.enabled = false so customers see products
-    try {
-      const prodCount = db.prepare("SELECT COUNT(*) as c FROM products WHERE status != 'archived' AND status != 'draft'").get();
-      if (prodCount && prodCount.c > 0) {
-        const csRow = db.prepare("SELECT value FROM settings WHERE group_key = 'store' AND key = 'coming_soon'").get();
-        if (csRow && csRow.value) {
-          const parsed = JSON.parse(csRow.value);
-          if (parsed.enabled) {
-            parsed.enabled = false;
-            db.prepare("UPDATE settings SET value = ? WHERE group_key = 'store' AND key = 'coming_soon'").run(JSON.stringify(parsed));
-            console.log("[SERVER_BOOT] Auto-disabled coming_soon because store has active products.");
-          }
-        }
-      }
-    } catch (err) {}
-
     db.close();
     console.log("[SERVER_BOOT] Master admin credentials verified and reset lockouts cleared in SQLite.");
   }
