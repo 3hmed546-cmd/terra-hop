@@ -9,36 +9,53 @@ import { useLocale } from "@/lib/locale-context";
 import { useLive } from "@/lib/use-live";
 import type { home, Product } from "@/content/home";
 
-export function Drop({ drop }: { drop: typeof home.drop }) {
+export function Drop({
+  drop,
+  initialProducts = [],
+}: {
+  drop: typeof home.drop;
+  initialProducts?: Product[];
+}) {
   const { t } = useLocale();
   const { data: liveProducts } = useLive("products");
 
   const effectiveProducts = useMemo<Product[]>(() => {
-    // If live products array was fetched (even if empty [])
+    // 1. Live products take top priority when loaded via SSE / API
     if (Array.isArray(liveProducts)) {
       return liveProducts.map((p: any) => ({
         slug: p.slug || p.id,
         name: p.name || p.nameAr,
-        category: (p.category === "tshirt" || p.category === "T-shirts")
-          ? "T-shirts"
-          : (p.category === "pants" || p.category === "Pants")
-          ? "Pants"
-          : "Hoodies",
+        category:
+          p.category === "tshirt" || p.category === "T-shirts"
+            ? "T-shirts"
+            : p.category === "pants" || p.category === "Pants"
+            ? "Pants"
+            : "Hoodies",
         price: (p.priceCents || 0) / 100,
         originalPrice: p.compareAtCents ? p.compareAtCents / 100 : undefined,
         status: p.forceSoldOut ? "Sold out" : "Preorder",
         description: p.description || p.descriptionAr || "",
-        sizes: Array.isArray(p.sizes) && p.sizes.length > 0
-          ? Array.from(new Set(p.sizes))
-          : Array.from(new Set((p.variants || []).map((v: any) => v.size).filter(Boolean))),
+        sizes:
+          Array.isArray(p.sizes) && p.sizes.length > 0
+            ? Array.from(new Set(p.sizes))
+            : Array.from(new Set((p.variants || []).map((v: any) => v.size).filter(Boolean))),
         images: (p.images || []).map((i: any) => (typeof i === "object" ? i.url : i)),
         href: `/shop/${p.slug || p.id}`,
         demo: false,
       }));
     }
-    // Fallback to static drop.products (which is now empty [])
+
+    // 2. Server-rendered initialProducts (Instant SSR, zero flash)
+    if (initialProducts && initialProducts.length > 0) {
+      return initialProducts;
+    }
+
+    // 3. Fallback to static drop.products
     return drop.products;
-  }, [liveProducts, drop.products]);
+  }, [liveProducts, initialProducts, drop.products]);
+
+  // Loading state is only true if liveProducts hasn't responded yet AND we have no SSR products
+  const isLoading = liveProducts === null && (!initialProducts || initialProducts.length === 0);
 
   return (
     <section aria-labelledby="drop-heading" className="pt-8 pb-16 lg:pt-12 lg:pb-24">
@@ -51,7 +68,7 @@ export function Drop({ drop }: { drop: typeof home.drop }) {
             </Link>
           )}
         </Reveal>
-        <ProductGrid products={effectiveProducts} />
+        <ProductGrid products={effectiveProducts} loading={isLoading} />
       </Container>
     </section>
   );

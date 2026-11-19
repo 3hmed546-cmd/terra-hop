@@ -579,35 +579,22 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
           <div ref={actionsRef} className="pt-2">
             {isSoldOut ? (
               <div className="rounded-2xl border-2 border-stone-900 bg-[#F4F1EB] p-5 sm:p-6 space-y-4 shadow-sm" dir="rtl">
-                <div className="flex items-center gap-3.5">
-                  <div className="w-10 h-10 rounded-full bg-stone-900 text-white flex items-center justify-center font-black text-lg shrink-0">
-                    ✕
-                  </div>
-                  <div>
-                    <h3 className="font-extrabold text-base sm:text-lg text-stone-900">هذا المنتج نفذ من المخزن حالياً</h3>
-                    <p className="text-xs text-stone-600 font-medium mt-0.5">الكميات المتاحة انتهت بالكامل وجاري إنتاج الدفعة القادمة.</p>
-                  </div>
+                <div>
+                  <h3 className="font-extrabold text-base sm:text-lg text-stone-900">هذا المنتج نفذ من المخزن حالياً</h3>
+                  <p className="text-xs text-stone-600 font-medium mt-0.5">الكميات المتاحة انتهت بالكامل وجاري إنتاج الدفعة القادمة.</p>
                 </div>
 
                 <div className="text-xs text-stone-700 leading-relaxed bg-white p-3.5 rounded-xl border border-stone-200 font-medium">
-                  انضم إلى مجتمع TERRA HOP على الواتساب لتكون أول من يعلم عند فتح باب الحجز وإعادة توفر هذا الهودي ومتابعة كل جديد. يتم نسخ رسالة الاستفسار تلقائياً لإرسالها بالجروب.
+                  انضم إلى تيراهوب على واتساب لتكون أول من يعلم عند فتح باب الحجز وإعادة توفير هذا الهودي ومتابعة كل جديد.
                 </div>
 
                 <a
                   href={home.signup.whatsappGroupUrl}
                   target="_blank"
                   rel="noreferrer"
-                  onClick={() => {
-                    try {
-                      navigator.clipboard.writeText(`مرحباً TERRA HOP، أود معرفة موعد إعادة توفر هودي "${localizedName}".`);
-                      setActionStatus("copied");
-                      setTimeout(() => setActionStatus("idle"), 4500);
-                    } catch (_) {}
-                  }}
                   className="w-full inline-flex items-center justify-center gap-2.5 rounded-xl py-3.5 px-4 font-bold text-xs sm:text-sm bg-stone-900 hover:bg-black text-white transition-all shadow-md cursor-pointer hover:scale-[1.01]"
                 >
-                  <WhatsAppIcon className="w-5 h-5 fill-current text-emerald-400" />
-                  <span>انضم لجروب الواتساب لمتابعة التوفر</span>
+                  <span>انضم لجروب الواتساب</span>
                 </a>
               </div>
             ) : (

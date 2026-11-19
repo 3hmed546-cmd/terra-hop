@@ -7,13 +7,31 @@ import { ProductCard } from "./product-card";
 import { useLocale } from "@/lib/locale-context";
 import type { Product } from "@/content/home";
 
-type Props = { products: Product[] };
+type Props = {
+  products: Product[];
+  loading?: boolean;
+};
 
-export function ProductGrid({ products }: Props) {
+export function ProductGrid({ products, loading = false }: Props) {
   const { t, locale } = useLocale();
   const [filterKey, setFilterKey] = useState<"all" | "tshirts" | "hoodies" | "pants">("all");
 
-  // When store / inventory has no products at all
+  // While loading initial products, render a subtle skeleton grid (never flash "coming soon")
+  if (loading && (!products || products.length === 0)) {
+    return (
+      <div className="mt-12 grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-3 md:gap-x-6 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="animate-pulse space-y-3">
+            <div className="aspect-[3/4] w-full rounded-2xl bg-stone-200/80" />
+            <div className="h-4 w-3/4 rounded-md bg-stone-200/80" />
+            <div className="h-4 w-1/3 rounded-md bg-stone-200/60" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // When store / inventory is confirmed to have no products at all
   if (!products || products.length === 0) {
     return (
       <div className="mt-8 sm:mt-12 w-full flex flex-col items-center justify-center py-16 sm:py-20 px-6 rounded-2xl border border-stone-200/80 bg-stone-50/60 text-center shadow-xs">

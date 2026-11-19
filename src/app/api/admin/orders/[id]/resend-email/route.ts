@@ -44,13 +44,35 @@ export async function POST(
       city: customer.city,
       address: customer.address,
     },
-    items: items.map((it) => ({
-      name: it.product_name,
-      color: it.color_name,
-      size: it.size,
-      qty: it.qty,
-      priceCents: it.price_cents_snapshot,
-    })),
+    items: items.map((it) => {
+      let itemImageUrl: string | undefined = undefined;
+      try {
+        const pl = db.prepare(`
+          SELECT p.meta, a.sha256
+          FROM image_placements p
+          JOIN assets a ON p.asset_id = a.id
+          WHERE p.slot_key = 'product' AND p.owner_id = ? AND p.active = 1
+          ORDER BY p.position ASC LIMIT 1
+        `).get(it.product_id) as any;
+        if (pl) {
+          if (pl.meta) {
+            try {
+              const m = JSON.parse(pl.meta);
+              if (m.sourceUrl) itemImageUrl = m.sourceUrl;
+            } catch {}
+          }
+          if (!itemImageUrl && pl.sha256) itemImageUrl = `/media/${pl.sha256}.webp`;
+        }
+      } catch {}
+      return {
+        name: it.product_name,
+        color: it.color_name,
+        size: it.size,
+        qty: it.qty,
+        priceCents: it.price_cents_snapshot,
+        imageUrl: itemImageUrl,
+      };
+    }),
     subtotalCents: order.subtotal_cents,
     shippingCents: order.shipping_cents,
     discountCents: order.discount_cents,

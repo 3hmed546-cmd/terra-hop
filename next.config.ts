@@ -61,8 +61,6 @@ const nextConfig: NextConfig = {
     "qrcode",
     "pino",
   ],
-  cacheComponents: true,
-  partialPrefetching: true,
   async headers() {
     return [
       {

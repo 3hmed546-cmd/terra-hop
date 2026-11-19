@@ -20,10 +20,8 @@ const DEFAULT_COMING_SOON: ComingSoonSetting = {
   caption: "",
 };
 
-export async function getComingSoonSettingServer(): Promise<ComingSoonSetting> {
+export function getComingSoonSettingSync(): ComingSoonSetting {
   try {
-    await connection();
-    seedDatabaseIfNeeded();
     const db = getDb();
     const row = db
       .prepare("SELECT value FROM settings WHERE group_key = 'store' AND key = 'coming_soon'")
@@ -49,4 +47,8 @@ export async function getComingSoonSettingServer(): Promise<ComingSoonSetting> {
   }
 
   return DEFAULT_COMING_SOON;
+}
+
+export async function getComingSoonSettingServer(): Promise<ComingSoonSetting> {
+  return getComingSoonSettingSync();
 }

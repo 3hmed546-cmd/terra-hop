@@ -1,8 +1,8 @@
 "use client";
 
-import { useSyncExternalStore, useEffect, useState } from "react";
+import { useSyncExternalStore, useEffect } from "react";
 
-type Topic = "media" | "products" | "settings" | "content";
+export type Topic = "media" | "products" | "settings" | "content";
 
 interface LiveState {
   revisions: Record<Topic, number>;
@@ -13,10 +13,10 @@ interface LiveState {
 
 const state: LiveState = {
   revisions: {
-    media: 1,
-    products: 1,
-    settings: 1,
-    content: 1,
+    media: 0,
+    products: 0,
+    settings: 0,
+    content: 0,
   },
   siteData: null,
   productsData: null,
@@ -32,8 +32,9 @@ function notify() {
 }
 
 let isInitialized = false;
-let eventSource: EventSource | null = null;
+let isChecking = false;
 let pollTimer: NodeJS.Timeout | null = null;
+let broadcastChannel: BroadcastChannel | null = null;
 
 async function fetchSiteData() {
   try {
@@ -61,7 +62,7 @@ async function fetchProductsData() {
   } catch {}
 }
 
-function handleTopicChange(topic: Topic, newRev?: number) {
+export function handleTopicChange(topic: Topic, newRev?: number) {
   if (typeof newRev === "number") {
     state.revisions[topic] = newRev;
   }
@@ -73,40 +74,74 @@ function handleTopicChange(topic: Topic, newRev?: number) {
   }
 }
 
+async function checkVersion() {
+  if (isChecking) return;
+  isChecking = true;
+  try {
+    const res = await fetch(`/api/public/version?_t=${Date.now()}`, { cache: "no-store" });
+    if (res.ok) {
+      const payload = await res.json();
+      if (payload.ok && payload.data) {
+        state.connected = true;
+        const v = payload.data;
+        for (const key of ["media", "products", "settings", "content"] as Topic[]) {
+          if (typeof v[key] === "number") {
+            if (state.revisions[key] === 0) {
+              state.revisions[key] = v[key];
+            } else if (v[key] > state.revisions[key]) {
+              handleTopicChange(key, v[key]);
+            }
+          }
+        }
+      }
+    }
+  } catch {} finally {
+    isChecking = false;
+  }
+}
+
+export function broadcastLiveChange(topic: Topic, revision?: number) {
+  try {
+    if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+      const bc = new BroadcastChannel("terra_live_updates");
+      bc.postMessage({ topic, revision: revision || Date.now() });
+      bc.close();
+    }
+  } catch {}
+}
+
 function initLiveEngine() {
   if (typeof window === "undefined" || isInitialized) return;
   isInitialized = true;
 
-  // Initial data fetch
+  // Cross-tab instant synchronization within the same browser
+  try {
+    if ("BroadcastChannel" in window) {
+      broadcastChannel = new BroadcastChannel("terra_live_updates");
+      broadcastChannel.onmessage = (event) => {
+        const { topic, revision } = event.data || {};
+        if (topic) {
+          handleTopicChange(topic, revision);
+        } else {
+          fetchSiteData();
+          fetchProductsData();
+        }
+      };
+    }
+  } catch {}
+
+  // Initial immediate data & version fetch
   fetchSiteData();
   fetchProductsData();
+  checkVersion();
 
-  async function checkVersion() {
-    try {
-      const res = await fetch("/api/public/version", { cache: "no-store" });
-      if (res.ok) {
-        const payload = await res.json();
-        if (payload.ok && payload.data) {
-          state.connected = true;
-          const v = payload.data;
-          for (const key of ["media", "products", "settings", "content"] as Topic[]) {
-            if (typeof v[key] === "number" && v[key] > state.revisions[key]) {
-              handleTopicChange(key, v[key]);
-            }
-          }
-          notify();
-        }
-      }
-    } catch {}
-  }
-
-  // Lightweight, non-blocking check every 12 seconds.
-  // Releases the Passenger worker instantly (2ms execution) without hogging server concurrency.
+  // Rapid 2.5s version check when the tab is visible for true real-time live feel
+  // (2ms execution per check, lightweight and non-blocking on cPanel Phusion Passenger)
   pollTimer = setInterval(() => {
     if (typeof document !== "undefined" && !document.hidden) {
       checkVersion();
     }
-  }, 12000);
+  }, 2500);
 
   // When tab becomes visible or focused, check version immediately
   window.addEventListener("visibilitychange", () => {
@@ -120,7 +155,10 @@ function initLiveEngine() {
   });
 }
 
-export function useLive<T = any>(topic: Topic, fallback?: T): { data: T | null; connected: boolean; revision: number } {
+export function useLive<T = any>(
+  topic: Topic,
+  fallback?: T
+): { data: T | null; connected: boolean; revision: number } {
   useEffect(() => {
     initLiveEngine();
   }, []);

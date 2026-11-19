@@ -27,7 +27,18 @@ export function getBaseStorageDir(): string {
     }
   }
 
-  // 1. On Vercel or AWS Lambda, process.cwd() is read-only (/var/task)
+  // 1. Check persistent cPanel external directory if present
+  if (fs.existsSync("/home/terrahop/terra-hop-storage")) {
+    const pDir = "/home/terrahop/terra-hop-storage";
+    try {
+      const testFile = path.join(pDir, ".perm_test");
+      fs.writeFileSync(testFile, "1");
+      fs.unlinkSync(testFile);
+      return pDir;
+    } catch {}
+  }
+
+  // 2. On Vercel or AWS Lambda, process.cwd() is read-only (/var/task)
   if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
     const tmpStorage = path.join(os.tmpdir(), "terra-storage");
     try {
@@ -1044,32 +1055,33 @@ export function recordChange(
   topic: "media" | "products" | "settings" | "content" | "orders" | "ambassadors" | "auth",
   entity: string,
   entityId: string | null,
-  revision: number
+  revision?: number
 ): number {
   const db = getDb();
   const stmt = db.prepare(`
     INSERT INTO change_log (topic, entity, entity_id, revision, at)
     VALUES (?, ?, ?, ?, ?)
   `);
-  const result = stmt.run(topic, entity, entityId, revision, new Date().toISOString());
+  const rev = revision && revision > 1 ? revision : Date.now();
+  const result = stmt.run(topic, entity, entityId, rev, new Date().toISOString());
   return Number(result.lastInsertRowid);
 }
 
 /**
- * Get latest change_log revision for a topic or overall
+ * Get latest change_log revision for a topic or overall (strictly increasing primary key id)
  */
 export function getLatestRevision(topic?: string): number {
   const db = getDb();
   if (topic) {
     const row = db
-      .prepare(`SELECT MAX(revision) as rev FROM change_log WHERE topic = ?`)
+      .prepare(`SELECT MAX(id) as rev FROM change_log WHERE topic = ?`)
       .get(topic) as { rev: number | null } | undefined;
-    return row?.rev ?? 1;
+    return row?.rev ?? 0;
   }
   const row = db.prepare(`SELECT MAX(id) as rev FROM change_log`).get() as
     | { rev: number | null }
     | undefined;
-  return row?.rev ?? 1;
+  return row?.rev ?? 0;
 }
 
 /**

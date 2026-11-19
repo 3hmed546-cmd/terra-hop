@@ -39,6 +39,14 @@ function calculateTimeLeft(targetIso: string): TimeLeft {
   };
 }
 
+const INITIAL_TIME: TimeLeft = {
+  days: 0,
+  hours: 0,
+  minutes: 0,
+  seconds: 0,
+  isExpired: false,
+};
+
 export function ComingSoonView({
   targetDate = "2026-11-20T00:00:00",
   title,
@@ -47,9 +55,11 @@ export function ComingSoonView({
   caption,
 }: ComingSoonViewProps) {
   const { locale } = useLocale();
-  const [timeLeft, setTimeLeft] = useState<TimeLeft>(() => calculateTimeLeft(targetDate));
+  const [mounted, setMounted] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<TimeLeft>(INITIAL_TIME);
 
   useEffect(() => {
+    setMounted(true);
     setTimeLeft(calculateTimeLeft(targetDate));
     const timer = setInterval(() => {
       setTimeLeft(calculateTimeLeft(targetDate));
@@ -147,22 +157,41 @@ export function ComingSoonView({
             Spans across the screen with high-impact streetwear typography,
             responsive on mobile and desktop, pure red with atmospheric glow, no border.
            ========================================================================= */}
-        <div className="w-full max-w-6xl mx-auto px-4 mt-8 sm:mt-12 md:mt-14 mb-4 sm:mb-6 flex items-center justify-center gap-3 sm:gap-6 md:gap-8 select-none">
-          <div className="hidden sm:block h-[2px] flex-1 bg-gradient-to-r from-transparent via-red-500/25 to-red-500/80 rounded-full" />
+        <div className="w-full max-w-6xl mx-auto px-3 sm:px-6 mt-8 sm:mt-12 md:mt-14 mb-4 sm:mb-6 flex items-center justify-center gap-2 sm:gap-6 md:gap-8 select-none">
+          <div className="flex-1 h-[1.5px] sm:h-[2px] bg-gradient-to-r from-transparent via-red-500/30 to-red-500/80 rounded-full min-w-[12px] sm:min-w-[40px]" />
           <h2
-            className="text-center font-black tracking-wide sm:tracking-wider text-red-500 drop-shadow-[0_0_35px_rgba(239,68,68,0.5)] whitespace-nowrap text-3xl xs:text-4xl sm:text-6xl md:text-7xl lg:text-8xl leading-none"
+            dir={locale === "ar" ? "rtl" : "ltr"}
+            className="text-center font-black tracking-wide sm:tracking-wider whitespace-nowrap leading-none flex items-baseline justify-center gap-2 sm:gap-3.5"
             style={{ fontFamily: "var(--font-cairo), sans-serif" }}
           >
-            {locale === "ar" ? "خلاص قربنا" : "ALMOST THERE"}
+            {locale === "ar" ? (
+              <>
+                <span className="text-white text-[28px] sm:text-[52px] md:text-[68px] lg:text-[76px] drop-shadow-[0_2px_10px_rgba(255,255,255,0.25)] font-black">
+                  خلاص
+                </span>
+                <span className="text-red-500 text-[43px] sm:text-[72px] md:text-[88px] lg:text-[96px] drop-shadow-[0_0_30px_rgba(239,68,68,0.85)] sm:drop-shadow-[0_0_45px_rgba(239,68,68,0.95)] font-black">
+                  قربنا
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-white text-[28px] sm:text-[52px] md:text-[68px] lg:text-[76px] font-black">
+                  ALMOST
+                </span>
+                <span className="text-red-500 text-[43px] sm:text-[72px] md:text-[88px] lg:text-[96px] drop-shadow-[0_0_30px_rgba(239,68,68,0.85)] font-black">
+                  THERE
+                </span>
+              </>
+            )}
           </h2>
-          <div className="hidden sm:block h-[2px] flex-1 bg-gradient-to-l from-transparent via-red-500/25 to-red-500/80 rounded-full" />
+          <div className="flex-1 h-[1.5px] sm:h-[2px] bg-gradient-to-l from-transparent via-red-500/30 to-red-500/80 rounded-full min-w-[12px] sm:min-w-[40px]" />
         </div>
 
         {/* =========================================================================
             4. LIVE COUNTDOWN DOCK:
             Mechanical Split-Flap Flip Cards Grid (DAYS - HOURS - MINUTES - SECONDS).
            ========================================================================= */}
-        <div className="w-full max-w-3xl mt-2 sm:mt-4 px-3 flex flex-col items-center">
+        <div suppressHydrationWarning className="w-full max-w-3xl mt-2 sm:mt-4 px-3 flex flex-col items-center">
           {/* Mechanical Split-Flap Flip Cards Grid (DAYS - HOURS - MINUTES - SECONDS) */}
           <div className="flex items-center justify-center gap-2 xs:gap-3 sm:gap-4 md:gap-5 lg:gap-6">
             <FlipCard

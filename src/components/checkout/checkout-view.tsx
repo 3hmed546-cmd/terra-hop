@@ -671,7 +671,7 @@ export function CheckoutView({ products }: { products: Product[] }) {
                   className="w-full inline-flex items-center justify-center gap-2 rounded-xl py-3 px-4 font-bold text-xs bg-stone-900 hover:bg-black text-white transition shadow-sm"
                 >
                   <WhatsAppIcon className="w-4 h-4 fill-current text-emerald-400" />
-                  <span>{locale === "ar" ? "انضم لجروب الواتساب لمتابعة التوفر" : "Join WhatsApp Group"}</span>
+                  <span>{locale === "ar" ? "انضم لجروب الواتساب" : "Join WhatsApp Group"}</span>
                 </a>
               </div>
             ) : (
@@ -863,7 +863,7 @@ export function CheckoutView({ products }: { products: Product[] }) {
                   className="w-full inline-flex items-center justify-center gap-2 rounded-xl py-3 px-4 font-bold text-xs bg-stone-900 hover:bg-black text-white transition shadow-sm"
                 >
                   <WhatsAppIcon className="w-4 h-4 fill-current text-emerald-400" />
-                  <span>{locale === "ar" ? "انضم لجروب الواتساب لمتابعة التوفر" : "Join WhatsApp Group"}</span>
+                  <span>{locale === "ar" ? "انضم لجروب الواتساب" : "Join WhatsApp Group"}</span>
                 </a>
               </div>
             ) : (

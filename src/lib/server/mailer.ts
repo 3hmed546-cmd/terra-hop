@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import fs from "fs";
+import path from "path";
 import nodemailer from "nodemailer";
 import { getDb } from "./db";
 
@@ -50,6 +51,7 @@ async function sendCpanelSmtp({
   recipientName,
   senderEmail,
   senderName,
+  attachments,
 }: {
   to: string;
   subject: string;
@@ -57,6 +59,7 @@ async function sendCpanelSmtp({
   recipientName?: string;
   senderEmail?: string;
   senderName?: string;
+  attachments?: any[];
 }): Promise<{ ok: boolean; messageId?: string; error?: string }> {
   const host = process.env.SMTP_HOST || process.env.CPANEL_SMTP_HOST || "s21766.fra1.stableserver.net";
   const port = Number(process.env.SMTP_PORT || process.env.CPANEL_SMTP_PORT || 465);
@@ -83,6 +86,7 @@ async function sendCpanelSmtp({
       replyTo: "support@terra-hop.com",
       subject,
       html,
+      attachments,
     });
 
     console.log(`[CPANEL_SMTP:SUCCESS] Sent email to ${to} via cPanel SMTP. MessageId: ${info.messageId}`);
@@ -102,11 +106,13 @@ async function sendLocalSendmailFallback({
   subject,
   html,
   recipientName,
+  attachments,
 }: {
   to: string;
   subject: string;
   html: string;
   recipientName?: string;
+  attachments?: any[];
 }): Promise<{ ok: boolean; messageId?: string; error?: string }> {
   const sendmailPath = "/usr/sbin/sendmail";
   try {
@@ -126,6 +132,7 @@ async function sendLocalSendmailFallback({
       replyTo: "support@terra-hop.com",
       subject,
       html,
+      attachments,
     });
 
     console.log(`[SENDMAIL_FALLBACK:SUCCESS] Sent email to ${to} via cPanel sendmail. MessageId: ${info.messageId}`);
@@ -144,11 +151,13 @@ async function sendGmailFallback({
   subject,
   html,
   recipientName,
+  attachments,
 }: {
   to: string;
   subject: string;
   html: string;
   recipientName?: string;
+  attachments?: any[];
 }): Promise<{ ok: boolean; messageId?: string; error?: string }> {
   const user = process.env.GMAIL_USER || "terr3hop@gmail.com";
   const pass = process.env.GMAIL_APP_PASSWORD;
@@ -170,6 +179,7 @@ async function sendGmailFallback({
       replyTo: "support@terra-hop.com",
       subject,
       html,
+      attachments,
     });
 
     console.log(`[GMAIL_FALLBACK:SUCCESS] Sent email to ${to} via Gmail SMTP. MessageId: ${info.messageId}`);
@@ -194,6 +204,7 @@ export async function sendBrevoEmail({
   recipientName,
   senderEmail,
   senderName,
+  attachments,
 }: {
   to: string;
   subject: string;
@@ -201,17 +212,18 @@ export async function sendBrevoEmail({
   recipientName?: string;
   senderEmail?: string;
   senderName?: string;
+  attachments?: any[];
 }): Promise<{ ok: boolean; messageId?: string; error?: string }> {
   // 1. Primary Engine: Direct cPanel SMTP from support@terra-hop.com
-  const smtpRes = await sendCpanelSmtp({ to, subject, html, recipientName, senderEmail, senderName });
+  const smtpRes = await sendCpanelSmtp({ to, subject, html, recipientName, senderEmail, senderName, attachments });
   if (smtpRes.ok) return smtpRes;
 
   // 2. Fallback 1: Local server sendmail (/usr/sbin/sendmail) from cPanel Exim
-  const sendmailRes = await sendLocalSendmailFallback({ to, subject, html, recipientName });
+  const sendmailRes = await sendLocalSendmailFallback({ to, subject, html, recipientName, attachments });
   if (sendmailRes.ok) return sendmailRes;
 
   // 3. Fallback 2: Gmail SMTP
-  return sendGmailFallback({ to, subject, html, recipientName });
+  return sendGmailFallback({ to, subject, html, recipientName, attachments });
 }
 
 /**
@@ -342,21 +354,83 @@ function formatEgp(cents: number): string {
 }
 
 /**
- * Resolve absolute product thumbnail image URL for email rendering.
+ * Resolve product thumbnail image for email rendering with guaranteed CID attachment.
+ * Supports Base64 data URLs, local filesystem images, uploaded assets, and fallback models.
+ * Using CID attachments ensures images display 100% reliably in Gmail, Outlook, and Apple Mail without proxy blocking.
  */
-function getItemImageUrl(item: { name: string; color?: string; image?: string; imageUrl?: string }): string {
-  let url = item.imageUrl || item.image;
-  if (!url) {
-    const text = `${item.name} ${item.color || ""}`.toLowerCase();
-    if (text.includes("عنابي") || text.includes("burgundy")) url = "/products/burgundy-hoodie-model.jpg";
-    else if (text.includes("أسود") || text.includes("black") || text.includes("obsidian")) url = "/products/black-hoodie-model.jpg";
-    else if (text.includes("كريمي") || text.includes("cream") || text.includes("vintage")) url = "/products/cream-hoodie-model.jpg";
-    else if (text.includes("زمردي") || text.includes("forest") || text.includes("emerald") || text.includes("أخضر")) url = "/products/forest-hoodie-model.jpg";
-    else if (text.includes("موكا") || text.includes("brown") || text.includes("mocha") || text.includes("بني")) url = "/products/brown-hoodie-model.jpg";
-    else if (text.includes("كحلي") || text.includes("navy")) url = "/products/navy-hoodie-model.jpg";
-    else url = "/products/burgundy-hoodie-model.jpg";
+function resolveItemImageAttachment(
+  item: { name: string; color?: string; image?: string; imageUrl?: string },
+  idx: number,
+  attachmentsList: any[]
+): string {
+  let url = item.imageUrl || item.image || "";
+
+  // 1. Data URL (Base64) - Convert to buffer and embed as inline CID attachment
+  if (url.startsWith("data:image/")) {
+    const match = url.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+    if (match) {
+      try {
+        const contentType = match[1];
+        const buffer = Buffer.from(match[2], "base64");
+        const cid = `item-img-${idx}`;
+        const ext = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
+        attachmentsList.push({
+          filename: `product-${idx + 1}.${ext}`,
+          content: buffer,
+          contentType,
+          cid,
+        });
+        return `cid:${cid}`;
+      } catch {}
+    }
   }
-  return url.startsWith("http") ? url : `${APP_BASE_URL}${url.startsWith("/") ? "" : "/"}${url}`;
+
+  // 2. Check local disk files (public directory, cPanel persistent uploads, preview-images)
+  const searchPaths = [
+    url ? path.join(process.cwd(), "public", url.replace(/^\/+/, "")) : null,
+    url ? path.join(process.cwd(), "public", "products", path.basename(url)) : null,
+    url ? path.join(process.cwd(), "public", "preview-images", path.basename(url)) : null,
+    url ? path.join("/home/terrahop/terra-hop-storage/uploads", path.basename(url)) : null,
+    url ? path.join(process.cwd(), "storage", "uploads", path.basename(url)) : null,
+  ].filter(Boolean) as string[];
+
+  for (const p of searchPaths) {
+    try {
+      if (fs.existsSync(p) && fs.statSync(p).isFile()) {
+        const cid = `item-img-${idx}`;
+        attachmentsList.push({
+          filename: `product-${idx + 1}${path.extname(p) || ".jpg"}`,
+          path: p,
+          cid,
+        });
+        return `cid:${cid}`;
+      }
+    } catch {}
+  }
+
+  // 3. Fallback based on name/color to guaranteed local files in public/products/
+  const text = `${item.name} ${item.color || ""}`.toLowerCase();
+  let fallbackRel = "/products/brown-hoodie-model.jpg";
+  if (text.includes("عنابي") || text.includes("burgundy")) fallbackRel = "/products/burgundy-hoodie-model.jpg";
+  else if (text.includes("أسود") || text.includes("black") || text.includes("obsidian")) fallbackRel = "/products/black-hoodie-model.jpg";
+  else if (text.includes("كريمي") || text.includes("cream") || text.includes("vintage")) fallbackRel = "/products/cream-hoodie-model.jpg";
+  else if (text.includes("زمردي") || text.includes("forest") || text.includes("emerald") || text.includes("أخضر")) fallbackRel = "/products/forest-hoodie-model.jpg";
+  else if (text.includes("موكا") || text.includes("brown") || text.includes("mocha") || text.includes("بني")) fallbackRel = "/products/brown-hoodie-model.jpg";
+  else if (text.includes("كحلي") || text.includes("navy")) fallbackRel = "/products/navy-hoodie-model.jpg";
+
+  const fallbackDisk = path.join(process.cwd(), "public", fallbackRel.replace(/^\/+/, ""));
+  if (fs.existsSync(fallbackDisk)) {
+    const cid = `item-img-${idx}`;
+    attachmentsList.push({
+      filename: `product-${idx + 1}.jpg`,
+      path: fallbackDisk,
+      cid,
+    });
+    return `cid:${cid}`;
+  }
+
+  if (url.startsWith("http")) return url;
+  return `${APP_BASE_URL}${url.startsWith("/") ? "" : "/"}${url || "products/brown-hoodie-model.jpg"}`;
 }
 
 /**
@@ -365,6 +439,20 @@ function getItemImageUrl(item: { name: string; color?: string; image?: string; i
  */
 export async function sendOrderInvoiceEmail(order: EmailOrderData): Promise<boolean> {
   if (!order.customer.email) return false;
+
+  const attachments: any[] = [];
+
+  // Store logo inline attachment (guaranteed rendering in Gmail without blocked proxy images)
+  let storeLogoSrc = `${APP_BASE_URL}/logo/terra-hop-logo-card.png`;
+  const localLogo = path.join(process.cwd(), "public", "logo", "terra-hop-logo-card.png");
+  if (fs.existsSync(localLogo)) {
+    attachments.push({
+      filename: "terra-hop-logo.png",
+      path: localLogo,
+      cid: "store-logo-card",
+    });
+    storeLogoSrc = "cid:store-logo-card";
+  }
 
   // Fully encrypted AES-256-GCM token (no plain-text orderId in URL)
   const encryptedToken = createEncryptedOrderConfirmationToken(order.id, order.createdAt);
@@ -383,9 +471,9 @@ export async function sendOrderInvoiceEmail(order: EmailOrderData): Promise<bool
   const totalFormatted = formatEgp(order.totalCents);
 
   const itemsHtml = order.items
-    .map((item) => {
+    .map((item, idx) => {
       const priceFormatted = formatEgp(item.priceCents * item.qty);
-      const imgUrl = getItemImageUrl(item);
+      const imgUrl = resolveItemImageAttachment(item, idx, attachments);
       const variantDetails = [item.color, item.size].filter(Boolean).join(" / ");
       return `
         <tr>
@@ -432,7 +520,7 @@ export async function sendOrderInvoiceEmail(order: EmailOrderData): Promise<bool
               <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
                 <tr>
                   <td style="background-color: #ffffff; padding: 12px 20px; border-radius: 6px; text-align: center; border: 1px solid #ffffff;">
-                    <img src="${storeUrl}/logo/terra-hop-logo-card.png" alt="TERRA HOP" width="130" style="display: block; width: 130px; height: auto;" />
+                    <img src="${storeLogoSrc}" alt="TERRA HOP" width="130" style="display: block; width: 130px; height: auto;" />
                   </td>
                 </tr>
               </table>
@@ -571,6 +659,7 @@ export async function sendOrderInvoiceEmail(order: EmailOrderData): Promise<bool
     recipientName: order.customer.name,
     subject: `فاتورة وتأكيد طلبك رقم ${order.number} | TERRA HOP`,
     html,
+    attachments,
   });
 
   return res.ok;
@@ -618,7 +707,7 @@ export async function sendOrderAcceptedEmail(
               <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
                 <tr>
                   <td style="background-color: #ffffff; padding: 12px 20px; border-radius: 6px; text-align: center; border: 1px solid #ffffff;">
-                    <img src="${storeUrl}/logo/terra-hop-logo-card.png" alt="TERRA HOP" width="130" style="display: block; width: 130px; height: auto;" />
+                    <img src="${storeLogoSrc}" alt="TERRA HOP" width="130" style="display: block; width: 130px; height: auto;" />
                   </td>
                 </tr>
               </table>
@@ -722,7 +811,7 @@ export async function sendOrderRejectedEmail(
               <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
                 <tr>
                   <td style="background-color: #ffffff; padding: 12px 20px; border-radius: 6px; text-align: center; border: 1px solid #ffffff;">
-                    <img src="${storeUrl}/logo/terra-hop-logo-card.png" alt="TERRA HOP" width="130" style="display: block; width: 130px; height: auto;" />
+                    <img src="${storeLogoSrc}" alt="TERRA HOP" width="130" style="display: block; width: 130px; height: auto;" />
                   </td>
                 </tr>
               </table>
@@ -818,7 +907,7 @@ export async function sendOrderDeliveredThankYouEmail(order: {
               <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
                 <tr>
                   <td style="background-color: #ffffff; padding: 12px 20px; border-radius: 6px; text-align: center; border: 1px solid #ffffff;">
-                    <img src="${storeUrl}/logo/terra-hop-logo-card.png" alt="TERRA HOP" width="130" style="display: block; width: 130px; height: auto;" />
+                    <img src="${storeLogoSrc}" alt="TERRA HOP" width="130" style="display: block; width: 130px; height: auto;" />
                   </td>
                 </tr>
               </table>

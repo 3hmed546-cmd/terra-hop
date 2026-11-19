@@ -8,12 +8,16 @@ import { Signup } from "@/components/sections/signup";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { home } from "@/content/home";
+import { getCatalogProducts } from "@/lib/server/catalog";
 
-export const metadata: Metadata = { title: { absolute: home.meta.title }, description: home.meta.description };
+export const metadata: Metadata = {
+  title: { absolute: home.meta.title },
+  description: home.meta.description,
+};
 
-// Homepage: Header, Hero, The Drop, Brand Story, Details, Signup, Footer, all from home.ts.
-// The header sits outside <main> (banner landmark) and is laid over the hero.
 export default function Page() {
+  const initialProducts = getCatalogProducts();
+
   return (
     <>
       <div className="relative">
@@ -21,7 +25,7 @@ export default function Page() {
         <main id="main">
           <Hero hero={home.hero} />
           <OffersTicker ticker={home.ticker} />
-          <Drop drop={home.drop} />
+          <Drop drop={home.drop} initialProducts={initialProducts} />
           <BrandStory story={home.brandStory} />
           <Quality quality={home.quality} />
           <Signup signup={home.signup} />
