@@ -13,7 +13,7 @@ function getCatalogProducts(): Product[] {
     const { getDb } = require("@/lib/server/db");
     const db = getDb();
     const rows = db
-      .prepare("SELECT * FROM products WHERE status = 'active' ORDER BY position ASC, created_at DESC")
+      .prepare("SELECT * FROM products WHERE status != 'archived' AND status != 'draft' ORDER BY position ASC, created_at DESC")
       .all() as any[];
 
     if (Array.isArray(rows) && rows.length > 0) {
@@ -38,8 +38,53 @@ function getCatalogProducts(): Product[] {
         imagesByProd.set(p.owner_id, list);
       }
 
+      let colorsByProd = new Map<string, any[]>();
+      try {
+        let colors: any[] = [];
+        try {
+          colors = db.prepare("SELECT id, product_id, name, hex, position, image_url as image FROM product_colors ORDER BY position ASC").all() as any[];
+        } catch {
+          colors = db.prepare("SELECT id, product_id, name, hex, position FROM product_colors ORDER BY position ASC").all() as any[];
+        }
+        for (const c of colors) {
+          const list = colorsByProd.get(c.product_id) || [];
+          list.push({ id: c.id, name: c.name, hex: c.hex, image: c.image || undefined });
+          colorsByProd.set(c.product_id, list);
+        }
+      } catch {}
+
+      let variantsByProd = new Map<string, any[]>();
+      try {
+        const variants = db.prepare("SELECT * FROM variants").all() as any[];
+        for (const v of variants) {
+          const list = variantsByProd.get(v.product_id) || [];
+          list.push({
+            id: v.id,
+            colorId: v.color_id,
+            size: v.size,
+            stock: v.stock ?? 0,
+            available: (v.stock ?? 0) > 0,
+            stockStatus: (v.stock ?? 0) <= 0 ? "sold_out" : v.stock <= 3 ? "low" : "available",
+          });
+          variantsByProd.set(v.product_id, list);
+        }
+      } catch {}
+
       return rows.map((p: any) => {
         const imgs = imagesByProd.get(p.id) || [];
+        const prodVariants = variantsByProd.get(p.id) || [];
+        const prodColors = colorsByProd.get(p.id) || [];
+
+        const isSoldOut =
+          p.force_sold_out === 1 ||
+          p.status === "sold_out" ||
+          (prodVariants.length > 0 && prodVariants.every((v: any) => !v.available));
+
+        const sizes =
+          prodVariants.length > 0
+            ? Array.from(new Set(prodVariants.map((v: any) => v.size).filter(Boolean)))
+            : ["S", "M", "L", "XL", "XXL"];
+
         let details = {};
         try {
           details = typeof p.details === "string" ? JSON.parse(p.details) : (p.details || {});
@@ -56,12 +101,12 @@ function getCatalogProducts(): Product[] {
             : "Hoodies",
           price: (p.price_cents || 0) / 100,
           originalPrice: p.compare_at_cents ? p.compare_at_cents / 100 : undefined,
-          status: p.force_sold_out === 1 ? "Sold out" : "Preorder",
+          status: isSoldOut ? "Sold out" : "Preorder",
           description: p.description_ar || p.description_en || "",
-          sizes: ["S", "M", "L", "XL", "XXL"],
+          sizes: sizes as string[],
           images: imgs.length > 0 ? imgs : ["/preview-images/hero.jpg"],
-          colors: [],
-          variants: [],
+          colors: prodColors,
+          variants: prodVariants,
           details,
           href: `/shop/${p.slug}`,
           demo: false,

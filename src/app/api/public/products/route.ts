@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     const db = getDb();
 
   const products = db
-    .prepare("SELECT * FROM products WHERE status = 'active' ORDER BY position ASC, created_at DESC")
+    .prepare("SELECT * FROM products WHERE status != 'archived' AND status != 'draft' ORDER BY position ASC, created_at DESC")
     .all() as any[];
 
   let colors: any[] = [];

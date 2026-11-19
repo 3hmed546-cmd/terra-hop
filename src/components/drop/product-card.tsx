@@ -71,7 +71,7 @@ export function ProductCard({ product }: { product: Product }) {
     : 0;
 
   return (
-    <Link href={product.href} className="group block">
+    <a href={product.href} className="group block">
       <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-charcoal">
         <Image
           src={firstSrc}
@@ -126,6 +126,6 @@ export function ProductCard({ product }: { product: Product }) {
         )}
       </div>
       {product.status && <StatusLabel className="mt-1.5 inline-block text-[10px]">{localizedStatus}</StatusLabel>}
-    </Link>
+    </a>
   );
 }

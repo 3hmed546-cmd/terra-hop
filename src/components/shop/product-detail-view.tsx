@@ -100,10 +100,11 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
 
   const isColorOutOfStock = (colorId: string) => {
     if (isSoldOut) return true;
-    if (!matchedAdmin?.variants || !Array.isArray(matchedAdmin.variants) || matchedAdmin.variants.length === 0) {
-      return false;
-    }
-    const colorVariants = matchedAdmin.variants.filter((v: any) => String(v.colorId) === String(colorId));
+    const variants = (matchedAdmin?.variants && Array.isArray(matchedAdmin.variants) && matchedAdmin.variants.length > 0)
+      ? matchedAdmin.variants
+      : ((product as any).variants && Array.isArray((product as any).variants) ? (product as any).variants : []);
+    if (!variants || variants.length === 0) return false;
+    const colorVariants = variants.filter((v: any) => String(v.colorId || v.color_id) === String(colorId));
     if (colorVariants.length === 0) return false;
     return colorVariants.every((v: any) => (v.stock ?? 0) <= 0 || v.available === false);
   };
@@ -121,7 +122,7 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
   const [showSizeGuide, setShowSizeGuide] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // Sizes to display: from admin product configuration or defaults
+  // Sizes to display: from admin product configuration, SSR product, or defaults
   const displaySizes = useMemo<string[]>(() => {
     if (matchedAdmin?.sizes && Array.isArray(matchedAdmin.sizes) && matchedAdmin.sizes.length > 0) {
       return Array.from(new Set<string>(matchedAdmin.sizes.map((s: string) => String(s).toUpperCase())));
@@ -130,21 +131,31 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
       const list = Array.from(new Set<string>(matchedAdmin.variants.map((v: any) => String(v.size || "").toUpperCase()))).filter(Boolean);
       if (list.length > 0) return list;
     }
+    if ((product as any).variants && Array.isArray((product as any).variants) && (product as any).variants.length > 0) {
+      const list = Array.from(new Set<string>((product as any).variants.map((v: any) => String(v.size || "").toUpperCase()))).filter(Boolean);
+      if (list.length > 0) return list;
+    }
     const base: readonly string[] = product.sizes && product.sizes.length > 0 ? product.sizes : ["S", "M", "L", "XL", "XXL"];
     return Array.from(new Set<string>(base.map((s) => String(s).toUpperCase())));
-  }, [matchedAdmin?.sizes, matchedAdmin?.variants, product.sizes]);
+  }, [matchedAdmin?.sizes, matchedAdmin?.variants, (product as any).variants, product.sizes]);
 
   // Determine which sizes are available vs out-of-stock (with X mark) for selected color
   const availableSizes = useMemo(() => {
-    if (!matchedAdmin?.variants || !Array.isArray(matchedAdmin.variants) || matchedAdmin.variants.length === 0) {
+    const rawVariants = (matchedAdmin?.variants && Array.isArray(matchedAdmin.variants) && matchedAdmin.variants.length > 0)
+      ? matchedAdmin.variants
+      : ((product as any).variants && Array.isArray((product as any).variants) && (product as any).variants.length > 0)
+      ? (product as any).variants
+      : [];
+
+    if (!rawVariants || rawVariants.length === 0) {
       return new Set(displaySizes);
     }
 
     const scopedVariants = selectedColor
-      ? matchedAdmin.variants.filter((v: any) => String(v.colorId).toLowerCase() === String(selectedColor.id).toLowerCase())
-      : matchedAdmin.variants;
+      ? rawVariants.filter((v: any) => String(v.colorId || v.color_id).toLowerCase() === String(selectedColor.id).toLowerCase())
+      : rawVariants;
 
-    const targetVariants = scopedVariants.length > 0 ? scopedVariants : matchedAdmin.variants;
+    const targetVariants = scopedVariants.length > 0 ? scopedVariants : rawVariants;
 
     const active = targetVariants
       .filter((v: any) => {
@@ -154,7 +165,7 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
       .map((v: any) => String(v.size).toUpperCase());
 
     return new Set(active);
-  }, [matchedAdmin?.variants, selectedColor, displaySizes]);
+  }, [matchedAdmin?.variants, (product as any).variants, selectedColor, displaySizes]);
 
   // Auto-select first available size when availableSizes changes
   useEffect(() => {
@@ -429,9 +440,7 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
                     <button
                       key={c.id}
                       type="button"
-                      disabled={outOfStock}
                       onClick={() => {
-                        if (outOfStock) return;
                         setSelectedColor(c);
                         if (c.image) {
                           setCustomActiveImage(c.image);
@@ -446,7 +455,7 @@ export function ProductDetailView({ product, allProducts = [] }: Props) {
                         isSelected
                           ? "ring-2 ring-offset-2 ring-stone-900 scale-110 shadow-sm"
                           : "hover:scale-105 shadow-2xs border border-black/20"
-                      } ${outOfStock ? "opacity-40 cursor-not-allowed hover:scale-100" : ""}`}
+                      } ${outOfStock ? "opacity-80" : ""}`}
                       style={{ backgroundColor: colorHex }}
                     >
                       {outOfStock && (

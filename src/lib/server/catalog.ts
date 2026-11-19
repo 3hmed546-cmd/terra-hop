@@ -6,7 +6,7 @@ export function getCatalogProducts(): Product[] {
     const db = getDb();
     const rows = db
       .prepare(
-        "SELECT * FROM products WHERE status = 'active' ORDER BY position ASC, created_at DESC"
+        "SELECT * FROM products WHERE status != 'archived' AND status != 'draft' ORDER BY position ASC, created_at DESC"
       )
       .all() as any[];
 
@@ -62,6 +62,7 @@ export function getCatalogProducts(): Product[] {
       const prodVariants = variantsByProd.get(p.id) || [];
       const isSoldOut =
         p.force_sold_out === 1 ||
+        p.status === "sold_out" ||
         (prodVariants.length > 0 && prodVariants.every((v) => (v.stock ?? 0) <= 0));
 
       const sizes =
@@ -70,6 +71,7 @@ export function getCatalogProducts(): Product[] {
           : ["S", "M", "L", "XL", "XXL"];
 
       return {
+        id: p.id,
         slug: p.slug,
         name: p.name_ar || p.name_en || p.slug,
         category:
@@ -85,6 +87,7 @@ export function getCatalogProducts(): Product[] {
         sizes: sizes as string[],
         images: imgs.length > 0 ? imgs : ["/preview-images/hoodie-1.jpg"],
         colors: colorsByProd.get(p.id) || [],
+        variants: prodVariants,
         href: `/shop/${p.slug}`,
         demo: false,
       };

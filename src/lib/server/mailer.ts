@@ -13,6 +13,23 @@ const APP_BASE_URL =
     ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
     : "https://terra-hop.com");
 
+const STORE_LOGO_URL = `${APP_BASE_URL}/logo/terra-hop-logo-card.png`;
+
+function getLogoAttachment(): { src: string; attachment?: any } {
+  const localLogo = path.join(process.cwd(), "public", "logo", "terra-hop-logo-card.png");
+  if (fs.existsSync(localLogo)) {
+    return {
+      src: "cid:store-logo-card",
+      attachment: {
+        filename: "terra-hop-logo.png",
+        path: localLogo,
+        cid: "store-logo-card",
+      },
+    };
+  }
+  return { src: STORE_LOGO_URL };
+}
+
 /**
  * Retrieve Brevo API Key and sender settings from DB settings or process.env
  */
@@ -687,6 +704,13 @@ export async function sendOrderAcceptedEmail(
   const totalFormatted = formatEgp(order.totalCents);
   const storeUrl = APP_BASE_URL;
 
+  const logoInfo = getLogoAttachment();
+  const storeLogoSrc = logoInfo.src;
+  const attachments: any[] = [];
+  if (logoInfo.attachment) {
+    attachments.push(logoInfo.attachment);
+  }
+
   const html = `
 <!DOCTYPE html>
 <html dir="rtl" lang="ar">
@@ -769,6 +793,7 @@ export async function sendOrderAcceptedEmail(
     recipientName: order.customer.name,
     subject: `تم قبول وشحن طلبك رقم ${order.number} | TERRA HOP`,
     html,
+    attachments,
   });
 
   return res.ok;
@@ -790,6 +815,13 @@ export async function sendOrderRejectedEmail(
   if (!order.customer.email) return false;
 
   const storeUrl = APP_BASE_URL;
+
+  const logoInfo = getLogoAttachment();
+  const storeLogoSrc = logoInfo.src;
+  const attachments: any[] = [];
+  if (logoInfo.attachment) {
+    attachments.push(logoInfo.attachment);
+  }
 
   const html = `
 <!DOCTYPE html>
@@ -866,6 +898,7 @@ export async function sendOrderRejectedEmail(
     recipientName: order.customer.name,
     subject: `تحديث بخصوص طلبك رقم ${order.number} | TERRA HOP`,
     html,
+    attachments,
   });
 
   return res.ok;
@@ -886,6 +919,13 @@ export async function sendOrderDeliveredThankYouEmail(order: {
 
   const storeUrl = APP_BASE_URL;
   const whatsappUrl = "https://chat.whatsapp.com/EWcBrybFmbr7jbMJUJGSUk?s=cl&p=a&iam=2";
+
+  const logoInfo = getLogoAttachment();
+  const storeLogoSrc = logoInfo.src;
+  const attachments: any[] = [];
+  if (logoInfo.attachment) {
+    attachments.push(logoInfo.attachment);
+  }
 
   const html = `
 <!DOCTYPE html>
@@ -978,6 +1018,7 @@ export async function sendOrderDeliveredThankYouEmail(order: {
     recipientName: order.customer.name,
     subject: `تم تسليم طلبك رقم ${order.number} | شكراً لتعاملك مع TERRA HOP`,
     html,
+    attachments,
   });
 
   return res.ok;

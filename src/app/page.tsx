@@ -10,6 +10,8 @@ import { Footer } from "@/components/layout/footer";
 import { home } from "@/content/home";
 import { getCatalogProducts } from "@/lib/server/catalog";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: { absolute: home.meta.title },
   description: home.meta.description,

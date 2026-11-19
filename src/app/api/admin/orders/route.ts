@@ -339,7 +339,7 @@ export async function PATCH(request: NextRequest) {
 
           // Send Order Rejection Email with cancellation reason
           try {
-            const cust = decryptCustomer(order.customer_enc);
+            const cust = decryptCustomer(Buffer.from(order.customer_enc));
             if (cust?.email) {
               sendOrderRejectedEmail(
                 {

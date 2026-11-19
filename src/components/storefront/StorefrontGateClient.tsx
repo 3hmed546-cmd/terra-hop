@@ -21,9 +21,10 @@ export function StorefrontGateClient({
 }: StorefrontGateClientProps) {
   const pathname = usePathname();
   const { data: liveSite } = useLive("settings");
+  const { data: liveProducts } = useLive("products");
 
-  // Keep admin, secret vault, ambassador, and API routes always accessible
-  const isAdmin =
+  // Keep admin, secret vault, ambassador, shop, and API routes always accessible
+  const isExcluded =
     initialIsAdmin ||
     !pathname ||
     pathname.startsWith("/admin") ||
@@ -31,9 +32,22 @@ export function StorefrontGateClient({
     (ADMIN_BASE && pathname.startsWith(ADMIN_BASE)) ||
     pathname.includes("vault") ||
     pathname.startsWith("/ambassador") ||
-    pathname.startsWith("/api");
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/shop") ||
+    pathname.startsWith("/cart") ||
+    pathname.startsWith("/checkout") ||
+    pathname.startsWith("/order");
 
-  if (isAdmin) {
+  if (isExcluded) {
+    return <>{children}</>;
+  }
+
+  // When products exist in the store, Coming Soon MUST NEVER appear (per merchant guidelines)
+  const hasProducts = Array.isArray(liveProducts)
+    ? liveProducts.length > 0
+    : Boolean(initialSetting.hasProducts);
+
+  if (hasProducts) {
     return <>{children}</>;
   }
 

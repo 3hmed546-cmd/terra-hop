@@ -4,6 +4,8 @@ import path from "path";
 import { ShopView } from "@/components/shop/shop-view";
 import { home, type Product } from "@/content/home";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "المتجر | Shop",
   description: "تشكيلة منتجات TERRA HOP - Drop 01",
@@ -16,7 +18,7 @@ function getCatalogProducts(): Product[] {
     const { getDb } = require("@/lib/server/db");
     const db = getDb();
     const rows = db
-      .prepare("SELECT * FROM products WHERE status = 'active' ORDER BY position ASC, created_at DESC")
+      .prepare("SELECT * FROM products WHERE status != 'archived' AND status != 'draft' ORDER BY position ASC, created_at DESC")
       .all() as any[];
 
     if (Array.isArray(rows) && rows.length > 0) {
@@ -44,6 +46,7 @@ function getCatalogProducts(): Product[] {
       return rows.map((p: any) => {
         const imgs = imagesByProd.get(p.id) || [];
         return {
+          id: p.id,
           slug: p.slug,
           name: p.name_ar || p.name_en || p.slug,
           category: (p.category === "tshirt" || p.category === "T-shirts")
@@ -53,7 +56,7 @@ function getCatalogProducts(): Product[] {
             : "Hoodies",
           price: (p.price_cents || 0) / 100,
           originalPrice: p.compare_at_cents ? p.compare_at_cents / 100 : undefined,
-          status: p.force_sold_out === 1 ? "Sold out" : "Preorder",
+          status: (p.force_sold_out === 1 || p.status === "sold_out") ? "Sold out" : "Preorder",
           description: p.description_ar || p.description_en || "",
           sizes: ["S", "M", "L", "XL", "XXL"],
           images: imgs.length > 0 ? imgs : ["/preview-images/hero.jpg"],
