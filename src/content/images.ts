@@ -34,24 +34,24 @@ export const images: Record<string, ImageAsset> = {
   "hoodie-2": tile("hoodie-2", "هودي أسود بتطريز اللوجو الأمامي"),
 
   brandModel: {
-    src: "/preview-images/brand-style-banner.jpg",
+    src: "/preview-images/brand-collection-banner.jpg",
     width: 1024,
     height: 572,
-    alt: "أختار اللون اللى يعجبك - ستايلك على مزاجك",
+    alt: "تشكيلة منتجات TERRA HOP الحصرية",
     demo: true,
   },
   aboutBrand: {
-    src: "/preview-images/about-brand.jpg",
+    src: "/preview-images/brand-collection-banner.jpg",
     width: 1024,
     height: 572,
-    alt: "تشكيلة هوديز وتيشرتات TERRA HOP الحصرية",
+    alt: "تشكيلة منتجات TERRA HOP الحصرية",
     demo: true,
   },
   story: {
-    src: "/preview-images/about-brand.jpg",
+    src: "/preview-images/brand-collection-banner.jpg",
     width: 1024,
     height: 572,
-    alt: "تشكيلة هوديز وتيشرتات TERRA HOP الفاخرة",
+    alt: "تشكيلة منتجات TERRA HOP الفاخرة",
     demo: true,
   },
 
