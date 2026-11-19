@@ -69,7 +69,7 @@ export const home = {
     demo: true,
     heading: "خليك على طبيعتك.. والبس بطريقتك.",
     body: "في TERRA HOP بنقدملك قطع مختارة بعناية، بتجمع بين الراحة والتصميم العصري. من أول تفصيلة لآخر خروجة، خليك دائمًا مميز بأسلوبك.",
-    image: "story" as const,
+    image: "brandModel" as const,
   },
   quality: {
     demo: true,

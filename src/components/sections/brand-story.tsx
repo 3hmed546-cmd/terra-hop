@@ -10,7 +10,7 @@ import type { home } from "@/content/home";
 export function BrandStory({ story }: { story: typeof home.brandStory }) {
   const { t, locale } = useLocale();
   if (!story.heading && !story.body) return null;
-  const image = images[story.image];
+  const image = images[story.image] || images.brandModel;
 
   return (
     <section aria-labelledby="story-heading" className="border-t border-line-light py-16 lg:py-24">

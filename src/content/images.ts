@@ -33,7 +33,27 @@ export const images: Record<string, ImageAsset> = {
   "hoodie-1": tile("hoodie-1", "الموديل يرتدي هودي أسود أوفر سايز"),
   "hoodie-2": tile("hoodie-2", "هودي أسود بتطريز اللوجو الأمامي"),
 
-  story: { src: "/preview-images/story.jpg", width: 1484, height: 1060, alt: "تشكيلة هوديز TERRA HOP الفاخرة", demo: true },
+  brandModel: {
+    src: "/preview-images/brand-model.jpg",
+    width: 768,
+    height: 1024,
+    alt: "موديل يرتدي هودي TERRA HOP باللون العنابي",
+    demo: true,
+  },
+  aboutBrand: {
+    src: "/preview-images/about-brand.jpg",
+    width: 1024,
+    height: 572,
+    alt: "تشكيلة هوديز وتيشرتات TERRA HOP الحصرية",
+    demo: true,
+  },
+  story: {
+    src: "/preview-images/about-brand.jpg",
+    width: 1024,
+    height: 572,
+    alt: "تشكيلة هوديز وتيشرتات TERRA HOP الفاخرة",
+    demo: true,
+  },
 
   // Lookbook model photography (Cleaned: no old tees or tags, only premium hoodies)
   "look-1": hoodie("hoodie-dusty-blue", "لوك بوك - هودي أزرق ترابي بستريت ستايل عصري"),

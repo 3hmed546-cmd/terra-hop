@@ -10,7 +10,7 @@ import { useLocale } from "@/lib/locale-context";
 
 export function AboutView() {
   const { t } = useLocale();
-  const image = images.story;
+  const image = images.aboutBrand || images.story;
 
   return (
     <PageShell>

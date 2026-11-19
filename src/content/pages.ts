@@ -18,7 +18,7 @@ export const pages = {
       "TERRA HOP releases small drops. Every piece is confirmed by preorder before production, so nothing is made that nobody asked for.",
       "We keep the range short and the fit oversized. The goal is simple: pieces you reach for every day.",
     ],
-    image: "story" as ImageSlot,
+    image: "aboutBrand" as ImageSlot,
     valuesHeading: "How we work",
     values: [
       { label: "Fit", value: "Oversized" },
