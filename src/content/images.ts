@@ -34,10 +34,10 @@ export const images: Record<string, ImageAsset> = {
   "hoodie-2": tile("hoodie-2", "هودي أسود بتطريز اللوجو الأمامي"),
 
   brandModel: {
-    src: "/preview-images/brand-model.jpg",
+    src: "/preview-images/brand-style-banner.jpg",
     width: 1024,
     height: 572,
-    alt: "موديل يرتدي هودي TERRA HOP باللون العنابي",
+    alt: "أختار اللون اللى يعجبك - ستايلك على مزاجك",
     demo: true,
   },
   aboutBrand: {
