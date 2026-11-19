@@ -132,12 +132,12 @@ export function DashboardOverview() {
         description={ADMIN_STRINGS.pages.dashboard.summary}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Link className="adm-btn adm-btn-primary" href={adminHref("/sales/new")}>
+            <a className="adm-btn adm-btn-primary" href={adminHref("/sales/new")}>
               + تسجيل بيع يدوي
-            </Link>
-            <Link className="adm-btn adm-btn-secondary" href={adminHref("/products/new")}>
+            </a>
+            <a className="adm-btn adm-btn-secondary" href={adminHref("/products/new")}>
               + إضافة منتج
-            </Link>
+            </a>
           </div>
         }
       />
@@ -215,12 +215,12 @@ export function DashboardOverview() {
             </p>
           </div>
           {needsActionOrders.length > 0 && (
-            <Link
+            <a
               href={adminHref("/orders")}
               className="text-xs font-semibold text-graphite hover:text-obsidian underline"
             >
               عرض كل الطلبات ←
-            </Link>
+            </a>
           )}
         </div>
 
@@ -245,12 +245,12 @@ export function DashboardOverview() {
                   {/* Top Bar: Order Number, Badge, Date, Total */}
                   <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-light pb-3">
                     <div className="flex items-center gap-2.5">
-                      <Link
+                      <a
                         href={adminHref(`/orders/${o.id}`)}
                         className="font-mono text-base font-extrabold text-obsidian hover:underline"
                       >
                         {o.number}
-                      </Link>
+                      </a>
                       <StatusBadge kind={o.status} />
                       <span className="text-xs text-graphite font-mono">
                         {new Date(o.createdAt).toLocaleDateString("ar-EG", {
@@ -375,13 +375,13 @@ export function DashboardOverview() {
 
                   {/* Bottom Action Footer */}
                   <div className="border-t border-line-light pt-3 flex flex-wrap items-center justify-between gap-3">
-                    <Link
+                    <a
                       href={adminHref(`/orders/${o.id}`)}
                       className="text-xs font-semibold text-graphite hover:text-obsidian inline-flex items-center gap-1 underline underline-offset-4"
                     >
                       عرض تفاصيل الفاتورة وتاريخ الطلب
                       <ArrowUpRight size={13} />
-                    </Link>
+                    </a>
 
                     <div className="flex items-center gap-2.5">
                       <Button
@@ -433,12 +433,12 @@ export function DashboardOverview() {
               منتجات أوشكت على النفاد في المستودع (الكمية متبقي منها {threshold} قطع أو أقل).
             </p>
           </div>
-          <Link
+          <a
             href={adminHref("/products")}
             className="text-xs font-semibold text-graphite hover:text-obsidian underline"
           >
             إدارة المخزون والمنتجات ←
-          </Link>
+          </a>
         </div>
 
         {lowStockProducts.length === 0 ? (
@@ -456,12 +456,12 @@ export function DashboardOverview() {
                 >
                   <div>
                     <div className="flex items-start justify-between gap-2">
-                      <Link
+                      <a
                         href={adminHref(`/products/${p.id}`)}
                         className="font-bold text-sm text-obsidian hover:underline"
                       >
                         {p.name}
-                      </Link>
+                      </a>
                       <StatusBadge kind="low" left={stock} />
                     </div>
                     <div className="text-xs text-graphite mt-1">
@@ -473,12 +473,12 @@ export function DashboardOverview() {
                   </div>
 
                   <div className="mt-4 pt-3 border-t border-line-light flex items-center justify-end">
-                    <Link
+                    <a
                       href={adminHref(`/products/${p.id}`)}
                       className="text-xs font-semibold text-obsidian underline hover:text-graphite"
                     >
                       تزويد المخزون / تعديل ←
-                    </Link>
+                    </a>
                   </div>
                 </div>
               );

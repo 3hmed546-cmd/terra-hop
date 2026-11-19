@@ -52,7 +52,7 @@ export function SessionSupersededModal({ info }: SessionSupersededModalProps) {
     try {
       await logout();
     } catch {}
-    router.replace(adminHref("/dashboard"));
+    window.location.href = adminHref("");
   }
 
   // 2. Brevo OTP flow

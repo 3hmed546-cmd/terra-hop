@@ -84,7 +84,7 @@ export function LoginForm() {
 
       // Redirect to admin dashboard
       setTimeout(() => {
-        router.replace(adminHref("/dashboard"));
+        window.location.href = adminHref("/dashboard");
       }, 1500);
       return;
     }

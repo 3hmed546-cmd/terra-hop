@@ -79,12 +79,12 @@ export function RecordSaleForm() {
           title={S.empty.title}
           description={S.empty.text}
           action={
-            <Link
+            <a
               className="adm-btn adm-btn-secondary"
               href={adminHref("/products")}
             >
               {S.empty.action}
-            </Link>
+            </a>
           }
         />
       </>
@@ -290,12 +290,12 @@ export function RecordSaleForm() {
         </section>
 
         <div className="adm-form-actions">
-          <Link
+          <a
             className="adm-btn adm-btn-ghost"
             href={adminHref("/dashboard")}
           >
             {ADMIN_STRINGS.common.cancel}
-          </Link>
+          </a>
           <Button type="submit">{S.submit}</Button>
         </div>
       </form>

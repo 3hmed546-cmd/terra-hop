@@ -49,9 +49,9 @@ function ProductName({ product }: { product: Product }) {
     <div className="adm-pname">
       <Thumb product={product} />
       <div>
-        <Link className="adm-plink" href={adminHref(`/products/${product.id}`)}>
+        <a className="adm-plink" href={adminHref(`/products/${product.id}`)}>
           {product.name}
-        </Link>
+        </a>
         <div className="adm-muted adm-small">
           {S.category[product.category]} · {S.updated(formatDate(product.updatedAt))}
         </div>
@@ -136,9 +136,9 @@ function RowActions({
         ]}
       />
       <div className="adm-row-links">
-        <Link className="adm-btn adm-btn-ghost" href={adminHref(`/products/${product.id}`)} aria-label={S.editAria(product.name)}>
+        <a className="adm-btn adm-btn-ghost" href={adminHref(`/products/${product.id}`)} aria-label={S.editAria(product.name)}>
           {S.edit}
-        </Link>
+        </a>
         <Button variant="ghost" onClick={duplicate} aria-label={S.duplicateAria(product.name)}>
           {S.duplicate}
         </Button>
@@ -184,9 +184,9 @@ export function ProductsList() {
       title={ADMIN_STRINGS.pages.products.title}
       description={ADMIN_STRINGS.pages.products.summary}
       actions={
-        <Link className="adm-btn adm-btn-primary" href={adminHref("/products/new")}>
+        <a className="adm-btn adm-btn-primary" href={adminHref("/products/new")}>
           {S.addProduct}
-        </Link>
+        </a>
       }
     />
   );
@@ -210,9 +210,9 @@ export function ProductsList() {
           title={S.empty.title}
           description={S.empty.description}
           action={
-            <Link className="adm-btn adm-btn-primary" href={adminHref("/products/new")}>
+            <a className="adm-btn adm-btn-primary" href={adminHref("/products/new")}>
               {S.empty.action}
-            </Link>
+            </a>
           }
         />
       </>

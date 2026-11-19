@@ -324,7 +324,7 @@ function Editor({ initial, existing, isNew, tab, onTab, focusLogRef }: EditorPro
         ) : null}
 
         <div className="adm-form-actions">
-          <Link className="adm-btn adm-btn-ghost" href={adminHref("/products")}>{F.actions.cancel}</Link>
+          <a className="adm-btn adm-btn-ghost" href={adminHref("/products")}>{F.actions.cancel}</a>
           <Button variant="secondary" onClick={() => save("draft")}>{F.actions.saveDraft}</Button>
           <Button type="submit">{isNew || existing?.status === "draft" ? F.actions.publish : F.actions.saveChanges}</Button>
         </div>
@@ -431,7 +431,7 @@ export function ProductForm({ productId }: { productId?: string }) {
         <EmptyState
           title={F.notFound.title}
           description={F.notFound.text}
-          action={<Link className="adm-btn adm-btn-secondary" href={adminHref("/products")}>{F.notFound.back}</Link>}
+          action={<a className="adm-btn adm-btn-secondary" href={adminHref("/products")}>{F.notFound.back}</a>}
         />
       </>
     );

@@ -22,9 +22,9 @@ const S = ADMIN_STRINGS.orders;
 
 function OrderLink({ order }: { order: Order }) {
   return (
-    <Link className="adm-plink adm-num" href={adminHref(`/orders/${order.id}`)} aria-label={S.viewAria(order.number)}>
+    <a className="adm-plink adm-num" href={adminHref(`/orders/${order.id}`)} aria-label={S.viewAria(order.number)}>
       {order.number}
-    </Link>
+    </a>
   );
 }
 

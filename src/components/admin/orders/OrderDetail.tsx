@@ -111,9 +111,9 @@ export function OrderDetail({ orderId }: { orderId: string }) {
   }, [dialog]);
 
   const backLink = (
-    <Link className="adm-btn adm-btn-secondary" href={adminHref("/orders")}>
+    <a className="adm-btn adm-btn-secondary" href={adminHref("/orders")}>
       {S.back}
-    </Link>
+    </a>
   );
 
   if (!ready || !data) {

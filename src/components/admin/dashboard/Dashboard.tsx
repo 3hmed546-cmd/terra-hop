@@ -41,7 +41,7 @@ export function Dashboard() {
   const low = useMemo(() => (data ? restockCandidates(data) : []), [data]);
 
   const recordSale = (
-    <Link className="adm-btn adm-btn-primary" href={adminHref("/sales/new")}>{D.recordSale}</Link>
+    <a className="adm-btn adm-btn-primary" href={adminHref("/sales/new")}>{D.recordSale}</a>
   );
   const header = <PageHeader title={ADMIN_STRINGS.pages.dashboard.title} description={ADMIN_STRINGS.pages.dashboard.summary} actions={recordSale} />;
 
@@ -109,7 +109,7 @@ export function Dashboard() {
 
   const orderLink = (order: Order) => (
     <div>
-      <Link className="adm-plink adm-num" href={adminHref(`/orders/${order.id}`)} aria-label={O.viewAria(order.number)}>{order.number}</Link>
+      <a className="adm-plink adm-num" href={adminHref(`/orders/${order.id}`)} aria-label={O.viewAria(order.number)}>{order.number}</a>
       <div className="adm-muted adm-small adm-num">{formatDateTime(order.createdAt)}</div>
     </div>
   );
@@ -139,7 +139,7 @@ export function Dashboard() {
     {
       key: "product",
       header: D.lowStock.columns.product,
-      cell: (p) => <Link className="adm-plink" href={adminHref(`/products/${p.id}`)}>{p.name}</Link>,
+      cell: (p) => <a className="adm-plink" href={adminHref(`/products/${p.id}`)}>{p.name}</a>,
     },
     { key: "stock", header: D.lowStock.columns.stock, align: "end", cell: (p) => <span className="adm-num">{formatNumber(productTotalStock(p))}</span> },
     {
@@ -177,7 +177,7 @@ export function Dashboard() {
         <div className="adm-page-head adm-subhead">
           <h2 id="dash-decision" ref={decisionHeading} tabIndex={-1} className="adm-h2">{D.decision.title}</h2>
           {queue.total > 0 ? (
-            <Link className="adm-btn adm-btn-ghost" href={adminHref("/orders")}>{D.decision.viewAll(queue.total)}</Link>
+            <a className="adm-btn adm-btn-ghost" href={adminHref("/orders")}>{D.decision.viewAll(queue.total)}</a>
           ) : null}
         </div>
         <Table
@@ -201,7 +201,7 @@ export function Dashboard() {
       <section className="adm-section" aria-labelledby="dash-low">
         <div className="adm-page-head adm-subhead">
           <h2 id="dash-low" ref={lowHeading} tabIndex={-1} className="adm-h2">{D.lowStock.title}</h2>
-          <Link className="adm-btn adm-btn-ghost" href={adminHref("/products")}>{D.lowStock.viewAll}</Link>
+          <a className="adm-btn adm-btn-ghost" href={adminHref("/products")}>{D.lowStock.viewAll}</a>
         </div>
         <Table
           caption={D.lowStock.caption}
@@ -213,7 +213,7 @@ export function Dashboard() {
             const s = deriveProductStatus(p, threshold);
             return (
               <div className="adm-pcard">
-                <Link className="adm-plink" href={adminHref(`/products/${p.id}`)}>{p.name}</Link>
+                <a className="adm-plink" href={adminHref(`/products/${p.id}`)}>{p.name}</a>
                 <div className="adm-row">
                   <StatusBadge kind={s.kind} left={s.total} />
                   <span className="adm-num">{O.pieces(s.total)}</span>

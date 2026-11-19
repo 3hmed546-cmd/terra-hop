@@ -26,7 +26,7 @@ export default function AdminError({ error, reset }: { error: Error & { digest?:
         action={
           <div className="adm-row">
             <Button onClick={reset}>{T.retry}</Button>
-            <Link className="adm-btn adm-btn-secondary" href={adminHref("/dashboard")}>{T.toDashboard}</Link>
+            <a className="adm-btn adm-btn-secondary" href={adminHref("/dashboard")}>{T.toDashboard}</a>
           </div>
         }
       />

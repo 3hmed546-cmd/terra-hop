@@ -36,7 +36,7 @@ function NavList({ relativePath, needsAction, onNavigate }: { relativePath: stri
         const showCount = item.path === "/orders" && needsAction > 0;
         return (
           <li key={item.path}>
-            <Link
+            <a
               href={adminHref(item.path)}
               className="adm-nav-link"
               aria-current={active ? "page" : undefined}
@@ -49,7 +49,7 @@ function NavList({ relativePath, needsAction, onNavigate }: { relativePath: stri
                   <span className="adm-sr">{N.needsAction(needsAction)}</span>
                 </>
               ) : null}
-            </Link>
+            </a>
           </li>
         );
       })}
@@ -65,7 +65,7 @@ function FootLinks({ onNavigate, onShortcuts }: { onNavigate?: () => void; onSho
       <button type="button" className="adm-nav-link adm-nav-button" onClick={() => { onNavigate?.(); onShortcuts(); }}>
         {ADMIN_STRINGS.shortcuts.open}
       </button>
-      <Link href="/" className="adm-nav-link" onClick={onNavigate}>{N.viewStore}</Link>
+      <a href="/" className="adm-nav-link" onClick={onNavigate}>{N.viewStore}</a>
       <button
         type="button"
         disabled={loggingOut}
@@ -158,10 +158,35 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const shortcutsOn = data?.settings.shortcuts ?? true;
 
   useShortcuts(shortcutsOn, (action: ShortcutAction) => {
-    if (action.type === "go") router.push(adminHref(action.path));
+    if (action.type === "go") window.location.href = adminHref(action.path);
     else if (action.type === "help") setHelpOpen(true);
     else document.querySelector<HTMLInputElement>('#adm-main input[type="search"]')?.focus();
   });
+
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      if (menuOpen) {
+        document.body.style.overflow = "hidden";
+      } else {
+        document.body.style.overflow = "";
+      }
+    }
+    return () => {
+      if (typeof document !== "undefined") {
+        document.body.style.overflow = "";
+      }
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && menuOpen) {
+        setMenuOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [menuOpen]);
 
   if (authed === false) {
     return (
@@ -179,7 +204,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <a className="adm-skip" href="#adm-main">{ADMIN_STRINGS.skipToContent}</a>
         <div className="adm-shell">
           <aside className="adm-sidebar">
-            <Link href={adminHref("/dashboard")} className="adm-brand">{ADMIN_STRINGS.brand}</Link>
+            <a href={adminHref("/dashboard")} className="adm-brand">{ADMIN_STRINGS.brand}</a>
             <nav aria-label={N.label}>
               <NavList relativePath={relativePath} needsAction={needsAction} />
             </nav>
@@ -187,39 +212,48 @@ export function AdminShell({ children }: { children: ReactNode }) {
           </aside>
 
           <div>
-            <header className="adm-topbar">
-              <Link href={adminHref("/dashboard")} className="adm-brand">{ADMIN_STRINGS.brand}</Link>
+            <header className="adm-topbar" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", background: "var(--adm-obsidian)", color: "var(--adm-offwhite)" }}>
+              <a href={adminHref("/dashboard")} className="adm-brand" style={{ fontSize: "1.1rem" }}>{ADMIN_STRINGS.brand}</a>
               <button
                 type="button"
-                className="adm-btn adm-btn-light"
+                className="adm-mini-burger"
                 onClick={() => setMenuOpen((prev) => !prev)}
                 aria-label={menuOpen ? N.closeMenu : N.menu}
-                aria-haspopup="dialog"
+                aria-expanded={menuOpen}
                 style={{
+                  position: "relative",
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  gap: 8,
-                  minHeight: 40,
-                  padding: "0 14px",
-                  borderRadius: 4,
+                  width: 42,
+                  height: 42,
+                  borderRadius: 8,
+                  backgroundColor: menuOpen ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.22)",
+                  color: "#fff",
                   cursor: "pointer",
-                  fontWeight: 700,
-                  fontSize: 13,
+                  transition: "all 0.15s ease",
                 }}
               >
-                {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-                <span>{menuOpen ? N.closeMenu : N.menu}</span>
-                {needsAction > 0 ? (
+                {menuOpen ? <X className="w-5 h-5 text-white" /> : <Menu className="w-5 h-5 text-white" />}
+                {needsAction > 0 && !menuOpen ? (
                   <span
                     style={{
-                      backgroundColor: "#c8102e",
+                      position: "absolute",
+                      top: -4,
+                      right: -4,
+                      backgroundColor: "#ef4444",
                       color: "#fff",
                       fontSize: 10,
                       fontWeight: 800,
                       borderRadius: 999,
-                      padding: "1px 6px",
-                      marginRight: 4,
+                      minWidth: 18,
+                      height: 18,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: "0 4px",
+                      boxShadow: "0 2px 4px rgba(0,0,0,0.5)",
                     }}
                   >
                     {needsAction}
@@ -236,15 +270,87 @@ export function AdminShell({ children }: { children: ReactNode }) {
           </div>
         </div>
 
-        <Dialog open={menuOpen} onClose={closeMenu} title={ADMIN_STRINGS.brand} variant="fullscreen">
-          <nav aria-label={N.label}>
-            <NavList relativePath={relativePath} needsAction={needsAction} onNavigate={closeMenu} />
-          </nav>
-          <FootLinks onNavigate={closeMenu} onShortcuts={openHelp} />
-          <div className="adm-dialog-foot">
-            <Button variant="light" onClick={closeMenu}>{N.closeMenu}</Button>
+        {/* Dedicated Modern Mobile Drawer */}
+        {menuOpen && (
+          <div
+            className="adm-mobile-drawer-root"
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 99999,
+              display: "flex",
+              justifyContent: "flex-end",
+            }}
+          >
+            <div
+              className="adm-mobile-drawer-backdrop"
+              onClick={closeMenu}
+              style={{
+                position: "fixed",
+                inset: 0,
+                backgroundColor: "rgba(0,0,0,0.75)",
+                backdropFilter: "blur(4px)",
+                WebkitBackdropFilter: "blur(4px)",
+              }}
+            />
+
+            <div
+              className="adm-mobile-drawer-panel"
+              style={{
+                position: "relative",
+                width: "min(320px, 85vw)",
+                height: "100%",
+                backgroundColor: "var(--adm-obsidian, #0a0a0a)",
+                color: "var(--adm-offwhite, #f5f5f5)",
+                boxShadow: "-4px 0 24px rgba(0,0,0,0.6)",
+                display: "flex",
+                flexDirection: "column",
+                padding: "20px 16px",
+                overflowY: "auto",
+                borderLeft: "1px solid rgba(255,255,255,0.1)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  paddingBottom: 16,
+                  marginBottom: 16,
+                  borderBottom: "1px solid rgba(255,255,255,0.1)",
+                }}
+              >
+                <span className="adm-brand" style={{ fontSize: "1.1rem" }}>{ADMIN_STRINGS.brand}</span>
+                <button
+                  type="button"
+                  onClick={closeMenu}
+                  aria-label={N.closeMenu}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 36,
+                    height: 36,
+                    borderRadius: 6,
+                    backgroundColor: "rgba(255,255,255,0.08)",
+                    border: "1px solid rgba(255,255,255,0.15)",
+                    color: "#fff",
+                    cursor: "pointer",
+                  }}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <nav aria-label={N.label} style={{ flex: 1 }}>
+                <NavList relativePath={relativePath} needsAction={needsAction} onNavigate={closeMenu} />
+              </nav>
+
+              <FootLinks onNavigate={closeMenu} onShortcuts={openHelp} />
+            </div>
           </div>
-        </Dialog>
+        )}
+
         <ShortcutsDialog open={helpOpen} onClose={() => setHelpOpen(false)} enabled={shortcutsOn} />
         {supersededInfo && <SessionSupersededModal info={supersededInfo} />}
       </div>

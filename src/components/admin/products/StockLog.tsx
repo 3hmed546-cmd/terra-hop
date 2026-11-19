@@ -15,9 +15,9 @@ function Reference({ row }: { row: StockLogRow }) {
   return (
     <div>
       {row.orderId && row.orderNumber ? (
-        <Link className="adm-plink adm-num" href={adminHref(`/orders/${row.orderId}`)}>
+        <a className="adm-plink adm-num" href={adminHref(`/orders/${row.orderId}`)}>
           {row.orderNumber}
-        </Link>
+        </a>
       ) : null}
       {row.note ? <div className="adm-muted adm-small">{row.note}</div> : null}
       {!row.orderNumber && !row.note ? <span className="adm-muted">—</span> : null}

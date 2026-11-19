@@ -132,12 +132,12 @@ export function StockLogTab({ product }: { product: Product }) {
             </span>
             {m.orderId && (
               <div className="mt-0.5">
-                <Link
+                <a
                   href={adminHref(`/orders/${m.orderId}`)}
                   className="text-[11px] font-mono text-obsidian underline"
                 >
                   الطلب #{m.orderId}
-                </Link>
+                </a>
               </div>
             )}
             {m.note && <div className="text-[11px] text-graphite italic mt-0.5">&ldquo;{m.note}&rdquo;</div>}
@@ -175,12 +175,12 @@ export function StockLogTab({ product }: { product: Product }) {
             {r.label}
           </span>
           {m.orderId && (
-            <Link
+            <a
               href={adminHref(`/orders/${m.orderId}`)}
               className="mr-2 font-mono text-obsidian underline text-[11px]"
             >
               الطلب #{m.orderId}
-            </Link>
+            </a>
           )}
           {m.note && <div className="text-graphite italic mt-1">&ldquo;{m.note}&rdquo;</div>}
         </div>

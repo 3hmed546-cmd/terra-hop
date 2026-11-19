@@ -109,12 +109,12 @@ export function ManualSaleForm() {
   return (
     <>
       <div className="mb-4">
-        <Link
+        <a
           href={adminHref("/orders")}
           className="text-xs font-semibold text-graphite hover:text-obsidian underline underline-offset-4"
         >
           ← العودة للطلبات
-        </Link>
+        </a>
       </div>
 
       <PageHeader
@@ -250,12 +250,12 @@ export function ManualSaleForm() {
         )}
 
         <div className="flex items-center justify-end gap-3 pt-2">
-          <Link
+          <a
             href={adminHref("/orders")}
             className="adm-btn adm-btn-secondary"
           >
             إلغاء
-          </Link>
+          </a>
           <Button
             type="submit"
             disabled={!canSubmit}
