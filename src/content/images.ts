@@ -35,8 +35,8 @@ export const images: Record<string, ImageAsset> = {
 
   brandModel: {
     src: "/preview-images/brand-model.jpg",
-    width: 768,
-    height: 1024,
+    width: 1024,
+    height: 572,
     alt: "موديل يرتدي هودي TERRA HOP باللون العنابي",
     demo: true,
   },
